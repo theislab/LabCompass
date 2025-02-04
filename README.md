@@ -66,7 +66,7 @@ pip install scExpDesign
 1. Install the latest development version:
 
 ```bash
-pip install git+https://github.com/lorenzo-consoli/scExpDesign.git@main
+pip install git+https://github.com/theislab/scExpDesign.git@main
 ```
 
 2. Run Tests
