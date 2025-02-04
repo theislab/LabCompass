@@ -26,6 +26,10 @@ dependencies = [
   "anndata",
   # for debug logging (referenced from the issue template)
   "session-info",
+  "torch>=1.11.0",
+  "scanpy",
+  "torchdyn",
+  "pot"
 ]
 optional-dependencies.dev = [
   "pre-commit",
