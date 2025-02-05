@@ -22,8 +22,9 @@ __all__ = [
 
 
 class DataManager:
-    """"""
-
+    """
+    Class for managing perturbation-related data in single-cell experiments.
+    """
     def __init__(
         self,
         adata: anndata.AnnData | None = None,
@@ -69,6 +70,7 @@ class DataManager:
                 perturbations = (perturbations,)
             for perturbation in perturbations:
                 perturbation_found = False
+                
                 # cell level covariates
                 if perturbation_covariates is not None:
                     if perturbation in perturbation_covariates.keys():
@@ -79,6 +81,7 @@ class DataManager:
                     else:
                         covariates = ()
                     perturbation_covariates[perturbation] = covariates
+                    
                 # perturbation level covariates
                 if perturbation_reps is not None:
                     if perturbation in perturbation_reps.keys():
@@ -89,6 +92,7 @@ class DataManager:
                     else:
                         rep = ()
                     perturbation_reps[perturbation] = rep
+                    
                 # warning if perturbation not found
                 if not perturbation_found:
                     msg = f"{perturbation} in `self.perturbation` has neither any representation nor covariates associates, skipping."
@@ -119,7 +123,15 @@ class DataManager:
         self,
         adata: anndata.AnnData,
     ) -> TensorLike:
-        """"""
+        """
+        :param adata: AnnData object containing single-cell data.
+        :type adata: anndata.AnnData
+
+        :return: The primary state representation of cells.
+        :rtype: TensorLike
+
+        :raises ValueError: If `sample_rep` is specified but not found in `adata.layers`.
+        """
         if self.sample_rep is None:
             state_data = adata.X
         else:
@@ -133,7 +145,15 @@ class DataManager:
         self,
         adata: anndata.AnnData,
     ) -> dict[str, TensorLike]:
-        """"""
+        """
+        :param adata: AnnData object containing single-cell data.
+        :type adata: anndata.AnnData
+
+        :return: Dictionary mapping perturbation features to tensor representations.
+        :rtype: dict[str, TensorLike]
+
+        :raises ValueError: If a specified perturbation or its representation is not found in `adata`.
+        """
         # retrieving perturbation data
         perturbation_data = {}
         # iterating over each perturbation covariate
@@ -142,6 +162,7 @@ class DataManager:
             if perturbation not in adata.obs.keys():
                 msg = f"{perturbation} not found in `adata.obs.keys()`"
                 raise ValueError(msg)
+            
             # what perturbation was applied
             covariate_data = adata.obs[perturbation].values
             # optionally retrieving the representation of such covariate
@@ -160,6 +181,7 @@ class DataManager:
                     # storing the results
                     covariate_rep_key = f"{CONDITION_REP_KEY}_{perturbation}_{rep}"
                     perturbation_data[covariate_rep_key] = covariate_reps
+                    
             # loading perturbation covariates that are individual for each cell
             if self.perturbation_covariates is not None:
                 perturbation_covariates = self.perturbation_covariates[perturbation]
@@ -175,16 +197,27 @@ class DataManager:
                     # storing the results
                     covariate_cov_key = f"{CONDITION_COV_KEY}_{perturbation}_{covariate}"
                     perturbation_data[covariate_cov_key] = covariate_data
-            # storing them to the output dictionary
         return perturbation_data
 
     def __get_perturbation_target_rep_data(
         self,
         adata: anndata.AnnData,
     ) -> dict[str, TensorLike]:
-        """"""
+        """
+        :param adata: AnnData object containing single-cell data.
+        :type adata: anndata.AnnData
+
+        :return: Dictionary mapping perturbation target covariates to encoded representations.
+        :rtype: dict[str, TensorLike]
+
+        :raises AssertionError: If a required perturbation target covariate is missing in `adata.obs` or `adata.obsm`.
+        :raises NotImplementedError: If an unsupported encoding type is requested.
+        """
+        # dictionary storing representations for perturbation target covariates
         out_dict = {}
+        
         for condition_target_covariate, condition_target_covariate_rep in self.perturbation_target_covariates.items():
+            # if covariate is stored in adata.obsm we retrieve its representation directly
             if condition_target_covariate in self.perturbation_target_covariates_in_obsm:
                 # sanity check
                 msg = f"{condition_target_covariate} not found in `adata.obsm.keys()`"
@@ -200,6 +233,7 @@ class DataManager:
                 covariate_target_rep = self.perturbation_target_covariates[condition_target_covariate]
                 covariate_target_rep_kwargs = self.perturbation_target_covariates_kwargs[condition_target_covariate]
 
+                # Collect the condition target covariate from the adata.obs 
                 covariate_data = adata.obs[[condition_target_covariate]].values
 
                 if covariate_target_rep == "one_hot":
@@ -217,6 +251,7 @@ class DataManager:
                     msg = f"{covariate_target_rep=} not currently supported (avaiable options are `['one_hot', 'label', 'identity']`)"
                     raise NotImplementedError(msg)
 
+                # Retrun dictionary 
                 out_dict[condition_target_covariate] = covariate_target_rep_data
         return out_dict
 
@@ -224,17 +259,27 @@ class DataManager:
         self,
         adata: anndata.AnnData | None = None,
     ) -> TrainData:
-        """"""
+        """
+        :param adata: AnnData object containing single-cell data. If `None`, uses `self.adata`.
+        :type adata: anndata.AnnData | None
+
+        :return: A structured object containing all necessary training inputs.
+        :rtype: TrainData
+
+        :raises ValueError: If both `adata` and `self.adata` are `None`.
+        """
         if adata is None and self.adata is None:
             msg = "Both `adata` and `self.adata` are None, you need to pass an `anndata.AnnData` object containing the data."
             raise ValueError(msg)
         elif adata is None:
             adata = self.adata
+        # return cell features 
         state_data = self.__get_state_data(adata)
         perturbation_data = None
+        # return perturbation data
         if self.perturbations is not None:
             perturbation_data = self.__get_perturbation_data(adata)
-        # condition target rep
+        # condition target representation
         target_perturbation_repr = None
         if self.use_perturbation_target_repr:
             target_perturbation_repr = self.__get_perturbation_target_rep_data(adata)
