@@ -20,9 +20,10 @@ __all__ = [
     "PredictionDataLoader",
 ]
 
-
 class TrainDataLoader:
-    """"""
+    """
+    Data loader for training that samples matched control and perturbed cell states.
+    """
 
     def __init__(
         self,
@@ -32,7 +33,20 @@ class TrainDataLoader:
         state_transforms: Transform | None = None,
         device_id: Literal["cuda", "cpu"] = "cuda",
     ) -> None:
-        """"""
+        """
+        Initializes the training data loader.
+
+        :param data: Training dataset containing control and perturbed cell states.
+        :type data: class:`TrainData`
+        :param coupling: Coupling strategy used to match control and perturbed states.
+        :type coupling: class:`Coupling`
+        :param batch_size: Number of samples per batch.
+        :type batch_size: class:`int`
+        :param state_transforms: Optional transformations applied to the states, defaults to `None`.
+        :type state_transforms: class:`Transform`, optional
+        :param device_id: Device to use for tensor operations (`cuda` or `cpu`), defaults to `cuda`.
+        :type device_id: class:`Literal[\"cuda\", \"cpu\"]`, optional
+        """
         self.data = data
         self.coupling = coupling
         self.batch_size = batch_size
@@ -40,11 +54,14 @@ class TrainDataLoader:
         self.state_transforms = state_transforms
         self.device = torch.device(self.device_id)
 
-    def sample(
-        self,
-    ) -> dict[str, TensorLike]:
-        """"""
+    def sample(self) -> dict[str, TensorLike]:
+        """
+        Samples a batch of matched control and perturbed cell states.
 
+        :return: Dictionary containing source (control) states, target (perturbed) states,
+                 and optional perturbation representations.
+        :rtype: dict[str, TensorLike]
+        """
         ctrl_data = self.data.get_controls(self.batch_size)
         ctrl_states = ctrl_data[STATE_DATA_KEY]
 
@@ -57,47 +74,35 @@ class TrainDataLoader:
             trtm_perts_target_rep = trtm_data[PERTURBATION_TARGET_REPR_KEY]
 
         source_idx, target_idx = self.coupling.match_groups(ctrl_states, trtm_states)
-
-        source = torch.from_numpy(ctrl_states[source_idx])
-        target = torch.from_numpy(trtm_states[target_idx])
-
-        if self.data.perturbation_data is not None:
-            condition = {cond: torch.from_numpy(cond_data[target_idx]) for cond, cond_data in trtm_perts.items()}
-        if self.data.target_perturbation_repr is not None:
-            trtm_perts_target_rep = {key: torch.from_numpy(val[target_idx]) for key, val in trtm_perts_target_rep.items()}
-
-        source = source.to(self.device)
-        target = target.to(self.device)
-
-        if self.data.perturbation_data is not None:        
-            condition = {key: val.to(self.device) for key, val in condition.items()}
-        if self.data.target_perturbation_repr is not None:
-            trtm_perts_target_rep = {key: val.to(self.device) for key, val in trtm_perts_target_rep.items()}
-
-        source = source.float()
-        target = target.float()
-
-        if self.data.perturbation_data is not None:
-            condition = {key: val.float() for key, val in condition.items()}
-        if self.data.target_perturbation_repr is not None:
-            trtm_perts_target_rep = {key: val.float() for key, val in trtm_perts_target_rep.items()}
+        
+        source = torch.from_numpy(ctrl_states[source_idx]).float()
+        target = torch.from_numpy(trtm_states[target_idx]).float()
 
         if self.state_transforms is not None:
             source = self.state_transforms.transform(source)
             target = self.state_transforms.transform(target)
 
+        if self.data.perturbation_data is not None:
+            condition = {cond: torch.from_numpy(cond_data[target_idx]).to(self.device).float()
+                         for cond, cond_data in trtm_perts.items()}
+        if self.data.target_perturbation_repr is not None:
+            trtm_perts_target_rep = {key: torch.from_numpy(val[target_idx]).to(self.device).float()
+                                     for key, val in trtm_perts_target_rep.items()}
+            
         out_dict = {SOURCE_STATE_KEY: source, TARGET_STATE_KEY: target}
-        
+
         out_dict[PERTURBATION_DATA_KEY] = None
         if self.data.perturbation_data is not None:
             out_dict[PERTURBATION_DATA_KEY] = condition
         if self.data.target_perturbation_repr is not None:
             out_dict[PERTURBATION_TARGET_REPR_KEY] = trtm_perts_target_rep
+        
         return out_dict
 
-
 class ValidationDataLoader:
-    """"""
+    """
+    Data loader for validation that samples matched control and perturbed cell states.
+    """
 
     def __init__(
         self,
@@ -107,7 +112,20 @@ class ValidationDataLoader:
         state_transforms: Transform | None = None,
         device_id: Literal["cuda", "cpu"] = "cuda",
     ) -> None:
-        """"""
+        """
+        Initializes the validation data loader.
+
+        :param data: Validation dataset containing control and perturbed cell states.
+        :type data: class:`PredictionData`
+        :param coupling: Coupling strategy used to match control and perturbed states.
+        :type coupling: class:`Coupling`
+        :param batch_size: Number of samples per batch.
+        :type batch_size: class:`int`
+        :param state_transforms: Optional transformations applied to the states, defaults to `None`.
+        :type state_transforms: class:`Transform`, optional
+        :param device_id: Device to use for tensor operations (`cuda` or `cpu`), defaults to `cuda`.
+        :type device_id: class:`Literal[\"cuda\", \"cpu\"]`, optional
+        """
         self.data = data
         self.coupling = coupling
         self.batch_size = batch_size
@@ -115,11 +133,14 @@ class ValidationDataLoader:
         self.state_transforms = state_transforms
         self.device = torch.device(self.device_id)
 
-    def sample(
-        self,
-    ) -> dict[str, TensorLike]:
-        """"""
+    def sample(self) -> dict[str, TensorLike]:
+        """
+        Samples a batch of matched control and perturbed cell states for validation.
 
+        :return: Dictionary containing source (control) states, target (perturbed) states,
+                 and optional perturbation representations.
+        :rtype: dict[str, TensorLike]
+        """
         ctrl_data = self.data.get_controls(self.batch_size)
         ctrl_states = ctrl_data[STATE_DATA_KEY]
 
@@ -133,43 +154,29 @@ class ValidationDataLoader:
 
         source_idx, target_idx = self.coupling.match_groups(ctrl_states, trtm_states)
 
-        source = torch.from_numpy(ctrl_states[source_idx])
-        target = torch.from_numpy(trtm_states[target_idx])
-
-        if self.data.perturbation_data is not None:
-            condition = {key: torch.from_numpy(val[target_idx]) for key, val in trtm_perts.items()}
-        if self.data.target_perturbation_repr is not None:
-            trtm_perts_target_rep = {key: torch.from_numpy(val[target_idx]) for key, val in trtm_perts_target_rep.items()}
-
-        source = source.to(self.device)
-        target = target.to(self.device)
-
-        if self.data.perturbation_data is not None:
-            condition = {key: val.to(self.device) for key, val in condition.items()}
-        if self.data.target_perturbation_repr is not None:
-            trtm_perts_target_rep = {key: val.to(self.device) for key, val in trtm_perts_target_rep.items()}
-
-        source = source.float()
-        target = target.float()
-
-        if self.data.perturbation_data is not None:
-            condition = {key: val.float() for key, val in condition.items()}
-        if self.data.target_perturbation_repr is not None:
-            trtm_perts_target_rep = {key: val.float() for key, val in trtm_perts_target_rep.items()}
+        source = torch.from_numpy(ctrl_states[source_idx]).to(self.device).float()
+        target = torch.from_numpy(trtm_states[target_idx]).to(self.device).float()
 
         if self.state_transforms is not None:
             source = self.state_transforms.transform(source)
             target = self.state_transforms.transform(target)
-
-        out_dict = {SOURCE_STATE_KEY: source, TARGET_STATE_KEY: target,}
-
-        out_dict[PERTURBATION_DATA_KEY] = {}
+            
         if self.data.perturbation_data is not None:
-            out_dict[PERTURBATION_DATA_KEY] =  condition
+            condition = {key: torch.from_numpy(val[target_idx]).to(self.device).float()
+                         for key, val in trtm_perts.items()}
+        if self.data.target_perturbation_repr is not None:
+            trtm_perts_target_rep = {key: torch.from_numpy(val[target_idx]).to(self.device).float()
+                                     for key, val in trtm_perts_target_rep.items()}
+        
+        out_dict = {SOURCE_STATE_KEY: source, TARGET_STATE_KEY: target}
+        out_dict[PERTURBATION_DATA_KEY] = {}
+        
+        if self.data.perturbation_data is not None:
+            out_dict[PERTURBATION_DATA_KEY] = condition
         if self.data.target_perturbation_repr is not None:
             out_dict[PERTURBATION_TARGET_REPR_KEY] = trtm_perts_target_rep
+        
         return out_dict
-
 
 class PredictionDataLoader:
     """"""
