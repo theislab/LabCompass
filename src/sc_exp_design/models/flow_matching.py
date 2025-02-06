@@ -66,12 +66,14 @@ class FlowMatching:
         time_sampler: Callable[[Sequence[int], Any], Tensor] = torch.rand,
         device_id: Literal["cuda", "cpu"] = "cuda",
     ) -> None:
+        # initialize the Flow model 
         if flow_class is None:
             flow_class = ConstantNoiseFlow
         if flow_kwargs is None:
             flow_kwargs = {}
         self.flow = flow_class(**flow_kwargs)
 
+        # initialize the coupling logic 
         if coupling_class is None:
             coupling_class = IndependentCoupling
         if coupling_kwargs is None:
@@ -222,7 +224,8 @@ class FlowMatching:
         """
         self.flow_dim = flow_dim
         self.cvf_config = cvf_config
-
+        
+        # given a dimensionality and a configuration of hparams, initialize a flow model 
         self.velocity_field = NeuralVelocityField(
             self.flow_dim,
             config=self.cvf_config,
@@ -230,6 +233,7 @@ class FlowMatching:
         self.velocity_field = self.velocity_field.float()
         self.velocity_field = self.velocity_field.to(self.device)
 
+        # optimizer and scheduler 
         self.optimizer = optimizer_class(
             self.velocity_field.parameters(),
             **optimizer_kwargs,

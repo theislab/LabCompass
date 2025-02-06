@@ -75,8 +75,8 @@ class TrainDataLoader:
 
         source_idx, target_idx = self.coupling.match_groups(ctrl_states, trtm_states)
         
-        source = torch.from_numpy(ctrl_states[source_idx]).float()
-        target = torch.from_numpy(trtm_states[target_idx]).float()
+        source = torch.from_numpy(ctrl_states[source_idx]).to(self.device).float()
+        target = torch.from_numpy(trtm_states[target_idx]).to(self.device).float()
 
         if self.state_transforms is not None:
             source = self.state_transforms.transform(source)

@@ -366,12 +366,15 @@ class NeuralVelocityFieldConfig:
     latent_perts_approximate_posterior_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
 
     def __post_init__(self) -> None:
-        """"""
+        """
+        Compatibility checks and edits for a valid configuration 
+        """
         # sanity checks posterior latent perturbations
         if self.learn_posterior_on_latent_perts and (not self.encode_conditions):
             msg = f"With {self.learn_posterior_on_latent_perts=}, `self.encode_condition` should be set to `True`, found {self.encode_conditions}. Setting `learn_posterior_on_latent_perts` to `False`."
             logger.warning(msg)
             self.learn_posterior_on_latent_perts = False
+            
         # sanity check posterior on perturbations
         if self.learn_posterior_on_perts:
             msg = f"With {self.learn_posterior_on_perts=}, you need to pass the target output dims in `self.pert_target_covariates_output_dims`, found `None`."
@@ -395,6 +398,7 @@ class NeuralVelocityFieldConfig:
                 self.pert_target_covariates_output_dims.keys()
             ), msg
             assert set(self.pert_approximate_posterior_kwargs.keys()) == set(self.pert_noise_model.keys()), msg
+            
         # sanity check on condition encoder
         if self.use_guidance:
             if self.encode_conditions:
@@ -426,7 +430,9 @@ class NeuralVelocityFieldConfig:
     def condition_input_dim(
         self,
     ) -> int | None:
-        """"""
+        """
+        Collect the condition input dimensions for the encoding process from the configuration.
+        """
         dim = 0
         for condition, layers_dict in self.perturbation_layers_before_pooling.items():
             if isinstance(layers_dict, LayersDict):
@@ -445,7 +451,9 @@ class NeuralVelocityFieldConfig:
     def perturbation_layers_after_pooling_input_dim(
         self,
     ) -> int | None:
-        """"""
+        """
+        Collect the condition input dimensions after pooling.
+        """
         dim = 0
         for condition, layers_dict in self.perturbation_layers_before_pooling.items():
             if isinstance(layers_dict, LayersDict):
@@ -461,7 +469,9 @@ class NeuralVelocityFieldConfig:
     def joint_latent_dim(
         self,
     ) -> int:
-        """"""
+        """
+        Collect the dimension of the joint latent space (concatenating time, latent feature dimensions and perturbation)
+        """
         perturbation_latent_dim = 0
         if self.use_guidance and self.encode_conditions:
             perturbation_latent_dim = self.perturbation_latent_dim
@@ -476,7 +486,9 @@ class NeuralVelocityFieldConfig:
     def joint_original_dim(
         self,
     ) -> int:
-        """"""
+        """
+        Collect dimensionality in the original space 
+        """
         perturbation_dim = 0
         if self.use_guidance:
             perturbation_dim = self.condition_input_dim

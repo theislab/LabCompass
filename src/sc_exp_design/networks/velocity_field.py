@@ -27,14 +27,25 @@ __all__ = ["NeuralVelocityField"]
 
 
 class NeuralVelocityField(BaseModule):
-    """"""
+    """
+    A neural velocity field module for modeling continuous-time dynamics with neural networks.
+    
+    This class implements a velocity field using a neural network architecture, allowing for encoding
+    time, state, and conditions to predict state transitions.
+    """
 
     def __init__(
         self,
         flow_dim: int,
         config: NeuralVelocityFieldConfig,
     ) -> None:
-
+        """
+        Initialize the NeuralVelocityField.
+        
+        Args:
+            flow_dim (int): Dimensionality of the flow field.
+            config (NeuralVelocityFieldConfig): Configuration settings for the model.
+        """
         super().__init__()
         self.flow_dim = flow_dim
         self.config = config
@@ -46,7 +57,15 @@ class NeuralVelocityField(BaseModule):
         self,
         device: torch.device,
     ) -> nn.Module:
-        """"""
+        """
+        Moves the model and its components to the specified device.
+        
+        Args:
+            device (torch.device): The target device (CPU/GPU).
+        
+        Returns:
+            nn.Module: The model moved to the specified device.
+        """
         self = super().to(device)
         if self.config.learn_posterior_on_perts:
             self.pert_approximate_posterior = self.pert_approximate_posterior.to(device)
@@ -57,7 +76,12 @@ class NeuralVelocityField(BaseModule):
     def parameters(
         self,
     ) -> Iterator[nn.Parameter]:
-        """"""
+        """
+        Returns an iterator over the model's parameters, including submodules.
+        
+        Returns:
+            Iterator[nn.Parameter]: Model parameters.
+        """
         parameters = [super().parameters()]
         if self.config.learn_posterior_on_perts:
             parameters.append(self.pert_approximate_posterior.parameters())
@@ -70,7 +94,15 @@ class NeuralVelocityField(BaseModule):
         self,
         mode: bool = True
     ) -> nn.Module:
-        """"""
+        """
+        Sets the model to training mode.
+        
+        Args:
+            mode (bool, optional): Whether to enable training mode. Defaults to True.
+        
+        Returns:
+            nn.Module: The model in training mode.
+        """
         self = super().train(mode)
         if self.config.learn_posterior_on_perts:
             self.pert_approximate_posterior = self.pert_approximate_posterior.train(mode)
@@ -81,7 +113,12 @@ class NeuralVelocityField(BaseModule):
     def eval(
         self,
     ) -> nn.Module:
-        """"""
+        """
+        Sets the model to evaluation mode.
+        
+        Returns:
+            nn.Module: The model in evaluation mode.
+        """
         self = super().eval()
         if self.config.learn_posterior_on_perts:
             self.pert_approximate_posterior = self.pert_approximate_posterior.eval()
@@ -93,7 +130,12 @@ class NeuralVelocityField(BaseModule):
     def cond_vars_input_dim(
         self,
     ) -> int:
-        """"""
+        """
+        Computes the input dimension for the inference network on conditioning variables.
+        
+        Returns:
+            int: Input dimension for conditioning variable inference.
+        """
         # retrieving the input dimension for the inference network on the conditioning variables
         if self.config.endpoints_approximate_posterior_use_latent_repr:
             return self.config.joint_latent_dim
@@ -103,7 +145,15 @@ class NeuralVelocityField(BaseModule):
     def pert_input_dim(
         self,
     ) -> int:
-        """"""
+        """
+        Computes the input dimension for the inference network on perturbations.
+        
+        Returns:
+            int: Input dimension for perturbation inference.
+        
+        Raises:
+            ValueError: If an unsupported perturbation input type is provided.
+        """
         # retrieving the input dimension for the inference network on the conditioning variables
         if self.config.pert_approximate_posterior_input_type == "latent":
             return self.config.joint_latent_dim
@@ -118,7 +168,9 @@ class NeuralVelocityField(BaseModule):
     def _init_modules(
         self,
     ) -> None:
-        """"""
+        """
+        Initializes all necessary neural network modules including encoders, decoders, and inference models.
+        """
         # state encoder
         self.x_encoder = MLPBlock(
             self.flow_dim,
@@ -178,7 +230,7 @@ class NeuralVelocityField(BaseModule):
                 activation_class=self.config.score_activation_class,
                 final_activation_class=self.config.score_final_activation_class,
             )
-        # inference on conditioning vars
+        # inference on conditioning vars 
         self.endpoints_approximate_posterior = None
         if self.config.learn_posterior_on_cond_vars:
             self.endpoints_approximate_posterior = EndpointsApproximatePosterior(
@@ -217,12 +269,25 @@ class NeuralVelocityField(BaseModule):
         source: Tensor | None = None,
         target: Tensor | None = None,
     ) -> dict[str, Tensor]:
-        """"""
+        """
+        Forward pass through the neural velocity field model.
+        
+        Args:
+            t (Tensor): Time input.
+            xt (Tensor): State input.
+            cond (dict[str, Tensor] | None, optional): Conditioning variables. Defaults to None.
+            source (Tensor | None, optional): Source state for perturbation inference. Defaults to None.
+            target (Tensor | None, optional): Target state for perturbation inference. Defaults to None.
+        
+        Returns:
+            dict[str, Tensor]: Model output including velocity field and latent representations.
+        """
         # encoding time
         t = torch.unsqueeze(t, dim=1)
         t_latent = t
         if self.config.encode_time:
             t_latent = self.time_encoder(t)
+            
         # encoding conditions
         condition_latent = cond
         if self.config.use_guidance and self.config.encode_conditions:
@@ -232,6 +297,7 @@ class NeuralVelocityField(BaseModule):
             cond_values = [val for key, val in cond.items() if key in self.config.perturbation_layers_before_pooling]
             condition_latent = torch.concatenate(cond_values, dim=-1)
             condition_original = condition_latent
+        
         # encoding states
         xt_latent = self.x_encoder(xt)
 
@@ -307,7 +373,17 @@ class NeuralVelocityField(BaseModule):
         xt: Tensor,
         cond: dict[str, Tensor] | None = None,
     ) -> Tensor:
-        """"""
+        """
+        Computes the velocity field given time and state.
+        
+        Args:
+            t (Tensor): Time input.
+            xt (Tensor): State input.
+            cond (dict[str, Tensor] | None, optional): Conditioning variables. Defaults to None.
+        
+        Returns:
+            Tensor: Velocity field output.
+        """
         return self.forward(t, xt, cond=cond)[VF_KEY]
 
     def score(
@@ -316,7 +392,17 @@ class NeuralVelocityField(BaseModule):
         xt: Tensor,
         cond: dict[str, Tensor] | None = None,
     ) -> Tensor:
-        """"""
+        """
+        Computes the score given time and state.
+        
+        Args:
+            t (Tensor): Time input.
+            xt (Tensor): State input.
+            cond (dict[str, Tensor] | None, optional): Conditioning variables. Defaults to None.
+        
+        Returns:
+            Tensor: Score output.
+        """
         msg = f"{self.config.learn_score_field=}, hence no score field was initialized"
         assert self.config.learn_score_field, msg
         return self.forward(t, xt, cond=cond)[SCORE_KEY]
@@ -326,7 +412,16 @@ class NeuralVelocityField(BaseModule):
         cond: dict[str, Tensor] | None = None,
         gamma_fn: Callable[[Tensor, Tensor], Tensor] | None = None,
     ) -> Callable[[Tensor, Tensor], Tensor]:
-        """"""
+        """
+        Returns a velocity field function.
+
+        Args:
+            cond (dict[str, Tensor] | None, optional): Conditioning variables. Defaults to None.
+            gamma_fn (Callable[[Tensor, Tensor], Tensor] | None, optional): Function for computing diffusion coefficient. Defaults to None.
+        
+        Returns:
+            Callable[[Tensor, Tensor], Tensor]: Velocity field function.
+        """
         # sanity checks
         if gamma_fn is not None and (not self.config.learn_score_field):
             msg = f"You passed `gamma_fn` for computing the diffusion coefficient with {self.config.learn_score_field=}. Deterministic sampling is set, hence it will be ignored."
@@ -353,7 +448,15 @@ class NeuralVelocityField(BaseModule):
         self,
         cond: dict[str, Tensor],
     ) -> Tensor:
-        """"""
+        """
+        Computes the condition embedding.
+        
+        Args:
+            cond (dict[str, Tensor]): Conditioning variables.
+        
+        Returns:
+            Tensor: Condition embedding tensor.
+        """
         # sanity check
         msg = f"No condition encoder associated to this Velocity Field (i.e.: {self.config.encode_conditions=})."
         assert self.config.encode_conditions, msg
@@ -368,7 +471,16 @@ class NeuralVelocityField(BaseModule):
         source: Tensor,
         target: Tensor,
     ) -> Tensor:
-        """"""
+        """
+        Computes latent condition inference parameters.
+        
+        Args:
+            source (Tensor): Source tensor.
+            target (Tensor): Target tensor.
+        
+        Returns:
+            Tensor: Inference parameters.
+        """
         input_perts_recognition_model = torch.concatenate((source, target), dim=1)
         params = self.latent_pert_approximate_posterior(input_perts_recognition_model)
         return params
@@ -378,7 +490,16 @@ class NeuralVelocityField(BaseModule):
         source: Tensor,
         target: Tensor,
     ) -> Tensor:
-        """"""
+        """
+        Computes perturbation inference parameters.
+        
+        Args:
+            source (Tensor): Source tensor.
+            target (Tensor): Target tensor.
+        
+        Returns:
+            Tensor: Perturbation inference parameters.
+        """
         msg = f"This method is only available when `self.config.pert_approximate_posterior_input_type` is either `'enpoints'` or `'one_step_prediction'`, found {self.config.pert_approximate_posterior_input_type=}"
         assert self.config.pert_approximate_posterior_input_type in ["endpoints", "one_step_prediction"], msg
         endpoints = torch.concatenate((source, target), dim=1)
