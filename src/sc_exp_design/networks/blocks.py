@@ -450,7 +450,7 @@ class AttentionPooling(BaseModule):
         :return: Tensor of shape `(batch_size, num_perts, self.embedding_dim)`
         :rtype: class:`torch.Tensor`
         """
-        out = self.attention_block(input_tensor, mask=mask)
+        out = self.attention_block(input_tensor, mask=attention_mask)
         return out[:, 0, :]
 
 
@@ -620,7 +620,7 @@ class ConditionEncoder(BaseModule):
                 activation_class=layers_dict.activation_class,
                 final_activation_class=layers_dict.final_activation_class,
             )
-        elif layer_type == "self_attention":
+        elif layers_dict.layer_type == "self_attention":
             layer = SelfAttentionBlock(
                 layers_dict.embed_dim,
                 layers_dict.num_heads,
@@ -634,7 +634,7 @@ class ConditionEncoder(BaseModule):
                 sparse=layers_dict.sparse,
             )
         else:
-            msg = f"{layer_type=} not available, possible options are `['mlp', 'self_attention']`"
+            msg = f"{layers_dict.layer_type=} not available, possible options are `['mlp', 'self_attention']`"
             raise ValueError(msg)
         return layer
 
