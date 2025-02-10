@@ -324,7 +324,8 @@ class EndpointsApproximatePosterior(BaseApproximatePosterior):
 
         This method takes an input tensor, clones it (to preserve gradients), detaches it (if freezing gradients),
         and computes the approximate posterior parameters for both the source and target endpoints. The parameters 
-        are returned in a dictionary with keys defined by `SOURCE_PARAMS_KEY` and `TARGET_PARAMS_KEY`.
+        are returned in a dictionary with keys defined by `sc_exp_design.constants.DataFields.SOURCE_PARAMS` 
+        and `sc_exp_design.constants.DataFields.TARGET_PARAMS`.
 
         Args:
             input_tensor (Tensor): The input tensor to the model.

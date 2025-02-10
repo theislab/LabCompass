@@ -36,7 +36,7 @@ def gaussian_rec_loss(
     """
     if cov_estimation_mode == "isotropic":
         mean = params[ParamsFields.MEAN]
-        cov = params[ParamsFields.COVARIANCE_KEY]
+        cov = params[ParamsFields.COVARIANCE]
         dim = mean.shape[1]
         cov = cov**2
         loss = (

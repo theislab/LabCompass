@@ -171,7 +171,7 @@ class PredictionData(BaseDataStruct):
                 ctrl_pert_repr = ctrl_pert_repr[batch_idxs]
 
         # dictionary of controls
-        output_dict = {STATE_DATA_KEY: ctrl_state_data}
+        output_dict = {DataFields.STATE_DATA: ctrl_state_data}
 
         if self.perturbation_data is not None:
             output_dict[DataFields.PERTURBATION_DATA] =  ctrl_perturbation_data
