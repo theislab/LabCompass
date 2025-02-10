@@ -103,9 +103,19 @@ class CFMTrainer:
             src_posterior_params = vt_step[VFStepFields.SOURCE_PARAMS]
             tgt_posterior_params = vt_step[VFStepFields.TARGET_PARAMS]
 
+            # optionally stopping backpropagation of the loss
             add_loss = True
             if self.posterior_on_cond_vars_update_step is not None:
                 add_loss = step_idx % self.posterior_on_cond_vars_update_step == 0
+
+            # retrieving covariance estimation mode in case of gaussian noise model
+            src_cov_estimation_mode = None
+            tgt_cov_estimation_mode = None
+            if self.velocity_field.config.src_noise_model == "gaussian":
+                src_cov_estimation_mode = self.velocity_field.endpoints_approximate_posterior.src_approximate_posterior.cov_estimation_mode
+            if self.velocity_field.config.tgt_noise_model == "gaussian":
+                tgt_cov_estimation_mode = self.velocity_field.endpoints_approximate_posterior.tgt_approximate_posterior.cov_estimation_mode
+
             loss, cond_var_posterior_loss = compute_cond_vars_inference_loss(
                 loss,
                 source,
@@ -114,8 +124,8 @@ class CFMTrainer:
                 tgt_posterior_params,
                 self.velocity_field.config.src_noise_model,
                 self.velocity_field.config.tgt_noise_model,
-                self.velocity_field.src_approximate_posterior.cov_estimation_mode,
-                self.velocity_field.tgt_approximate_posterior.cov_estimation_mode,
+                src_cov_estimation_mode,
+                tgt_cov_estimation_mode,
                 add_loss=add_loss,
             )
             log_dict.update(cond_var_posterior_loss)
@@ -125,6 +135,7 @@ class CFMTrainer:
             pert_posterior_params = vt_step[VFStepFields.PERTURBATION_PARAMS]
             pert_target_rep = batch[DataFields.PERTURBATION_TARGET_REPR]
 
+            # optionally stopping backpropagation of the loss
             add_loss = True
             if self.posterior_on_perts_update_step is not None:
                 add_loss = step_idx % self.posterior_on_perts_update_step == 0
@@ -144,9 +155,11 @@ class CFMTrainer:
             if self.velocity_field.config.latent_perts_posterior_freeze_grads:
                 latent_perturbation = latent_perturbation.detach()
 
+            # optionally stopping backpropagation of the loss
             add_loss = True
             if self.posterior_on_latent_perts_update_step is not None:
                 add_loss = step_idx % self.posterior_on_latent_perts_update_step == 0
+
             params = self.velocity_field.get_latent_condition_inf_params(source, target)
             loss, latent_cond_inf_loss = compute_latent_perturbation_inference_loss(
                 loss,
