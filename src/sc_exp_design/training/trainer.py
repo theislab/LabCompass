@@ -8,21 +8,7 @@ from matplotlib.figure import Figure
 from torch import Tensor
 from tqdm import tqdm
 
-from sc_exp_design.constants import (
-    PERTURBATION_DATA_KEY,
-    PERTURBATION_TARGET_REPR_KEY,
-    LATENT_PERTURBATION_KEY,
-    LOSS_KEY,
-    PERTURBATION_PARAMS_KEYS,
-    SCORE_KEY,
-    SCORE_LOSS_KEY,
-    SOURCE_PARAMS_KEY,
-    SOURCE_STATE_KEY,
-    TARGET_PARAMS_KEY,
-    TARGET_STATE_KEY,
-    VF_KEY,
-    VF_LOSS_KEY,
-)
+from sc_exp_design.constants import DataFields, LossFields, VFStepFields
 from sc_exp_design.data import (
     TrainDataLoader,
     ValidationDataLoader,
@@ -88,9 +74,9 @@ class CFMTrainer:
     ) -> tuple[Tensor, dict[str, Tensor]]:
         """"""
         # parsing batch dictionary
-        source = batch[SOURCE_STATE_KEY]
-        target = batch[TARGET_STATE_KEY]
-        condition = batch[PERTURBATION_DATA_KEY]
+        source = batch[DataFields.SOURCE_STATE]
+        target = batch[DataFields.TARGET_STATE]
+        condition = batch[DataFields.PERTURBATION_DATA]
         # retrieving batch size and ode time
         batch_size = source.shape[0]
         t = self.time_sampler((batch_size,), device=source.device)
@@ -114,8 +100,8 @@ class CFMTrainer:
             log_dict.update({SCORE_LOSS_KEY: score_loss.detach().cpu()})
         # optional decoding on conditioning variables
         if self.velocity_field.config.learn_posterior_on_cond_vars:
-            src_posterior_params = vt_step[SOURCE_PARAMS_KEY]
-            tgt_posterior_params = vt_step[TARGET_PARAMS_KEY]
+            src_posterior_params = vt_step[VFStepFields.SOURCE_PARAMS]
+            tgt_posterior_params = vt_step[VFStepFields.TARGET_PARAMS]
 
             add_loss = True
             if self.posterior_on_cond_vars_update_step is not None:
@@ -136,8 +122,8 @@ class CFMTrainer:
 
         # optional decoding on perturbations
         if self.velocity_field.config.learn_posterior_on_perts:
-            pert_posterior_params = vt_step[PERTURBATION_PARAMS_KEYS]
-            pert_target_rep = batch[PERTURBATION_TARGET_REPR_KEY]
+            pert_posterior_params = vt_step[VFStepFields.PERTURBATION_PARAMS]
+            pert_target_rep = batch[DataFields.PERTURBATION_TARGET_REPR]
 
             add_loss = True
             if self.posterior_on_perts_update_step is not None:
@@ -154,7 +140,7 @@ class CFMTrainer:
             log_dict.update(pert_posterior_loss)
         # optional inference on perturbation latent state from endpoints
         if self.velocity_field.config.learn_posterior_on_latent_perts:
-            latent_perturbation = vt_step[LATENT_PERTURBATION_KEY]
+            latent_perturbation = vt_step[VFStepFields.LATENT_PERTURBATION]
             if self.velocity_field.config.latent_perts_posterior_freeze_grads:
                 latent_perturbation = latent_perturbation.detach()
 
@@ -180,9 +166,9 @@ class CFMTrainer:
     ) -> tuple[TensorLike]:
         """"""
         # parsing batch dictionary
-        source = batch[SOURCE_STATE_KEY]
-        target = batch[TARGET_STATE_KEY]
-        condition = batch[PERTURBATION_DATA_KEY]
+        source = batch[DataFields.SOURCE_STATE]
+        target = batch[DataFields.TARGET_STATE]
+        condition = batch[DataFields.PERTURBATION_DATA]
         # defining velocity function
         vf = self.velocity_field.get_vf_fn(condition, gamma_fn=self.gamma_fn)
         # initializing the sampler clss
@@ -252,7 +238,7 @@ class CFMTrainer:
     ) -> None:
         """"""
 
-        self.training_logs = {LOSS_KEY: []}
+        self.training_logs = {LossFields.LOSS: []}
 
         iterator = range(num_training_steps)
         prog_bar = tqdm(iterator)
@@ -268,7 +254,7 @@ class CFMTrainer:
 
             # updaring progress bar
             if (grad_step + 1) % self.grad_step_interval_log and grad_step > 0:
-                prog_bar.set_description(f"Loss: {log_dict[LOSS_KEY]:.4f}")
+                prog_bar.set_description(f"Loss: {log_dict[LossFields.LOSS]:.4f}")
                 prog_bar.update()
 
             # validation step

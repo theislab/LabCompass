@@ -5,11 +5,7 @@ from typing import Any
 import anndata
 import numpy as np
 
-from sc_exp_design.constants import (
-    PERTURBATION_DATA_KEY,
-    PERTURBATION_TARGET_REPR_KEY,
-    STATE_DATA_KEY,
-)
+from sc_exp_design.constants import DataFields
 from sc_exp_design.types import TensorLike
 
 __all__ = [
@@ -80,11 +76,11 @@ class TrainData(BaseDataStruct):
                 ctrl_pert_repr = {key: val[batch_idxs] for key, val in ctrl_pert_repr.items()}
 
         # Dictionary of controls 
-        output_dict = {STATE_DATA_KEY: ctrl_state_data,}        
+        output_dict = {DataFields.STATE_DATA: ctrl_state_data,}        
         if self.perturbation_data is not None:
-            output_dict[PERTURBATION_DATA_KEY] = ctrl_perturbation_data
+            output_dict[DataFields.PERTURBATION_DATA] = ctrl_perturbation_data
         if self.target_perturbation_repr is not None:
-            output_dict[PERTURBATION_TARGET_REPR_KEY] = ctrl_pert_repr
+            output_dict[DataFields.PERTURBATION_TARGET_REPR] = ctrl_pert_repr
         return output_dict
 
     def get_treatments(
@@ -121,11 +117,11 @@ class TrainData(BaseDataStruct):
                 trtm_pert_repr = {key: val[batch_idxs] for key, val in trtm_pert_repr.items()}
 
         # dictionary of treatments 
-        output_dict = {STATE_DATA_KEY: trtm_state_data,}
+        output_dict = {DataFields.STATE_DATA: trtm_state_data,}
         if self.perturbation_data is not None:
-            output_dict[PERTURBATION_DATA_KEY] = trtm_perturbation_data
+            output_dict[DataFields.PERTURBATION_DATA] = trtm_perturbation_data
         if self.target_perturbation_repr is not None:
-            output_dict[PERTURBATION_TARGET_REPR_KEY] = trtm_pert_repr
+            output_dict[DataFields.PERTURBATION_TARGET_REPR] = trtm_pert_repr
         return output_dict
 
 
@@ -178,9 +174,9 @@ class PredictionData(BaseDataStruct):
         output_dict = {STATE_DATA_KEY: ctrl_state_data}
 
         if self.perturbation_data is not None:
-            output_dict[PERTURBATION_DATA_KEY] =  ctrl_perturbation_data
+            output_dict[DataFields.PERTURBATION_DATA] =  ctrl_perturbation_data
         if self.target_perturbation_repr is not None:
-            output_dict[PERTURBATION_TARGET_REPR_KEY] = ctrl_pert_repr
+            output_dict[DataFields.PERTURBATION_TARGET_REPR] = ctrl_pert_repr
         return output_dict
 
     def get_treatments(
@@ -216,10 +212,10 @@ class PredictionData(BaseDataStruct):
                 trtm_pert_repr = trtm_pert_repr[batch_idxs]
 
         # dictionary of controls
-        output_dict = {STATE_DATA_KEY: trtm_state_data,}
+        output_dict = {DataFields.STATE_DATA: trtm_state_data,}
 
         if self.perturbation_data is not None:
-            output_dict[PERTURBATION_DATA_KEY] = trtm_perturbation_data
+            output_dict[DataFields.PERTURBATION_DATA] = trtm_perturbation_data
         if self.target_perturbation_repr is not None:
-            output_dict[PERTURBATION_TARGET_REPR_KEY] = trtm_pert_repr
+            output_dict[DataFields.PERTURBATION_TARGET_REPR] = trtm_pert_repr
         return output_dict

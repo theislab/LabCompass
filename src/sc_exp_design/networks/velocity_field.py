@@ -5,17 +5,7 @@ from collections.abc import Callable, Iterator
 import torch
 from torch import Tensor, nn
 
-from sc_exp_design.constants import (
-    LATENT_PERTURBATION_KEY,
-    LATENT_REPR_KEY,
-    LATENT_STATE_KEY,
-    LATENT_TIME_KEY,
-    PERTURBATION_PARAMS_KEYS,
-    SCORE_KEY,
-    SOURCE_PARAMS_KEY,
-    TARGET_PARAMS_KEY,
-    VF_KEY,
-)
+from sc_exp_design.constants import VFStepFields
 from sc_exp_design.networks.blocks import BaseModule, ConditionEncoder, MLPBlock
 from sc_exp_design.networks.config import NeuralVelocityFieldConfig
 from sc_exp_design.networks.neural_noise_models import MLPGaussianNoiseModel, MLPNegBinNoiseModel
@@ -312,7 +302,7 @@ class NeuralVelocityField(BaseModule):
         # forward pass on neural velocity field
         vf = self.decoder(latent_concat)
         # creating output dictionary
-        output_dict = {VF_KEY: vf, LATENT_REPR_KEY: latent_concat, LATENT_STATE_KEY: xt_latent}
+        output_dict = {VFStepFields.VF: vf, VFStepFields.LATENT_REPR: latent_concat, VFStepFields.LATENT_STATE: xt_latent}
 
         # preparing the endpoints for inference on perturbation
         endpoints = None
@@ -333,11 +323,11 @@ class NeuralVelocityField(BaseModule):
             if self.config.score_field_freeze_grads:
                 score_decoder_input = score_decoder_input.detach()
             score = self.score_decoder(latent_concat)
-            output_dict[SCORE_KEY] = score
+            output_dict[VFStepFields.SCORE] = score
         if self.config.encode_time:
-            output_dict[LATENT_TIME_KEY] = t_latent
+            output_dict[VFStepFields.LATENT_TIME] = t_latent
         if self.config.use_guidance and self.config.encode_conditions:
-            output_dict[LATENT_PERTURBATION_KEY] = condition_latent
+            output_dict[VFStepFields.LATENT_PERTURBATION] = condition_latent
 
         # optional inference on conditioning variables
         if self.config.learn_posterior_on_cond_vars:
@@ -384,7 +374,7 @@ class NeuralVelocityField(BaseModule):
         Returns:
             Tensor: Velocity field output.
         """
-        return self.forward(t, xt, cond=cond)[VF_KEY]
+        return self.forward(t, xt, cond=cond)[VFStepFields.VF]
 
     def score(
         self,
@@ -405,7 +395,7 @@ class NeuralVelocityField(BaseModule):
         """
         msg = f"{self.config.learn_score_field=}, hence no score field was initialized"
         assert self.config.learn_score_field, msg
-        return self.forward(t, xt, cond=cond)[SCORE_KEY]
+        return self.forward(t, xt, cond=cond)[VFStepFields.SCORE]
 
     def get_vf_fn(
         self,
