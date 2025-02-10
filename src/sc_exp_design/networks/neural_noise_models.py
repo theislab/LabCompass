@@ -102,8 +102,17 @@ class MLPGaussianNoiseModel(BaseModule):
         self.latent_dim = latent_dim
         self.use_shared_representation = use_shared_representation
         self.cov_estimation_mode = cov_estimation_mode
+        
+        if encoder_mlp_kwargs is None:
+            encoder_mlp_kwargs = {}
         self.encoder_mlp_kwargs = encoder_mlp_kwargs
+        
+        if mean_mlp_kwargs is None:
+            mean_mlp_kwargs = {}
         self.mean_mlp_kwargs = mean_mlp_kwargs
+
+        if cov_mlp_kwargs is None:
+            cov_mlp_kwargs = {}
         self.cov_mlp_kwargs = cov_mlp_kwargs
         # initializing modules
         self._init_modules()

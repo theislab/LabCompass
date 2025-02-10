@@ -23,10 +23,10 @@ class NeuralVelocityFieldConfig:
         Sets the attribute :attr:`MLPBlock.hidden_dims` of :class:`NeuralVelocityField.x_encoder`, defaults to `(128, 64, 32)`.
     :type x_encoder_hidden_dims: class:`Sequence[int]`
 
-    :param x_encoder_output_dim: The output dimensions for the state encoder.
+    :param state_encoder_output_dim: The output dimensions for the state encoder.
         This represents the latent dimensionality of the space which the states will be embedded into.
         Sets the attribute :attr:`MLPBlock.output_dim` of :attr:`NeuralVelocityField.x_encoder`, defaults to `10`.
-    :type x_encoder_output_dim: class:`int`
+    :type state_encoder_output_dim: class:`int`
 
     :param x_encoder_use_batchnorm: Whether to use batch normalization when encoding the states.
         Sets the attribe :attr:`MLPBlock.use_batchnorm` of :attr:`NeuralVelocityField.x_encoder`, defaults to `False`.
@@ -309,6 +309,7 @@ class NeuralVelocityFieldConfig:
     :type latent_perts_approximate_posterior_kwargs: class`dict[str, Any]`
     """
 
+    state_encoder_output_dim: int = 10
     state_encoder_mlp_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
     encode_time: bool = False
     time_encoder_input_dim: int = 1
@@ -458,4 +459,4 @@ class NeuralVelocityFieldConfig:
         time_latent_dim = self.time_encoder_input_dim
         if self.encode_time:
             time_latent_dim = self.time_encoder_output_dim
-        return self.x_encoder_output_dim + time_latent_dim + perturbation_latent_dim
+        return self.state_encoder_output_dim + time_latent_dim + perturbation_latent_dim
