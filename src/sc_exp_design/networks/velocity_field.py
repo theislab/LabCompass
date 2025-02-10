@@ -177,12 +177,7 @@ class NeuralVelocityField(BaseModule):
         self.x_encoder = MLPBlock(
             self.flow_dim,
             self.config.x_encoder_output_dim,
-            hidden_dims=self.config.x_encoder_hidden_dims,
-            use_batchnorm=self.config.x_encoder_use_batchnorm,
-            use_dropout=self.config.x_encoder_use_dropout,
-            dropout_rate=self.config.x_encoder_dropout_rate,
-            activation_class=self.config.x_encoder_activation_class,
-            final_activation_class=self.config.x_encoder_final_activation_class,
+            **self.config.state_encoder_mlp_kwargs,
         )
         # time encoder
         self.time_encoder = None
@@ -190,12 +185,7 @@ class NeuralVelocityField(BaseModule):
             self.time_encoder = MLPBlock(
                 self.config.time_encoder_input_dim,
                 self.config.time_encoder_output_dim,
-                hidden_dims=self.config.time_encoder_hidden_dims,
-                use_batchnorm=self.config.time_encoder_use_batchnorm,
-                use_dropout=self.config.time_encoder_use_dropout,
-                dropout_rate=self.config.time_encoder_dropout_rate,
-                activation_class=self.config.time_encoder_activation_class,
-                final_activation_class=self.config.time_encoder_final_activation_class,
+                **self.config.time_encoder_mlp_kwargs,
             )
         # condition encoder
         self.condition_encoder = None
@@ -212,12 +202,7 @@ class NeuralVelocityField(BaseModule):
         self.decoder = MLPBlock(
             self.config.joint_latent_dim,
             self.flow_dim,
-            hidden_dims=self.config.decoder_hidden_dims,
-            use_batchnorm=self.config.decoder_use_batchnorm,
-            use_dropout=self.config.decoder_use_dropout,
-            dropout_rate=self.config.decoder_dropout_rate,
-            activation_class=self.config.decoder_activation_class,
-            final_activation_class=self.config.decoder_final_activation_class,
+            **self.config.decoder_mlp_kwargs
         )
         # score
         self.score_decoder = None
@@ -225,12 +210,7 @@ class NeuralVelocityField(BaseModule):
             self.score_decoder = MLPBlock(
                 self.config.joint_latent_dim,
                 self.flow_dim,
-                hidden_dims=self.config.score_hidden_dims,
-                use_batchnorm=self.config.score_use_batchnorm,
-                use_dropout=self.config.score_use_dropout,
-                dropout_rate=self.config.score_dropout_rate,
-                activation_class=self.config.score_activation_class,
-                final_activation_class=self.config.score_final_activation_class,
+                **self.config.score_mlp_kwargs,
             )
         # inference on conditioning vars 
         self.endpoints_approximate_posterior = None
