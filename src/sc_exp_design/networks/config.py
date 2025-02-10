@@ -481,15 +481,3 @@ class NeuralVelocityFieldConfig:
         if self.encode_time:
             time_latent_dim = self.time_encoder_output_dim
         return self.x_encoder_output_dim + time_latent_dim + perturbation_latent_dim
-    
-    @property
-    def joint_original_dim(
-        self,
-    ) -> int:
-        """
-        Collect dimensionality in the original space 
-        """
-        perturbation_dim = 0
-        if self.use_guidance:
-            perturbation_dim = self.condition_input_dim
-        return self.flow_dim + self.time_encoder_input_dim + perturbation_dim

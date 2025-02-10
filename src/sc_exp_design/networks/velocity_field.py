@@ -117,6 +117,18 @@ class NeuralVelocityField(BaseModule):
         return self
 
     @property
+    def joint_original_dim(
+        self,
+    ) -> int:
+        """
+        Collect dimensionality in the original space
+        """
+        perturbation_dim = 0
+        if self.config.use_guidance:
+            perturbation_dim = self.config.condition_input_dim
+        return self.flow_dim + self.config.time_encoder_input_dim + perturbation_dim
+
+    @property
     def cond_vars_input_dim(
         self,
     ) -> int:
@@ -129,7 +141,7 @@ class NeuralVelocityField(BaseModule):
         # retrieving the input dimension for the inference network on the conditioning variables
         if self.config.endpoints_approximate_posterior_use_latent_repr:
             return self.config.joint_latent_dim
-        return self.config.joint_original_dim
+        return self.joint_original_dim
         
     @property
     def pert_input_dim(
@@ -150,7 +162,7 @@ class NeuralVelocityField(BaseModule):
         elif self.config.pert_approximate_posterior_input_type in ["endpoints", "one_step_prediction"]:
             return self.flow_dim * 2
         elif self.config.pert_approximate_posterior_input_type == "original":
-            return self.config.joint_original_dim
+            return self.joint_original_dim
         else:
             msg = f"{self.config.pert_approximate_posterior_input_type=} is not supported, possible values are `['latent', 'endpoints', 'one_step_prediction', 'original']`"
             raise ValueError(msg)
