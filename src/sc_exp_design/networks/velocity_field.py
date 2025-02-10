@@ -176,7 +176,7 @@ class NeuralVelocityField(BaseModule):
         # state encoder
         self.x_encoder = MLPBlock(
             self.flow_dim,
-            self.config.x_encoder_output_dim,
+            self.config.state_encoder_output_dim,
             **self.config.state_encoder_mlp_kwargs,
         )
         # time encoder
