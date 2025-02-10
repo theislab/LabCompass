@@ -6,10 +6,7 @@ import torch
 from anndata import AnnData
 from torch import Tensor
 
-from sc_exp_design.constants import (
-    PERTURBATION_DATA_KEY,
-    SOURCE_STATE_KEY,
-)
+from sc_exp_design.constants import DataFields
 from sc_exp_design.couplings import Coupling, IndependentCoupling
 from sc_exp_design.data import DataManager, TrainDataLoader, ValidationDataLoader
 from sc_exp_design.flows import BaseFlow, ConstantNoiseFlow
@@ -379,11 +376,11 @@ class FlowMatching:
         :return: Tensor of shape `(batch_size, self.flow_dim)` if :param:`return_trajectory` is `False`, otherwise Tensor of shape `(batch_size, self.num_time_steps, self.flow_dim)`
         :rtype: class:`torch.Tensor`
         """
-        source = batch[SOURCE_STATE_KEY]
+        source = batch[DataFields.SOURCE_STATE]
         
         condition = None
-        if PERTURBATION_DATA_KEY in batch.keys():
-            condition = batch[PERTURBATION_DATA_KEY]
+        if DataFields.PERTURBATION_DATA in batch.keys():
+            condition = batch[DataFields.PERTURBATION_DATA]
 
         # defining velocity function
         vf = self.velocity_field.get_vf_fn(condition, gamma_fn=gamma_fn)

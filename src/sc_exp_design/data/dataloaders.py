@@ -2,13 +2,7 @@ from typing import Literal
 
 import torch
 
-from sc_exp_design.constants import (
-    PERTURBATION_DATA_KEY,
-    PERTURBATION_TARGET_REPR_KEY,
-    SOURCE_STATE_KEY,
-    STATE_DATA_KEY,
-    TARGET_STATE_KEY,
-)
+from sc_exp_design.constants import DataFields
 from sc_exp_design.couplings import Coupling
 from sc_exp_design.data.data import PredictionData, TrainData
 from sc_exp_design.transforms import Transform
@@ -63,15 +57,15 @@ class TrainDataLoader:
         :rtype: dict[str, TensorLike]
         """
         ctrl_data = self.data.get_controls(self.batch_size)
-        ctrl_states = ctrl_data[STATE_DATA_KEY]
+        ctrl_states = ctrl_data[DataFields.STATE_DATA]
 
         trtm_data = self.data.get_treatments(self.batch_size)
-        trtm_states = trtm_data[STATE_DATA_KEY]
+        trtm_states = trtm_data[DataFields.STATE_DATA]
 
         if self.data.perturbation_data is not None:
-            trtm_perts = trtm_data[PERTURBATION_DATA_KEY]
+            trtm_perts = trtm_data[DataFields.PERTURBATION_DATA]
         if self.data.target_perturbation_repr is not None:
-            trtm_perts_target_rep = trtm_data[PERTURBATION_TARGET_REPR_KEY]
+            trtm_perts_target_rep = trtm_data[DataFields.PERTURBATION_TARGET_REPR]
 
         source_idx, target_idx = self.coupling.match_groups(ctrl_states, trtm_states)
         
@@ -89,13 +83,13 @@ class TrainDataLoader:
             trtm_perts_target_rep = {key: torch.from_numpy(val[target_idx]).to(self.device).float()
                                      for key, val in trtm_perts_target_rep.items()}
             
-        out_dict = {SOURCE_STATE_KEY: source, TARGET_STATE_KEY: target}
+        out_dict = {DataFields.SOURCE_STATE: source, DataFields.TARGET_STATE: target}
 
-        out_dict[PERTURBATION_DATA_KEY] = None
+        out_dict[DataFields.PERTURBATION_DATA] = None
         if self.data.perturbation_data is not None:
-            out_dict[PERTURBATION_DATA_KEY] = condition
+            out_dict[DataFields.PERTURBATION_DATA] = condition
         if self.data.target_perturbation_repr is not None:
-            out_dict[PERTURBATION_TARGET_REPR_KEY] = trtm_perts_target_rep
+            out_dict[DataFields.PERTURBATION_TARGET_REPR] = trtm_perts_target_rep
         
         return out_dict
 
@@ -142,15 +136,15 @@ class ValidationDataLoader:
         :rtype: dict[str, TensorLike]
         """
         ctrl_data = self.data.get_controls(self.batch_size)
-        ctrl_states = ctrl_data[STATE_DATA_KEY]
+        ctrl_states = ctrl_data[DataFields.STATE_DATA]
 
         trtm_data = self.data.get_treatments(self.batch_size)
-        trtm_states = trtm_data[STATE_DATA_KEY]
+        trtm_states = trtm_data[DataFields.STATE_DATA]
 
         if self.data.perturbation_data is not None:
-            trtm_perts = trtm_data[PERTURBATION_DATA_KEY]
+            trtm_perts = trtm_data[DataFields.PERTURBATION_DATA]
         if self.data.target_perturbation_repr is not None:
-            trtm_perts_target_rep = trtm_data[PERTURBATION_TARGET_REPR_KEY]
+            trtm_perts_target_rep = trtm_data[DataFields.PERTURBATION_TARGET_REPR]
 
         source_idx, target_idx = self.coupling.match_groups(ctrl_states, trtm_states)
 
@@ -168,13 +162,13 @@ class ValidationDataLoader:
             trtm_perts_target_rep = {key: torch.from_numpy(val[target_idx]).to(self.device).float()
                                      for key, val in trtm_perts_target_rep.items()}
         
-        out_dict = {SOURCE_STATE_KEY: source, TARGET_STATE_KEY: target}
-        out_dict[PERTURBATION_DATA_KEY] = {}
+        out_dict = {DataFields.SOURCE_STATE: source, DataFields.TARGET_STATE: target}
+        out_dict[DataFields.PERTURBATION_DATA] = {}
         
         if self.data.perturbation_data is not None:
-            out_dict[PERTURBATION_DATA_KEY] = condition
+            out_dict[DataFields.PERTURBATION_DATA] = condition
         if self.data.target_perturbation_repr is not None:
-            out_dict[PERTURBATION_TARGET_REPR_KEY] = trtm_perts_target_rep
+            out_dict[DataFields.PERTURBATION_TARGET_REPR] = trtm_perts_target_rep
         
         return out_dict
 

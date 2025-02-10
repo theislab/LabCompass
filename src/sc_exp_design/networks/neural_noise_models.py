@@ -3,10 +3,7 @@ from typing import Literal
 
 from torch import Tensor, nn
 
-from sc_exp_design.constants import (
-    COVARIANCE_KEY,
-    MEAN_KEY,
-)
+from sc_exp_design.constants import ParamsFields
 from sc_exp_design.networks.blocks import BaseModule, MLPBlock
 
 __all__ = [
@@ -222,4 +219,4 @@ class MLPGaussianNoiseModel(BaseModule):
             input_tensor = self.encoder(input_tensor)
         mean_hat = self.mean_net(input_tensor)
         cov_hat = self.cov_net(input_tensor)
-        return {MEAN_KEY: mean_hat, COVARIANCE_KEY: cov_hat}
+        return {ParamsFields.MEAN: mean_hat, ParamsFields.COVARIANCE: cov_hat}

@@ -6,11 +6,7 @@ import anndata
 import numpy as np
 from sklearn.preprocessing import OneHotEncoder, LabelEncoder
 
-from sc_exp_design.constants import (
-    CONDITION_COV_KEY,
-    CONDITION_REP_KEY,
-    TARGET_CATEGORIES_KEY,
-)
+from sc_exp_design.constants import DataFields
 from sc_exp_design.data.data import TrainData
 from sc_exp_design.types import TensorLike
 
@@ -179,7 +175,7 @@ class DataManager:
                     covariate_reps = [covariate_reps_dict[covariate] for covariate in covariate_data]
                     covariate_reps = np.stack(covariate_reps, axis=0)
                     # storing the results
-                    covariate_rep_key = f"{CONDITION_REP_KEY}_{perturbation}_{rep}"
+                    covariate_rep_key = f"{DataFields.CONDITION_REP}_{perturbation}_{rep}"
                     perturbation_data[covariate_rep_key] = covariate_reps
                     
             # loading perturbation covariates that are individual for each cell
@@ -195,7 +191,7 @@ class DataManager:
                     # retrieving the covariate data
                     covariate_data = adata.obsm[covariate]
                     # storing the results
-                    covariate_cov_key = f"{CONDITION_COV_KEY}_{perturbation}_{covariate}"
+                    covariate_cov_key = f"{DataFields.CONDITION_COV}_{perturbation}_{covariate}"
                     perturbation_data[covariate_cov_key] = covariate_data
         return perturbation_data
 
@@ -241,8 +237,8 @@ class DataManager:
                     covariate_target_rep_data = covariate_rep_encoder.fit_transform(covariate_data).toarray()
                 elif covariate_target_rep == "label":
                     covariate_rep_encoder = LabelEncoder()
-                    if TARGET_CATEGORIES_KEY in covariate_target_rep_kwargs.keys():
-                        target_categories = covariate_target_rep_kwargs[TARGET_CATEGORIES_KEY]
+                    if DataFields.TARGET_CATEGORIES in covariate_target_rep_kwargs.keys():
+                        target_categories = covariate_target_rep_kwargs[DataFields.TARGET_CATEGORIES]
                         covariate_rep_encoder.fit(target_categories)
                         covariate_target_rep_data = covariate_rep_encoder.transform(covariate_data)
                     else:

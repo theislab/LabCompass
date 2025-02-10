@@ -6,11 +6,7 @@ from typing import Any, Literal
 import torch
 from torch import Tensor, nn
 
-from sc_exp_design.constants import (
-    PERTURBATION_PARAMS_KEYS,
-    SOURCE_PARAMS_KEY,
-    TARGET_PARAMS_KEY,
-)
+from sc_exp_design.constants import VFStepFields
 from sc_exp_design.networks.blocks import BaseModule, MLPBlock
 from sc_exp_design.networks.neural_noise_models import MLPGaussianNoiseModel, MLPNegBinNoiseModel
 
@@ -247,7 +243,7 @@ class PerturbationApproximatePosterior(BaseApproximatePosterior):
             # forward pass on nn and storing the results
             pert_posterior_params = cov_decoder(input_pert_posterior)
             pert_posterior_params_dict[cov_id] = pert_posterior_params
-        pert_output_dict[PERTURBATION_PARAMS_KEYS] = pert_posterior_params_dict
+        pert_output_dict[VFStepFields.PERTURBATION_PARAMS] = pert_posterior_params_dict
         return pert_output_dict
 
 
@@ -328,7 +324,8 @@ class EndpointsApproximatePosterior(BaseApproximatePosterior):
 
         This method takes an input tensor, clones it (to preserve gradients), detaches it (if freezing gradients),
         and computes the approximate posterior parameters for both the source and target endpoints. The parameters 
-        are returned in a dictionary with keys defined by `SOURCE_PARAMS_KEY` and `TARGET_PARAMS_KEY`.
+        are returned in a dictionary with keys defined by `sc_exp_design.constants.DataFields.SOURCE_PARAMS` 
+        and `sc_exp_design.constants.DataFields.TARGET_PARAMS`.
 
         Args:
             input_tensor (Tensor): The input tensor to the model.
@@ -348,6 +345,6 @@ class EndpointsApproximatePosterior(BaseApproximatePosterior):
         src_posterior_params = self.src_approximate_posterior(input_tensor)
         tgt_posterior_params = self.tgt_approximate_posterior(input_tensor)
         # storing the results
-        cond_vars_output_dict[SOURCE_PARAMS_KEY] = src_posterior_params
-        cond_vars_output_dict[TARGET_PARAMS_KEY] = tgt_posterior_params
+        cond_vars_output_dict[VFStepFields.SOURCE_PARAMS] = src_posterior_params
+        cond_vars_output_dict[VFStepFields.TARGET_PARAMS] = tgt_posterior_params
         return cond_vars_output_dict

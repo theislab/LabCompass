@@ -5,14 +5,7 @@ import numpy as np
 import torch
 from torch import Tensor, nn
 
-from sc_exp_design.constants import (
-    COVARIANCE_KEY,
-    LATENT_PERTURBATION_INF_LOSS_KEY,
-    MEAN_KEY,
-    PERTURBATION_LOSS_KEY,
-    SOURCE_LOSS_KEY,
-    TARGET_LOSS_KEY,
-)
+from sc_exp_design.constants import LossFields, ParamsFields
 
 __all__ = [
     "gaussian_rec_loss",
@@ -42,8 +35,8 @@ def gaussian_rec_loss(
     :type cov_estimation_mode: class: `Literal["isotropic", "anisotropic"]`
     """
     if cov_estimation_mode == "isotropic":
-        mean = params[MEAN_KEY]
-        cov = params[COVARIANCE_KEY]
+        mean = params[ParamsFields.MEAN]
+        cov = params[ParamsFields.COVARIANCE]
         dim = mean.shape[1]
         cov = cov**2
         loss = (
@@ -134,8 +127,8 @@ def compute_cond_vars_inference_loss(
     if add_loss:
         loss = loss + src_posterior_loss + tgt_posterior_loss
     loss_dict = {
-        SOURCE_LOSS_KEY: src_posterior_loss.detach().cpu().item(),
-        TARGET_LOSS_KEY: src_posterior_loss.detach().cpu().item(),
+        LossFields.SOURCE_LOSS: src_posterior_loss.detach().cpu().item(),
+        LossFields.TARGET_LOSS: src_posterior_loss.detach().cpu().item(),
     }
     return loss, loss_dict
 
@@ -175,7 +168,7 @@ def compute_pert_inference_loss(
             loss = loss + pert_posterior_loss
 
         # updating log dict
-        cov_loss_id = f"{pert_target_cov_id}_{PERTURBATION_LOSS_KEY}"
+        cov_loss_id = f"{pert_target_cov_id}_{LossFields.PERTURBATION_LOSS}"
         loss_dict[cov_loss_id] = pert_posterior_loss.detach().cpu().item()
 
     return loss, loss_dict
@@ -192,7 +185,7 @@ def compute_latent_perturbation_inference_loss(
     latent_pert_inference_loss = reconstruction_loss_noise_model(
         params, latent_perturbation, "gaussian", cov_estimation_mode=cov_estimation_mode
     )
-    loss_dict = {LATENT_PERTURBATION_INF_LOSS_KEY: latent_pert_inference_loss.detach().cpu().item()}
+    loss_dict = {LossFields.LATENT_PERTURBATION_INF_LOSS: latent_pert_inference_loss.detach().cpu().item()}
     if add_loss:
         loss = loss + latent_pert_inference_loss
     return loss, loss_dict
