@@ -85,19 +85,19 @@ class CFMTrainer:
         ut = self.flow.compute_u_t(t, source, target, xt)
         # forward pass on the neural vf
         vt_step = self.velocity_field(t, xt, condition, source=source, target=target)
-        vt = vt_step[VF_KEY]
+        vt = vt_step[VFStepFields.VF]
         # computing losses
         vf_loss = torch.nn.functional.mse_loss(vt, ut)
         loss = vf_loss
 
-        log_dict = {VF_LOSS_KEY: vf_loss.detach().cpu()}
+        log_dict = {LossFields.VF_LOSS: vf_loss.detach().cpu()}
         # optional loss on the score field
         if self.velocity_field.config.learn_score_field:
             score_t = self.flow.compute_score_t(t, source, target, xt)
-            st = vt_step[SCORE_KEY]
+            st = vt_step[LossFields.SCORE]
             score_loss = torch.nn.functional.mse_loss(st, score_t)
             loss = loss + score_loss
-            log_dict.update({SCORE_LOSS_KEY: score_loss.detach().cpu()})
+            log_dict.update({LossFields.SCORE_LOSS: score_loss.detach().cpu()})
         # optional decoding on conditioning variables
         if self.velocity_field.config.learn_posterior_on_cond_vars:
             src_posterior_params = vt_step[VFStepFields.SOURCE_PARAMS]
@@ -157,7 +157,7 @@ class CFMTrainer:
             )
             log_dict.update(latent_cond_inf_loss)
         # updating log dictionary with final loss value
-        log_dict[LOSS_KEY] = loss.detach().cpu().item()
+        log_dict[LossFields.LOSS] = loss.detach().cpu().item()
         return loss, log_dict
 
     def __validation_step_(

@@ -166,9 +166,9 @@ class ValidationDataLoader:
         out_dict[DataFields.PERTURBATION_DATA] = {}
         
         if self.data.perturbation_data is not None:
-            out_dict[PERTURBATION_DATA_KEY] = condition
+            out_dict[DataFields.PERTURBATION_DATA] = condition
         if self.data.target_perturbation_repr is not None:
-            out_dict[PERTURBATION_TARGET_REPR_KEY] = trtm_perts_target_rep
+            out_dict[DataFields.PERTURBATION_TARGET_REPR] = trtm_perts_target_rep
         
         return out_dict
 

@@ -379,7 +379,7 @@ class FlowMatching:
         source = batch[DataFields.SOURCE_STATE]
         
         condition = None
-        if PERTURBATION_DATA_KEY in batch.keys():
+        if DataFields.PERTURBATION_DATA in batch.keys():
             condition = batch[DataFields.PERTURBATION_DATA]
 
         # defining velocity function
