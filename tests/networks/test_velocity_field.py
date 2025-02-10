@@ -5,14 +5,7 @@ import pytest
 import torch
 
 import sc_exp_design
-from sc_exp_design.constants import (
-    COVARIANCE_KEY,
-    MEAN_KEY,
-    PERTURBATION_PARAMS_KEYS,
-    SOURCE_PARAMS_KEY,
-    TARGET_PARAMS_KEY,
-    VF_KEY,
-)
+from sc_exp_design.constants import ParamsFields, VFStepFields
 
 
 batch_size = 10
@@ -113,36 +106,36 @@ class TestNeuralVelocityField:
         vf_out = cvf.forward(t_test, x_test, cond)
 
         # sanity check on velocity field output
-        msg = f"The velocity field has the wrong shape. Got {vf_out[VF_KEY].shape}, expected {(batch_size, flow_dim)}."
-        assert vf_out[VF_KEY].shape == (batch_size, flow_dim), msg
+        msg = f"The velocity field has the wrong shape. Got {vf_out[VFStepFields.VF].shape}, expected {(batch_size, flow_dim)}."
+        assert vf_out[VFStepFields.VF].shape == (batch_size, flow_dim), msg
 
         # sanity check on conditioning var posterior
         if learn_posterior_on_cond_vars:
             # source
-            msg = f"The mean for the source state distribution has the wrong shape. Got {vf_out[SOURCE_PARAMS_KEY][MEAN_KEY].shape}, expected {(batch_size, flow_dim)}."
-            assert vf_out[SOURCE_PARAMS_KEY][MEAN_KEY].shape == (batch_size, flow_dim), msg
+            msg = f"The mean for the source state distribution has the wrong shape. Got {vf_out[VFStepFields.SOURCE_PARAMS][ParamsFields.MEAN].shape}, expected {(batch_size, flow_dim)}."
+            assert vf_out[VFStepFields.SOURCE_PARAMS][ParamsFields.MEAN].shape == (batch_size, flow_dim), msg
             if src_approximate_posterior_kwargs["cov_estimation_mode"] == "isotropic":
-                msg = f"The covariance for the source state distribution has the wrong shape. Got {vf_out[SOURCE_PARAMS_KEY][COVARIANCE_KEY].shape}, expected {(batch_size, 1)}."
-                assert vf_out[SOURCE_PARAMS_KEY][COVARIANCE_KEY].shape == (batch_size, 1), msg
+                msg = f"The covariance for the source state distribution has the wrong shape. Got {vf_out[VFStepFields.SOURCE_PARAMS][ParamsFields.COVARIANCE].shape}, expected {(batch_size, 1)}."
+                assert vf_out[VFStepFields.SOURCE_PARAMS][ParamsFields.COVARIANCE].shape == (batch_size, 1), msg
             elif src_approximate_posterior_kwargs["cov_estimation_mode"] == "anisotropic":
-                msg = f"The covariance for the target source distribution has the wrong shape. Got {vf_out[SOURCE_PARAMS_KEY][MEAN_KEY].shape}, expected {(batch_size, flow_dim)}."
-                assert vf_out[SOURCE_PARAMS_KEY][COVARIANCE_KEY].shape == (batch_size, flow_dim), msg
+                msg = f"The covariance for the target source distribution has the wrong shape. Got {vf_out[VFStepFields.SOURCE_PARAMS][ParamsFields.COVARIANCE].shape}, expected {(batch_size, flow_dim)}."
+                assert vf_out[VFStepFields.SOURCE_PARAMS][ParamsFields.COVARIANCE].shape == (batch_size, flow_dim), msg
             # target
-            msg = f"The mean for the target state distribution has the wrong shape. Got {vf_out[TARGET_PARAMS_KEY][MEAN_KEY].shape}, expected {(batch_size, flow_dim)}."
-            assert vf_out[TARGET_PARAMS_KEY][MEAN_KEY].shape == (batch_size, flow_dim), msg
+            msg = f"The mean for the target state distribution has the wrong shape. Got {vf_out[VFStepFields.TARGET_PARAMS][ParamsFields.MEAN].shape}, expected {(batch_size, flow_dim)}."
+            assert vf_out[VFStepFields.TARGET_PARAMS][ParamsFields.MEAN].shape == (batch_size, flow_dim), msg
             if tgt_approximate_posterior_kwargs["cov_estimation_mode"] == "isotropic":
-                msg = f"The covariance for the source state distribution has the wrong shape. Got {vf_out[TARGET_PARAMS_KEY][COVARIANCE_KEY].shape}, expected {(batch_size, 1)}."
-                assert vf_out[TARGET_PARAMS_KEY][COVARIANCE_KEY].shape == (batch_size, 1), msg
+                msg = f"The covariance for the source state distribution has the wrong shape. Got {vf_out[VFStepFields.TARGET_PARAMS][ParamsFields.COVARIANCE].shape}, expected {(batch_size, 1)}."
+                assert vf_out[VFStepFields.TARGET_PARAMS][ParamsFields.COVARIANCE].shape == (batch_size, 1), msg
             elif tgt_approximate_posterior_kwargs["cov_estimation_mode"] == "anisotropic":
-                msg = f"The covariance for the source state distribution has the wrong shape. Got {vf_out[TARGET_PARAMS_KEY][COVARIANCE_KEY].shape}, expected {(batch_size, flow_dim)}."
-                assert vf_out[TARGET_PARAMS_KEY][COVARIANCE_KEY].shape == (batch_size, flow_dim), msg
+                msg = f"The covariance for the source state distribution has the wrong shape. Got {vf_out[VFStepFields.TARGET_PARAMS][ParamsFields.COVARIANCE].shape}, expected {(batch_size, flow_dim)}."
+                assert vf_out[VFStepFields.TARGET_PARAMS][ParamsFields.COVARIANCE].shape == (batch_size, flow_dim), msg
 
         # sanity check on perturbation posterior
         if learn_posterior_on_perts:
             if pert_approximate_posterior_input_type in ["endpoints", "one_step_prediction"]:
                 ...
             else:
-                for covariate_id, covariate_posterior_params in vf_out[PERTURBATION_PARAMS_KEYS].items():
+                for covariate_id, covariate_posterior_params in vf_out[VFStepFields.PERTURBATION_PARAMS].items():
                     msg = f"The posterior parameters for {covariate_id=} has the wrong shape. Got {covariate_posterior_params.shape}, expected {(batch_size, pert_target_covariates_output_dims[covariate_id])}"
                     assert covariate_posterior_params.shape == (
                         batch_size,
@@ -152,14 +145,14 @@ class TestNeuralVelocityField:
         # sanity check on latent perturbation posterior
         if learn_posterior_on_latent_perts and encode_conditions:
             latent_condition_inf_params = cvf.get_latent_condition_inf_params(source, target)
-            msg = f"The mean of posterior parameters for the latent perturbations has the wrong shape. Got {latent_condition_inf_params[MEAN_KEY].shape}, expected {(batch_size, cvf.condition_encoder.latent_dim)}"
-            assert latent_condition_inf_params[MEAN_KEY].shape == (batch_size, cvf.condition_encoder.latent_dim), msg
+            msg = f"The mean of posterior parameters for the latent perturbations has the wrong shape. Got {latent_condition_inf_params[ParamsFields.MEAN].shape}, expected {(batch_size, cvf.condition_encoder.latent_dim)}"
+            assert latent_condition_inf_params[ParamsFields.MEAN].shape == (batch_size, cvf.condition_encoder.latent_dim), msg
             if latent_perts_approximate_posterior_kwargs["cov_estimation_mode"] == "isotropic":
-                msg = f"The covariance of posterior parameters for the latent perturbations has the wrong shape. Got {latent_condition_inf_params[COVARIANCE_KEY].shape}, expected {(batch_size, 1)}"
-                assert latent_condition_inf_params[COVARIANCE_KEY].shape == (batch_size, 1)
+                msg = f"The covariance of posterior parameters for the latent perturbations has the wrong shape. Got {latent_condition_inf_params[ParamsFields.COVARIANCE].shape}, expected {(batch_size, 1)}"
+                assert latent_condition_inf_params[ParamsFields.COVARIANCE].shape == (batch_size, 1)
             if latent_perts_approximate_posterior_kwargs["cov_estimation_mode"] == "anisotropic":
-                msg = f"The covariance of posterior parameters for the latent perturbations has the wrong shape. Got {latent_condition_inf_params[COVARIANCE_KEY].shape}, expected {(batch_size, cvf.condition_encoder.latent_dim)}"
-                assert latent_condition_inf_params[COVARIANCE_KEY].shape == (
+                msg = f"The covariance of posterior parameters for the latent perturbations has the wrong shape. Got {latent_condition_inf_params[ParamsFields.COVARIANCE].shape}, expected {(batch_size, cvf.condition_encoder.latent_dim)}"
+                assert latent_condition_inf_params[ParamsFields.COVARIANCE].shape == (
                     batch_size,
                     cvf.condition_encoder.latent_dim,
                 ), msg
