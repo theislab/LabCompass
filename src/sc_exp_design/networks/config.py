@@ -309,22 +309,10 @@ class NeuralVelocityFieldConfig:
     :type latent_perts_approximate_posterior_kwargs: class`dict[str, Any]`
     """
 
-    x_encoder_hidden_dims: Sequence[int] = (128, 64, 32)
-    x_encoder_output_dim: int = 10
-    x_encoder_use_batchnorm: bool = False
-    x_encoder_use_dropout: bool = False
-    x_encoder_dropout_rate: float = 0.0
-    x_encoder_activation_class: nn.Module = nn.ELU
-    x_encoder_final_activation_class: nn.Module = nn.Identity
+    state_encoder_mlp_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
     encode_time: bool = False
     time_encoder_input_dim: int = 1
-    time_encoder_hidden_dims: Sequence[int] = (128, 64, 32)
-    time_encoder_output_dim: int = 10
-    time_encoder_use_batchnorm: bool = False
-    time_encoder_use_dropout: bool = False
-    time_encoder_dropout_rate: float = 0.0
-    time_encoder_activation_class: nn.Module = nn.ELU
-    time_encoder_final_activation_class: nn.Module = nn.Identity
+    time_encoder_mlp_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
     use_guidance: bool = True
     encode_conditions: bool = False
     perturbation_latent_dim: int | None = None
@@ -333,20 +321,10 @@ class NeuralVelocityFieldConfig:
     perturbation_pooling: Literal["mean", "self_attention"] = "mean"
     perturbation_pooling_kwargs: dict[str, Any] | None = None
     perturbation_layers_after_pooling: LayersDict | None = None
-    decoder_hidden_dims: Sequence[int] = (128, 64, 32)
-    decoder_use_batchnorm: bool = False
-    decoder_use_dropout: bool = False
-    decoder_dropout_rate: float = 0.0
-    decoder_activation_class: nn.Module = nn.ELU
-    decoder_final_activation_class: nn.Module = nn.Identity
+    decoder_mlp_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
     learn_score_field: bool = False
     score_field_freeze_grads: bool = True
-    score_hidden_dims: Sequence[int] = (128, 64, 32)
-    score_use_batchnorm: bool = False
-    score_use_dropout: bool = False
-    score_dropout_rate: float = 0.0
-    score_activation_class: nn.Module = nn.ELU
-    score_final_activation_class: nn.Module = nn.Identity
+    score_mlp_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
     learn_posterior_on_cond_vars: bool = False
     endpoints_approximate_posterior_freeze_grads: bool = True
     endpoints_approximate_posterior_use_latent_repr: bool = True
