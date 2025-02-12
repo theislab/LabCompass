@@ -40,6 +40,7 @@ class CFMTrainer:
         lr_scheduler: torch.optim.lr_scheduler.LRScheduler | None = None,
         lr_scheduler_step: Literal["grad_step", "valid_step"] = "grad_step",
         time_sampler: Callable = torch.rand,
+        genot_latent_sampler: Callable = torch.randn,
         callbacks: CallBack | None = None,
         grad_step_interval_log: int = 1000,
         solver_class: ODESolver | None = None,
@@ -57,6 +58,7 @@ class CFMTrainer:
         self.lr_scheduler = lr_scheduler
         self.lr_scheduler_step = lr_scheduler_step
         self.time_sampler = time_sampler
+        self.genot_latent_sampler = genot_latent_sampler
         self.callbacks = callbacks
         self.grad_step_interval_log = grad_step_interval_log
         self.solver_class = solver_class
@@ -66,6 +68,31 @@ class CFMTrainer:
         self.posterior_on_cond_vars_update_step = posterior_on_cond_vars_update_step
         self.posterior_on_perts_update_step = posterior_on_perts_update_step
         self.posterior_on_latent_perts_update_step = posterior_on_latent_perts_update_step
+
+    def __compute_x_t(
+        self,
+        t: Tensor,
+        source: Tensor,
+        target: Tensor,
+        latent: Tensor | None = None,
+    ) -> Tensor:
+        """"""
+        if self.velocity_field.config.use_genot:
+            return self.flow.compute_x_t(t, latent, target)
+        return self.flow.compute_x_t(t, source, target)
+
+    def __compute_u_t(
+        self,
+        t: Tensor,
+        source: Tensor,
+        target: Tensor,
+        xt: Tensor,
+        latent: Tensor | None = None,
+    ) -> Tensor:
+        """"""
+        if self.velocity_field.config.use_genot:
+            return self.flow.compute_u_t(t, latent, target, xt)
+        return self.flow.compute_u_t(t, source, target, xt)
 
     def __train_step_(
         self,
@@ -80,9 +107,14 @@ class CFMTrainer:
         # retrieving batch size and ode time
         batch_size = source.shape[0]
         t = self.time_sampler((batch_size,), device=source.device)
+        # sampling latent source state when using genot
+        latent = None
+        if self.velocity_field.config.use_genot:
+            latent = self.genot_latent_sampler((batch_size, self.velocity_field.config.flow_dim), device=target.device)
+            condition[DataFields.GENOT_SOURCE] = source
         # computing flow and target velocity field
-        xt = self.flow.compute_x_t(t, source, target)
-        ut = self.flow.compute_u_t(t, source, target, xt)
+        xt = self.__compute_x_t(t, source, target, latent=latent)
+        ut = self.__compute_u_t(t, source, target, xt, latent=latent)
         # forward pass on the neural vf
         vt_step = self.velocity_field(t, xt, condition, source=source, target=target)
         vt = vt_step[VFStepFields.VF]

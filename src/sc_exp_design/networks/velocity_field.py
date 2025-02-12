@@ -5,7 +5,7 @@ from collections.abc import Callable, Iterator
 import torch
 from torch import Tensor, nn
 
-from sc_exp_design.constants import VFStepFields
+from sc_exp_design.constants import DataFields, VFStepFields
 from sc_exp_design.networks.blocks import BaseModule, ConditionEncoder, MLPBlock
 from sc_exp_design.networks.config import NeuralVelocityFieldConfig
 from sc_exp_design.networks.neural_noise_models import MLPGaussianNoiseModel, MLPNegBinNoiseModel
@@ -26,7 +26,6 @@ class NeuralVelocityField(BaseModule):
 
     def __init__(
         self,
-        flow_dim: int,
         config: NeuralVelocityFieldConfig,
     ) -> None:
         """
@@ -37,7 +36,6 @@ class NeuralVelocityField(BaseModule):
             config (NeuralVelocityFieldConfig): Configuration settings for the model.
         """
         super().__init__()
-        self.flow_dim = flow_dim
         self.config = config
 
         # initializing modules
@@ -117,18 +115,6 @@ class NeuralVelocityField(BaseModule):
         return self
 
     @property
-    def joint_original_dim(
-        self,
-    ) -> int:
-        """
-        Collect dimensionality in the original space
-        """
-        perturbation_dim = 0
-        if self.config.use_guidance:
-            perturbation_dim = self.config.condition_input_dim
-        return self.flow_dim + self.config.time_encoder_input_dim + perturbation_dim
-
-    @property
     def cond_vars_input_dim(
         self,
     ) -> int:
@@ -160,7 +146,7 @@ class NeuralVelocityField(BaseModule):
         if self.config.pert_approximate_posterior_input_type == "latent":
             return self.config.joint_latent_dim
         elif self.config.pert_approximate_posterior_input_type in ["endpoints", "one_step_prediction"]:
-            return self.flow_dim * 2
+            return self.config.flow_dim * 2
         elif self.config.pert_approximate_posterior_input_type == "original":
             return self.joint_original_dim
         else:
@@ -175,7 +161,7 @@ class NeuralVelocityField(BaseModule):
         """
         # state encoder
         self.x_encoder = MLPBlock(
-            self.flow_dim,
+            self.config.flow_dim,
             self.config.state_encoder_output_dim,
             **self.config.state_encoder_mlp_kwargs,
         )
@@ -189,7 +175,7 @@ class NeuralVelocityField(BaseModule):
             )
         # condition encoder
         self.condition_encoder = None
-        if self.config.use_guidance and self.config.encode_conditions:
+        if self.config.initialize_condition_encoder:
             self.condition_encoder = ConditionEncoder(
                 latent_dim=self.config.perturbation_latent_dim,
                 layers_before_pooling=self.config.perturbation_layers_before_pooling,
@@ -197,11 +183,14 @@ class NeuralVelocityField(BaseModule):
                 pooling=self.config.perturbation_pooling,
                 pooling_kwargs=self.config.perturbation_pooling_kwargs,
                 layers_after_pooling=self.config.perturbation_layers_after_pooling,
+                use_genot=self.config.use_genot,
+                encode_only_genot_source=self.config.encode_only_genot_source,
+                genot_source_mlp_kwargs=self.config.genot_source_mlp_kwargs,
             )
         # decoder
         self.decoder = MLPBlock(
             self.config.joint_latent_dim,
-            self.flow_dim,
+            self.config.flow_dim,
             **self.config.decoder_mlp_kwargs
         )
         # score
@@ -209,7 +198,7 @@ class NeuralVelocityField(BaseModule):
         if self.config.learn_score_field:
             self.score_decoder = MLPBlock(
                 self.config.joint_latent_dim,
-                self.flow_dim,
+                self.config.flow_dim,
                 **self.config.score_mlp_kwargs,
             )
         # inference on conditioning vars 
@@ -217,7 +206,7 @@ class NeuralVelocityField(BaseModule):
         if self.config.learn_posterior_on_cond_vars:
             self.endpoints_approximate_posterior = EndpointsApproximatePosterior(
                 self.cond_vars_input_dim,
-                self.flow_dim,
+                self.config.flow_dim,
                 freeze_grads=self.config.endpoints_approximate_posterior_freeze_grads,
                 src_noise_model=self.config.src_noise_model,
                 src_approximate_posterior_kwargs=self.config.src_approximate_posterior_kwargs,
@@ -238,7 +227,7 @@ class NeuralVelocityField(BaseModule):
         self.latent_pert_approximate_posterior = None
         if self.config.learn_posterior_on_latent_perts:
             self.latent_pert_approximate_posterior = MLPGaussianNoiseModel(
-                2 * self.flow_dim,
+                2 * self.config.flow_dim,
                 self.condition_encoder.latent_dim,
                 **self.config.latent_perts_approximate_posterior_kwargs,
             )
@@ -272,11 +261,11 @@ class NeuralVelocityField(BaseModule):
             
         # encoding conditions
         condition_latent = cond
-        if self.config.use_guidance and self.config.encode_conditions:
+        if (self.config.use_guidance and self.config.encode_conditions) or self.config.use_genot:
             condition_latent = self.condition_encoder(cond)
-            condition_original = torch.concatenate(list(cond.values()), dim=-1)
+            condition_original = torch.concatenate([v for k, v in cond.items() if k != DataFields.GENOT_SOURCE], dim=-1)
         elif self.config.use_guidance and (not self.config.encode_conditions):
-            cond_values = [val for key, val in cond.items() if key in self.config.perturbation_layers_before_pooling]
+            cond_values = [val for key, val in cond.items() if (key in self.config.perturbation_layers_before_pooling and key != DataFields.GENOT_SOURCE)]
             condition_latent = torch.concatenate(cond_values, dim=-1)
             condition_original = condition_latent
         
@@ -284,9 +273,14 @@ class NeuralVelocityField(BaseModule):
         xt_latent = self.x_encoder(xt)
 
         # concatenating original and latent representations
-        if self.config.use_guidance:
+        if self.config.use_guidance or self.config.use_genot:
             latent_concat = torch.cat([t_latent, xt_latent, condition_latent], dim=1)
             original_concat = torch.cat([t, xt, condition_original], dim=1)
+            # Concatenating original condition when we do not encode it.
+            # In this case the `condition_latent` variable will hold only the data 
+            # of the encoded genot source.
+            if self.config.use_genot and self.config.encode_only_genot_source:
+                latent_concat = torch.cat([latent_concat, condition_original], dim=1)
         else:
             latent_concat = torch.cat([t_latent, xt_latent], dim=1)
             original_concat = torch.cat([t, xt], dim=1)
@@ -417,11 +411,17 @@ class NeuralVelocityField(BaseModule):
             xt: Tensor,
         ) -> Tensor:
             """"""
-            vf = self.vf(t, xt, cond=cond)
+            # copying the condition dictionary to preserve keys
+            cond_copy = cond.copy()
+            # forward step on neural velocity field
+            vf_step = self.forward(t, xt, cond=cond_copy)
+            vf = vf_step[VFStepFields.VF]
             if self.config.learn_score_field and gamma_fn is None:
-                score = self.score(t, xt, cond=cond)
+                score = vf_step[VFStepFields.SCORE]
                 gamma = gamma_fn(t, xt)
                 return vf + 0.5 * (gamma**2) * score
+            # cleaning memory
+            del cond_copy
             return vf
 
         return vf_fn
@@ -445,7 +445,7 @@ class NeuralVelocityField(BaseModule):
         msg = f"The velocity field is in the unguided mode (i.e.: {self.config.use_guidance=})"
         assert self.config.use_guidance, msg
         # forward pass on condition encoder
-        condition_latent = self.condition_encoder(cond)
+        condition_latent = self.condition_encoder(cond, return_conditions_only=True)
         return condition_latent
 
     def get_latent_condition_inf_params(

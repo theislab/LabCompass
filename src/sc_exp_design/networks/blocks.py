@@ -6,9 +6,10 @@ from typing import Any, Literal
 import torch
 from torch import Tensor, nn
 
+from sc_exp_design.constants import DataFields
 from sc_exp_design.types import LayersDict
 
-__all__ = ["ConditionEncoder", "BaseModule", "MLPBlock", "SelfAttentionBlock", "AttentionPooling"]
+__all__ = ["ConditionEncoder", "BaseModule", "MLPBlock", "CategoricalEmbedder", "SelfAttentionBlock", "AttentionPooling"]
 
 
 class BaseModule(abc.ABC, nn.Module):
@@ -493,6 +494,9 @@ class ConditionEncoder(BaseModule):
         pooling: Literal["mean", "self_attention"] = "mean",
         pooling_kwargs: dict[str, Any] | None = None,
         layers_after_pooling: LayersDict | None = None,
+        use_genot: bool = False,
+        encode_only_genot_source: bool = False,
+        genot_source_mlp_kwargs: LayersDict | None = None,
     ) -> None:
         super().__init__()
         self.latent_dim = latent_dim
@@ -501,6 +505,9 @@ class ConditionEncoder(BaseModule):
         self.pooling = pooling
         self.pooling_kwargs = pooling_kwargs
         self.layers_after_pooling = layers_after_pooling
+        self.use_genot = use_genot
+        self.encode_only_genot_source = encode_only_genot_source
+        self.genot_source_mlp_kwargs = genot_source_mlp_kwargs
         # initializing modules
         self._init_modules()
 
@@ -529,10 +536,12 @@ class ConditionEncoder(BaseModule):
         :type device: class:`torch.device`
         """
         self = super().to(device)
-        before_pooling = {}
-        for covariate_id, cov_before_pooling in self.before_pooling.items():
-            before_pooling[covariate_id] = cov_before_pooling.to(device)
-        self.before_pooling = before_pooling
+        # initializing the condition encoder
+        if (not self.encode_only_genot_source):
+            before_pooling = {}
+            for covariate_id, cov_before_pooling in self.before_pooling.items():
+                before_pooling[covariate_id] = cov_before_pooling.to(device)
+            self.before_pooling = before_pooling
         return self
 
     def parameters(
@@ -540,8 +549,10 @@ class ConditionEncoder(BaseModule):
     ) -> Iterator[nn.Parameter]:
         """Returns an iterator with the parameters of each module"""
         parameters = [super().parameters()]
-        for covariate_id, cov_before_pooling in self.before_pooling.items():
-            parameters.append(cov_before_pooling.parameters())
+        # initializing the condition encoder
+        if (not self.encode_only_genot_source):
+            for covariate_id, cov_before_pooling in self.before_pooling.items():
+                parameters.append(cov_before_pooling.parameters())
         parameters = itertools.chain(*parameters)
         return parameters
 
@@ -552,10 +563,12 @@ class ConditionEncoder(BaseModule):
         :type train: class:`bool`
         """
         self = super().train(train)
-        before_pooling = {}
-        for covariate_id, cov_before_pooling in self.before_pooling.items():
-            before_pooling[covariate_id] = cov_before_pooling.train(train)
-        self.before_pooling = before_pooling
+        # initializing the condition encoder
+        if (not self.encode_only_genot_source):
+            before_pooling = {}
+            for covariate_id, cov_before_pooling in self.before_pooling.items():
+                before_pooling[covariate_id] = cov_before_pooling.train(train)
+            self.before_pooling = before_pooling
         return self
 
     def eval(
@@ -563,33 +576,42 @@ class ConditionEncoder(BaseModule):
     ) -> None:
         """Sets the computation to the deterministic/evaluation mode."""
         self = super().eval()
-        before_pooling = {}
-        for covariate_id, cov_before_pooling in self.before_pooling.items():
-            before_pooling[covariate_id] = cov_before_pooling.eval()
-        self.before_pooling = before_pooling
+        # initializing the condition encoder
+        if (not self.encode_only_genot_source):
+            before_pooling = {}
+            for covariate_id, cov_before_pooling in self.before_pooling.items():
+                before_pooling[covariate_id] = cov_before_pooling.eval()
+            self.before_pooling = before_pooling
         return self
 
     def _init_modules(
         self,
     ) -> None:
         """Initializes the modules."""
-        # initializing the layers before pooling
-        self.before_pooling = {}
-        for covariate, layers_dict in self.layers_before_pooling.items():
-            covariate_layers = self._get_layers(layers_dict)
-            self.before_pooling[covariate] = covariate_layers
+        # genot source layers
+        if self.use_genot:
+            self.genot_source_layers = self._get_layers(
+                self.genot_source_mlp_kwargs    
+            )
+        # initializing the condition encoder
+        if (not self.encode_only_genot_source):
+            # initializing the layers before pooling
+            self.before_pooling = {}
+            for covariate, layers_dict in self.layers_before_pooling.items():
+                covariate_layers = self._get_layers(layers_dict)
+                self.before_pooling[covariate] = covariate_layers
 
-        # pooling modules
-        if self.pooling == "mean":
-            self.pooling_layer = lambda x, mask: torch.mean(x * mask, dim=-2)
-        elif self.pooling == "self_attention":
-            self.pooling_layer = AttentionPooling(**self.pooling_kwargs)
-        else:
-            msg = f"{self.pooling=} not available, possible options are `['mean', 'self_attention']`"
-            raise ValueError(msg)
+            # pooling modules
+            if self.pooling == "mean":
+                self.pooling_layer = lambda x, mask: torch.mean(x * mask, dim=-2)
+            elif self.pooling == "self_attention":
+                self.pooling_layer = AttentionPooling(**self.pooling_kwargs)
+            else:
+                msg = f"{self.pooling=} not available, possible options are `['mean', 'self_attention']`"
+                raise ValueError(msg)
 
-        # layers after pooling
-        self.after_pooling = self._get_layers(self.layers_after_pooling)
+            # layers after pooling
+            self.after_pooling = self._get_layers(self.layers_after_pooling)
 
     def __get_mask(
         self,
@@ -641,6 +663,7 @@ class ConditionEncoder(BaseModule):
     def forward(
         self,
         conditions: dict[str, Tensor],
+        return_conditions_only: bool = False,
     ) -> Tensor:
         """Forward pass on the condition encoder
 
@@ -648,6 +671,13 @@ class ConditionEncoder(BaseModule):
             perturbation covarites to be used to guide the flow and values being their corresponding data.
         :type conditions: class:`dict[str, Tensor]`
         """
+        # genot source
+        if self.use_genot and (not return_conditions_only):
+            genot_source = conditions.pop(DataFields.GENOT_SOURCE)
+            encoded_genot_source = self.genot_source_layers(genot_source)
+            # encoding only genot source
+            if self.encode_only_genot_source:
+                return encoded_genot_source
         # layers before pooling
         encoded_covariates = {}
         for covariate, covariate_data in conditions.items():
@@ -698,4 +728,7 @@ class ConditionEncoder(BaseModule):
             z = self.after_pooling(z, mask)
         else:
             z = self.after_pooling(z)
+        # returning only condition encoding
+        if self.use_genot or (not return_conditions_only):  
+            z = torch.concatenate((z, encoded_genot_source), dim=-1)
         return z

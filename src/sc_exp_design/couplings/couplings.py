@@ -1,11 +1,16 @@
+import logging
 import abc
 from collections.abc import Callable
+from functools import partial
 from typing import Any, Literal
 
+import numpy as np
 import ot as pot
 import torch
 
 from sc_exp_design.types import TensorLike
+
+logger = logging.getLogger(__name__)
 
 __all__ = ["Coupling", "FixedCoupling", "OTCoupling", "IndependentCoupling"]
 
@@ -80,25 +85,49 @@ class OTCoupling(Coupling):
 
     def __init__(
         self,
-        method: Literal["exact", "sinkhorn", "unbalanced", "partial"],
-        cost_fn: Callable[[TensorLike, TensorLike], TensorLike],
-        reg: float | None,
-        reg_m: float | None,
+        method: Literal["exact", "sinkhorn", "unbalanced", "partial"] = "sinkhorn",
+        solver_kwargs: dict[str, Any] | None = None,
+        cost_fn: Callable[[TensorLike, TensorLike], TensorLike] | None = None,
+        reg: float = 5e-1,
+        reg_m: float = 1e-0,
+        normalize_cost: bool = False,
+        replace: bool = True,
     ) -> None:
+        # empty dictionary if no solver kwargs provided
+        if solver_kwargs is None:
+            solver_kwargs = {}
         # sanity checks
-        if method in ["sinkhorn", "partial"] and reg is None:
-            msg = f"{method=} requires `reg` to be a `float`, `None` found"
-            raise ValueError(msg)
-        if method == "unbalanced" and reg:
-            msg = f"{method=} requires `reg` to be a `float`, `None` found"
-            raise ValueError(msg)
-        if method == "unbalanced" and reg_m is None:
-            msg = f"{method=} requires `reg_m` to be a `float`, `None` found"
-            raise ValueError(msg)
+        if method == "exact":
+            ot_fn = pot.emd
+        elif method == "sinkhorn":
+            if reg is None:
+                msg = f"{method=} requires `reg` to be a `float`, `None` found"
+                raise ValueError(msg)
+            ot_fn = partial(pot.sinkhorn, reg=reg, **solver_kwargs)
+        elif method == "partial":
+            if reg is None:
+                msg = f"{method=} requires `reg` to be a `float`, `None` found"
+                raise ValueError(msg)
+            ot_fn = partial(pot.partial.entropic_partial_wasserstein, reg=reg, **solver_kwargs)
+        elif method == "unbalanced":
+            if reg is None:
+                msg = f"{method=} requires `reg` to be a `float`, `None` found" 
+                raise ValueError(msg)
+            if reg_m is None:
+                msg = f"{method=} requires `reg_m` to be a `float`, `None` found" 
+                raise ValueError(msg)
+            ot_fn = partial(pot.unbalanced.sinkhorn_knopp_unbalanced, reg=reg, reg_m=reg_m, **solver_kwargs)
+        # defaults to euclidean distance
+        if cost_fn is None:
+            cost_fn = lambda source, target: torch.cdist(source, target)**2
         self.method = method
+        self.solver_kwargs = solver_kwargs
+        self.ot_fn = ot_fn
         self.cost_fn = cost_fn
         self.reg = reg
         self.reg_m = reg_m
+        self.normalize_cost = normalize_cost
+        self.replace = replace
 
     def match_groups(
         self,
@@ -113,10 +142,51 @@ class OTCoupling(Coupling):
         :param target: A tensor or array of values containing the data coming from the target distribution.
         :type target: class:`TensorLike`
         """
+        # computing weights
         src_weights = pot.unif(source.shape[0])
         tgt_weights = pot.unif(target.shape[0])
+        # moving arrays to torch tensors
+        if isinstance(source, np.ndarray):
+            source = torch.from_numpy(source)
+        if isinstance(target, np.ndarray):
+            target = torch.from_numpy(target)
+        # flattening tensors
+        source = torch.flatten(source, start_dim=1)
+        target = torch.flatten(target, start_dim=1)
+        # computing cost matrix
         distance_matrix = self.cost_fn(source, target)
-        raise NotImplementedError
+        # optional normalization of cost
+        if self.normalize_cost:
+            distance_matrix = distance_matrix / distance_matrix.max()
+        # computing coupling matrix
+        coupling_matrix = self.ot_fn(
+            src_weights,
+            tgt_weights,
+            distance_matrix.detach().cpu().numpy()
+        )
+        # checking for numerical errors in the coupling matrix
+        if not np.all(np.isfinite(coupling_matrix)):
+            msg = f"Non finite values found in `coupling_matrix` \n {coupling_matrix=} \n {source=} \n {target=} \n {distance_matrix.mean()=} \n {distance_matrix.max()=}"
+            logger.warning(msg)
+        if np.abs(coupling_matrix.sum()) < 1e-8:
+            msg = f""
+            logger.warning(msg)
+            coupling_matrix = np.ones_like(coupling_matrix) / coupling_matrix.size
+        # retrieving coupling probabilities
+        coupling_probs = coupling_matrix.flatten()
+        coupling_probs = coupling_probs / coupling_probs.sum()
+        # sampling indices
+        choices = np.random.choice(
+            coupling_matrix.shape[0]*coupling_matrix.shape[1],
+            p=coupling_probs,
+            size=source.shape[0],
+            replace=self.replace,
+        )
+        source_idxs, target_idxs = np.divmod(
+            choices,
+            coupling_matrix.shape[1]
+        ) 
+        return source_idxs, target_idxs
 
 
 class IndependentCoupling(Coupling):
