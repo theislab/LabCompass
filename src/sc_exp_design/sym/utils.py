@@ -5,14 +5,25 @@ import itertools
 import numpy as np
 import torch
 from sc_exp_design.sym.gmm import AnnotatedGaussianMixtureModel
+from sc_exp_design.utils import set_reproducibility
 
-def generate_annotated_perturbation_data(sigma, d, U, n_cat, N0, Nu, mean_range=5, linespace_width=10, uniform_range=5, seed=None):
+def generate_annotated_perturbation_data(
+        sigma: float,
+        d: int,
+        U: int,
+        n_cat: int,
+        N0: int,
+        Nu: int,
+        mean_range: int = 5,
+        linespace_width: int = 10,
+        uniform_range: int = 5,
+        seed: int | None = None,
+    ) -> tuple[AnnotatedGaussianMixtureModel, np.ndarray, np.ndarray, np.ndarray]:
     """
     Generate observations
     """
     if seed is not None:
-        torch.manual_seed(seed)
-        np.random.seed(seed)
+        set_reproducibility(seed)
         
     N = Nu*d + N0  # total number of samples
     cov = torch.eye(d)*sigma  # covariance matrix for perturbed distributions
