@@ -7,7 +7,7 @@ from torch.distributions.categorical import Categorical
 
 from sc_exp_design.types import TensorLike
 
-__all__ = ["GaussianMixtureModel"]
+__all__ = ["GaussianMixtureModel", "AnnotatedGaussianMixtureModel"]
 
 
 class GaussianMixtureModel:
