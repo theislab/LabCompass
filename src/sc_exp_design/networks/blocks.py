@@ -9,7 +9,7 @@ from torch import Tensor, nn
 from sc_exp_design.constants import DataFields
 from sc_exp_design.types import LayersDict
 
-__all__ = ["ConditionEncoder", "BaseModule", "MLPBlock", "SelfAttentionBlock", "AttentionPooling"]
+__all__ = ["ConditionEncoder", "BaseModule", "MLPBlock", "CategoricalEmbedder", "SelfAttentionBlock", "AttentionPooling"]
 
 
 class BaseModule(abc.ABC, nn.Module):
