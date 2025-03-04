@@ -139,10 +139,10 @@ class AnnotatedGaussianMixtureModel(GaussianMixtureModel):
 
     def __init__(
         self,
-        params,
-        n_cat,  
-        cat_logit_lm,
-        weights=None,
+        params: Sequence[dict[str, TensorLike]],
+        n_cat: int,
+        cat_logit_lm: TensorLike,
+        weights: Sequence[float] | None = None,
     ) -> None:
         """
         Initializes the annotated Gaussian Mixture Model with given parameters, category information, 
@@ -161,7 +161,9 @@ class AnnotatedGaussianMixtureModel(GaussianMixtureModel):
         self.cat_logit_lm = cat_logit_lm  # (n_features x n_categories) matrix representing the logits 
         
     @property
-    def num_categories(self) -> int:
+    def num_categories(
+            self,
+        ) -> int:
         """
         Returns the number of categorical labels.
 
@@ -170,7 +172,10 @@ class AnnotatedGaussianMixtureModel(GaussianMixtureModel):
         """
         return self.n_cat
 
-    def sample_categories(self, features):
+    def sample_categories(
+            self,
+            features: TensorLike
+        ) -> TensorLike:
         """
         Samples categorical labels based on the given features.
 

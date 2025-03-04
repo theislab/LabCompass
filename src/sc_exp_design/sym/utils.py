@@ -5,6 +5,7 @@ import itertools
 import numpy as np
 import torch
 from sc_exp_design.sym.gmm import AnnotatedGaussianMixtureModel
+from sc_exp_design.utils import set_reproducibility
 
 def generate_annotated_perturbation_data(sigma, 
                                          d, 
@@ -43,8 +44,10 @@ def generate_annotated_perturbation_data(sigma,
     
     # if specified, set the seed for both torch and numpy
     if seed is not None:
-        torch.manual_seed(seed)
-        np.random.seed(seed)
+        set_reproducibility(seed)
+        
+    N = Nu*d + N0  # total number of samples
+    cov = torch.eye(d)*sigma  # covariance matrix for perturbed distributions
 
     # Collect mean perturbation shifts
     feature_range = np.linspace(-mean_range, mean_range, linespace_width)
