@@ -159,7 +159,7 @@ class AnnotatedGaussianMixtureModel(GaussianMixtureModel):
         super(AnnotatedGaussianMixtureModel, self).__init__(params, weights)
         self.n_cat = n_cat  # number of categories 
         self.cat_logit_lm = cat_logit_lm  # (n_features x n_categories) matrix representing the logits 
-
+        
     @property
     def num_categories(self) -> int:
         """
