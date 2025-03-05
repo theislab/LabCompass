@@ -309,7 +309,6 @@ class NeuralVelocityFieldConfig:
     :type latent_perts_approximate_posterior_kwargs: class`dict[str, Any]`
     """
 
-    flow_dim: int
     state_encoder_output_dim: int = 10
     state_encoder_mlp_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
     encode_time: bool = False
@@ -324,9 +323,6 @@ class NeuralVelocityFieldConfig:
     perturbation_pooling_kwargs: dict[str, Any] | None = None
     perturbation_layers_after_pooling: LayersDict | None = None
     decoder_mlp_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
-    use_genot: bool = False
-    genot_source_latent_dim: int = 10
-    genot_source_mlp_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
     learn_score_field: bool = False
     score_field_freeze_grads: bool = True
     score_mlp_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
@@ -409,22 +405,6 @@ class NeuralVelocityFieldConfig:
             msg = f"With {self.use_guidance=} an unguided flow model will be initialized, thus the settings for the condition encoder will be ignored."
             logger.warning(msg)
 
-        # sanity check on GENOT
-        if self.use_genot:
-            if isinstance(self.genot_source_mlp_kwargs, dict):
-                # preparing dictionary
-                if "layer_type" not in self.genot_source_mlp_kwargs.keys():
-                    self.genot_source_mlp_kwargs["layer_type"] = "mlp"
-                if "input_dim" not in self.genot_source_mlp_kwargs.keys():
-                    self.genot_source_mlp_kwargs["input_dim"] = self.flow_dim
-                self.genot_source_mlp_kwargs["output_dim"] = self.genot_source_latent_dim
-                # verifying keys and initializing layer configurations
-                msg = "Genot source layers only support MLPs"
-                assert self.genot_source_mlp_kwargs["layer_type"] == "mlp", msg
-                self.genot_source_mlp_kwargs = LayersDict(**self.genot_source_mlp_kwargs)
-            msg = f"`self.genot_source_mlp_kwargs` is expected to be an instance of `LayersDict`, found {type(self.genot_source_mlp_kwargs)}"
-            assert isinstance(self.genot_source_mlp_kwargs, LayersDict), msg
-
     @property
     def condition_input_dim(
         self,
@@ -433,10 +413,6 @@ class NeuralVelocityFieldConfig:
         Collect the condition input dimensions for the encoding process from the configuration.
         """
         dim = 0
-        # early return if no encoding of perturbations
-        if self.perturbation_layers_before_pooling is None:
-            return dim
-        # iterating over the perturbation covariates
         for condition, layers_dict in self.perturbation_layers_before_pooling.items():
             if isinstance(layers_dict, LayersDict):
                 layers_dict = vars(layers_dict)
@@ -458,10 +434,6 @@ class NeuralVelocityFieldConfig:
         Collect the condition input dimensions after pooling.
         """
         dim = 0
-        # early return if no encoding of perturbations
-        if self.perturbation_layers_before_pooling is None:
-            return dim
-        # iterating over the perturbation covariates
         for condition, layers_dict in self.perturbation_layers_before_pooling.items():
             if isinstance(layers_dict, LayersDict):
                 layers_dict = vars(layers_dict)
@@ -484,53 +456,7 @@ class NeuralVelocityFieldConfig:
             perturbation_latent_dim = self.perturbation_latent_dim
         elif self.use_guidance and (not self.encode_conditions):
             perturbation_latent_dim = self.condition_input_dim
-        if self.use_genot:
-            perturbation_latent_dim = perturbation_latent_dim + self.genot_source_mlp_kwargs.output_dim
         time_latent_dim = self.time_encoder_input_dim
         if self.encode_time:
             time_latent_dim = self.time_encoder_output_dim
         return self.state_encoder_output_dim + time_latent_dim + perturbation_latent_dim
-
-    @property
-    def joint_original_dim(
-        self,
-    ) -> int:
-        """
-        Collect dimensionality in the original space
-        """
-        perturbation_dim = 0
-        if self.use_guidance:
-            perturbation_dim = self.condition_input_dim
-        return self.flow_dim + self.time_encoder_input_dim + perturbation_dim
-
-    @property
-    def encode_only_genot_source(
-        self,
-    ) -> bool:
-        """
-        Whether to only encode the genot source in the condition encoder module,
-        for example when no explicit guidance is used with a genot solver in which case we still
-        need to initialize the condition encoder.
-        """
-        # no genot used
-        if (not self.use_genot):
-            return False
-        # in this case we need to return conditions as well
-        if self.use_guidance and self.encode_conditions:
-            return False
-        # here the condition encoder won't be initialized
-        # so we only need to encode the genot source
-        return True
-
-    @property
-    def initialize_condition_encoder(
-        self,
-    ) -> bool:
-        """
-        Attribute indicating wheter or not to initiailize condition encoder
-        """
-        if self.use_guidance and self.encode_conditions:
-            return True
-        if self.encode_only_genot_source:
-            return True
-        return False

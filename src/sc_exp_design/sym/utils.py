@@ -19,6 +19,10 @@ def generate_annotated_perturbation_data(sigma,
                                          seed=None, 
                                          return_perturbation_representation=False
                                          ):
+<<<<<<< HEAD
+=======
+>>>>>>> 848bd51 (Minor changes in simulation scripts)
+>>>>>>> f1e5643 (Added the categorical GMM simulation)
     """
     Generate annotated perturbation data using a Gaussian Mixture Model (GMM).
 
@@ -44,8 +48,20 @@ def generate_annotated_perturbation_data(sigma,
     
     # if specified, set the seed for both torch and numpy
     if seed is not None:
+<<<<<<< HEAD
         torch.manual_seed(seed)
         np.random.seed(seed)
+=======
+<<<<<<< HEAD
+        set_reproducibility(seed)
+        
+    N = Nu*d + N0  # total number of samples
+    cov = torch.eye(d)*sigma  # covariance matrix for perturbed distributions
+=======
+        torch.manual_seed(seed)
+        np.random.seed(seed)
+>>>>>>> 848bd51 (Minor changes in simulation scripts)
+>>>>>>> f1e5643 (Added the categorical GMM simulation)
 
     # Collect mean perturbation shifts
     feature_range = np.linspace(-mean_range, mean_range, linespace_width)

@@ -13,7 +13,6 @@ class DataFields:
     CONDITION_REP: str = "repr"
     CONDITION_COV: str = "cov"
     TARGET_CATEGORIES: str = "target_categories"
-    GENOT_SOURCE: str = "genot_source"
 
 
 @dataclass(frozen=True)

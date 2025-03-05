@@ -170,6 +170,7 @@ class FlowMatching:
 
     def prepare_model(
         self,
+        flow_dim: int,
         cvf_config: NeuralVelocityFieldConfig,
         optimizer_class: torch.optim.Optimizer = torch.optim.AdamW,
         lr_scheduler_class: torch.optim.lr_scheduler.LRScheduler | None = None,
@@ -179,7 +180,6 @@ class FlowMatching:
         solver_class: ODESolver | None = ODESolver,
         num_time_steps: int = 100,
         solver_kwargs: dict[str, Any] | None = None,
-        genot_latent_sampler: Callable = torch.randn,
     ) -> None:
         """Initializes the model.
 
@@ -219,10 +219,12 @@ class FlowMatching:
         :param solver_kwargs: Dictionary containining the keyword arguments used to initialize the :param:`solver_class`, defaults to `None`.
         :type solver_kwargs: class:`dict[str, Any] | None`
         """
+        self.flow_dim = flow_dim
         self.cvf_config = cvf_config
         
         # given a dimensionality and a configuration of hparams, initialize a flow model 
         self.velocity_field = NeuralVelocityField(
+            self.flow_dim,
             config=self.cvf_config,
         )
         self.velocity_field = self.velocity_field.float()
@@ -245,7 +247,6 @@ class FlowMatching:
         self.solver_class = solver_class
         self.num_time_steps = num_time_steps
         self.solver_kwargs = solver_kwargs
-        self.genot_latent_sampler = genot_latent_sampler
 
     def train(
         self,
@@ -317,7 +318,6 @@ class FlowMatching:
             lr_scheduler=self.lr_scheduler,
             lr_scheduler_step=self.lr_scheduler_step,
             time_sampler=self.time_sampler,
-            genot_latent_sampler=self.genot_latent_sampler,
             callbacks=callbacks,
             grad_step_interval_log=grad_step_interval_log,
             solver_class=self.solver_class,
@@ -373,22 +373,15 @@ class FlowMatching:
             default as from the original fromulation, defaults to `None`.
         :type gamma_fn: class:`Callable[[Tensor, Tensor], Tensor] | None`
 
-        :return: Tensor of shape `(batch_size, self.cvf_config.flow_dim)` if :param:`return_trajectory` is `False`, otherwise Tensor of shape `(batch_size, self.num_time_steps, self.cvf_config.flow_dim)`
+        :return: Tensor of shape `(batch_size, self.flow_dim)` if :param:`return_trajectory` is `False`, otherwise Tensor of shape `(batch_size, self.num_time_steps, self.flow_dim)`
         :rtype: class:`torch.Tensor`
         """
         source = batch[DataFields.SOURCE_STATE]
         
-        condition = {}
+        condition = None
         if DataFields.PERTURBATION_DATA in batch.keys():
             condition = batch[DataFields.PERTURBATION_DATA]
 
-        # sampling latent state and adding source to condition dictionary when using genot
-        if self.cvf_config.use_genot:
-            condition[DataFields.GENOT_SOURCE] = source
-            latent = self.genot_latent_sampler((source.shape[0], self.cvf_config.flow_dim), device=self.device)
-
-        # setting velocity field in evaluation mode
-        self.velocity_field.eval()
         # defining velocity function
         vf = self.velocity_field.get_vf_fn(condition, gamma_fn=gamma_fn)
         # initializing the sampler clss
@@ -400,6 +393,5 @@ class FlowMatching:
             device_id=self.device_id,
         )
         with torch.no_grad():
-            if self.cvf_config.use_genot:
-                return ode_sampler.integrate(latent, return_trajectory=return_trajectory)
-            return ode_sampler.integrate(source, return_trajectory=return_trajectory)
+            predictions = ode_sampler.integrate(source, return_trajectory=return_trajectory)
+        return predictions
