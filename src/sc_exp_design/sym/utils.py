@@ -7,6 +7,9 @@ import torch
 from sc_exp_design.sym.gmm import AnnotatedGaussianMixtureModel
 from sc_exp_design.utils import set_reproducibility
 
+__all__ = ["generate_annotated_perturbation_data"]
+
+
 def generate_annotated_perturbation_data(sigma, 
                                          d, 
                                          U, 
