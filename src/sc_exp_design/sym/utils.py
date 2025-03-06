@@ -17,7 +17,10 @@ def generate_annotated_perturbation_data(sigma,
                                          linespace_width=10, 
                                          uniform_range=5, 
                                          seed=None, 
-                                         return_perturbation_representation=False
+                                         return_perturbation_representation=False,
+                                         heteroskedastic=False,
+                                         max_var=5.0,
+                                         min_var=1e-4,
                                          ):
     """
     Generate annotated perturbation data using a Gaussian Mixture Model (GMM).
@@ -57,10 +60,20 @@ def generate_annotated_perturbation_data(sigma,
     sampled_means = np.random.choice(len(combinations), U)  # sample combinations of dimension means 
     sampled_means = combinations[sampled_means]
 
+    # sampling the variances when heteroskedastic == True
+    trtms_covs = None
+    if heteroskedastic:
+        sigmas = [min_var + np.random.rand()*max_var for _ in range(U)]
+        trtms_covs = [torch.eye(d)*sigma for sigma in sigmas]
+
     cov = torch.eye(d) * sigma  # covariance matrix for perturbed distributions
 
+    # if not trtms covs if found, use control by default
+    if trtms_covs is None:
+        trtms_covs = [cov for _ in range(U)]
+
     mu_array = [torch.tensor(mu).float() for mu in sampled_means]
-    params_array = [{"mean": mu, "cov": cov} for mu in mu_array]
+    params_array = [{"mean": mu, "cov": trtms_covs[idx]} for idx, mu in enumerate(mu_array)]
     cat_logits_lm = torch.rand(d, n_cat) * uniform_range  # logits defining class of interest
 
     gmm = AnnotatedGaussianMixtureModel(params=params_array,
