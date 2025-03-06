@@ -61,7 +61,7 @@ class MLPBlock(BaseModule):
         self,
         input_dim: int,
         output_dim: int,
-        hidden_dims: Sequence[int] = (128, 64, 32),
+        hidden_dims: Sequence[int] = (1024, 1024, 1024),
         use_batchnorm: bool = False,
         use_dropout: bool = False,
         dropout_rate: float = 0.0,

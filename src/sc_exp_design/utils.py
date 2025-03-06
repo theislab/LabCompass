@@ -11,62 +11,22 @@ __all__ = [
 
 
 def match_shapes(
-    input: float | Tensor,
+    t: Tensor | float,
+    source: Tensor,
     target: Tensor,
 ) -> Tensor:
-    """
-    :param `input`: The input which we have to broadcast to match `target` dimension.
-        Could either be a `float` or a `torch.Tensor`.
-        When `isinstance(input, Tensor)`, `input` will need to satisfy one of the following conditions:
-            * Have only one elemen, `input.numel() == 1`.
-            * Be a 1-dimensional tensor with shape `input.shape == (target.shape[0], )`.
-            * Be a 2-dimensional tensor with a tailing singleton axis `input.shape == (target.shape[0], 1)`.
-    :type `input`: `float | Tensor`
-
-    :param `target`: The target tensor whose shape will be matched. It only supports 2-dimensional tensors.
-    :type `target`: `Tensor`    
-    """
-    # sanity check on inputs
-    msg = f"`input` must be either a `float` or `Tensor`, found {type(input)}"
-    assert isinstance(input, float | Tensor), msg
-
-    msg = f"`target` must be either a `Tensor`, found {type(target)}"
-    assert isinstance(target, Tensor), msg
-
-    msg = f"`target` only supports 2 dimensional tensors, found {target.ndim}-dimensional tensor instead."
-    assert (target.ndim == 2), msg
-
-    # input is float
-    if isinstance(input, float):
-        return torch.ones((target.shape[0], 1), device=target.device)*input
-
-    # input is tensor
-    if isinstance(input, Tensor):
-        # case 1 (1-element tensor): extract float value then recursive call
-        # note: already handles the case when input.ndim == 1 but we only have one value 
-        if input.numel() == 1:
-            input = input.item()
-            return match_shapes(input, target)
-
-        # case 2 (1-dimensional tensor with same shape): simply unsqueeze last dimension
-        if input.ndim == 1:
-            msg = f"When `input` is a `torch.tensor` with `input.ndim == 1`, `input` and `target` should share the same batch size, found {input.shape[0]=} and {target.shape[0]=}"
-            assert input.shape[0] == target.shape[0], msg
-
-            return torch.unsqueeze(input, dim=1)
-        
-        # case 3 (2-dimensional tensor with dummy trailing dimension): keep unchanges
-        if input.ndim == 2:
-            msg = f"When `input` is a `torch.tensor` with `input.ndim == 2`, `input` and `target` should share the same batch size, found {input.shape[0]=} and {target.shape[0]=}"
-            assert input.shape[0] == target.shape[0], msg
-
-            msg = f"When `input` is a `torch.tensor` with `input.ndim == 2`, the second dimension of `input` should be 1, found {input.shape[1]=}"
-            assert input.shape[1] == 1, msg
-
-            return input
-    
-        # raise value error if the cases are not matched
-        raise ValueError
+    """"""
+    assert source.shape == target.shape
+    if isinstance(t, float):
+        t = torch.ones_like(source) * t
+    if isinstance(t, Tensor):
+        if t.shape == source.shape:
+            return t
+        assert t.shape[0] == source.shape[0], ""
+        assert t.ndim == 1, ""
+        dims_to_repeat = (1, *source.shape[1:])[::-1]
+        t = t.repeat(*dims_to_repeat).T
+    return t
 
 
 def set_reproducibility(random_seed: int) -> None:
