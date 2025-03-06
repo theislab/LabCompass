@@ -88,10 +88,8 @@ class BaseFlow(abc.ABC, nn.Module):
         :return: Computed latent representation at time `t`.
         :rtype: Tensor
         """
-        # handling shapes
-        msg = f"`source` and `target` are supposed to have the same shape, found  {source.shape=} and {target.shape=}"
-        assert source.shape == target.shape, msg
-        t = match_shapes(t, source)
+        # matching shapes
+        t = match_shapes(t, source, target)
         # computing coefficients and ode noise
         mu_t = self.compute_mu_t(t, source, target)
         sigma_t = self.compute_sigma_t(t)
@@ -119,10 +117,8 @@ class BaseFlow(abc.ABC, nn.Module):
         :return: Computed score function at time `t`.
         :rtype: Tensor
         """
-        # handling shapes
-        msg = f"`source` and `target` are supposed to have the same shape, found  {source.shape=} and {target.shape=}"
-        assert source.shape == target.shape, msg
-        t = match_shapes(t, source)
+        # matching shapes
+        t = match_shapes(t, source, target)
         # computing coefficients and ode noise
         mu_t = self.compute_mu_t(t, source, target)
         sigma_t = self.compute_sigma_t(t)
@@ -310,11 +306,8 @@ class VariancePreservingFlow(BaseFlow):
         """
         Computes the velocity field.
         """
-        # handling shapes
-        msg = f"`source` and `target` are supposed to have the same shape, found  {source.shape=} and {target.shape=}"
-        assert source.shape == target.shape, msg
-        t = match_shapes(t, source)
-        # computing coefficients and ode noise
+        # matching shapes
+        t = match_shapes(t, source, target)
         mu = self.compute_mu_t(t, source, target)
         sigma = self.compute_sigma_t(t)
         sigma_dot = self.sigma * t / torch.sqrt(self.sigma * t * (1 - t))
@@ -376,11 +369,7 @@ class EncodingDecodingFlow(BaseFlow):
         """
         Computes the velocity field for encoding-decoding dynamics.
         """
-        # handling shapes
-        msg = f"`source` and `target` are supposed to have the same shape, found  {source.shape=} and {target.shape=}"
-        assert source.shape == target.shape, msg
-        t = match_shapes(t, source)
-        # computing coefficients and ode noise
+        t = match_shapes(t, source, target)
         sigma = self.compute_sigma_t(t)
         mu = self.compute_mu_t(t, source, target)
         alpha_dot = -2 * np.pi * torch.sin(np.pi * t) * torch.cos(np.pi * t)
