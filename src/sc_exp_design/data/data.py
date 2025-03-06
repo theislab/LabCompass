@@ -1,4 +1,6 @@
 import abc
+from collections.abc import Sequence
+from itertools import product
 from dataclasses import dataclass
 from typing import Any
 
@@ -41,6 +43,26 @@ class TrainData(BaseDataStruct):
     state_data: TensorLike
     perturbation_data: dict[str, TensorLike] | None
     target_perturbation_repr: dict[str, TensorLike] | None = None
+    perturbations_with_rep: dict[str, Sequence[str]] | None = None
+
+    @property
+    def seen_combinatorial_perturbations(
+        self,
+    ) -> list[list[str]] | None:
+        """"""
+        # no perturbation data is passed to the TrainData object or no perturbation with associated representation
+        if (self.perturbation_data is None) or (self.perturbations_with_rep is None):
+            return None
+        return self.adata.obs[[pert for pert in self.perturbations_with_rep.keys()]].drop_duplicates().values.tolist()
+
+    @property
+    def num_seen_combinatorial_perturbations(
+        self,
+    ) -> int | None:
+        """"""
+        if self.seen_combinatorial_perturbations is None:
+            return None
+        return len(self.seen_combinatorial_perturbations)
 
     def get_controls(
         self,
@@ -86,17 +108,26 @@ class TrainData(BaseDataStruct):
     def get_treatments(
         self,
         batch_size: int | None = None,
+        treatments: int | None = None,
     ) -> tuple[TensorLike, TensorLike]:
         """
         Retrieve treatment group data.
 
         :param batch_size: Number of samples to return. If None, all treatments are returned.
         :type batch_size: int | None
+
+        :param treatment_ids: The identifier for the treatment to be sampled in the current batch.
+            Defaults to `None`, in which case all individual treatments could be sampled.
+        :type treatment_ids: int | None
+
         :return: Dictionary containing treatment state and perturbation data (if available).
         :rtype: Dict[str, TensorLike]
         """
         # collect treatment ids and features
         trtm_obs_idx = np.argwhere(self.adata.obs[self.control_key] == False)[:, 0]
+        # optionally selecting only the current treatment (used in case of OT couplings) 
+        if treatments is not None:
+            trtm_obs_idx = np.argwhere(self.adata.obs[[pert for pert in self.perturbations_with_rep.keys()]] == treatments)[:, 0]
         trtm_state_data = self.state_data[trtm_obs_idx]
 
         # collect treatment annotations from perturbation data 

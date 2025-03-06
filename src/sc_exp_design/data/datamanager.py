@@ -115,6 +115,48 @@ class DataManager:
         self.perturbation_target_covariates_in_obsm = perturbation_target_covariates_in_obsm
         self.perturbation_target_covariates_kwargs = perturbation_target_covariates_kwargs
 
+    @property
+    def perturbations_with_rep(
+        self,
+    ) -> dict[str, Sequence[str]] | None:
+        """
+        Returns a dictionary with keys given by the modeled perturbation and values being the list
+        of unique values that each perturbation can assume. This is needed to get a complete list
+        of perturbations from which we can sample unique perturbation when using OT couplings.
+        """
+        # sanity check as we need to have initialized `self.adata` attribute
+        msg = f""
+        assert self.adata is not None, msg
+        # no representation found
+        if self.perturbation_reps is None:
+            return None
+        # defining list of perturbations for which we have found the representation
+        perturbations_with_rep = {}
+        # iterating over each perturbation covariate
+        for perturbation in self.perturbations:
+            # This will contain a list with all the representation modalities for the current perturbation. 
+            # It will be automatically constructed even when the perturbation does not have an associated representation
+            # (check `self.__init__`), in which case it will be a 0-elements sequence.
+            # Hence, we can check the length of this list to verify whether the perturbation has an associated representation or not.
+            perturbation_covariate_rep = self.perturbation_reps[perturbation]
+            # when we have at least one element, it means that we have found an associated representation
+            # and we can append the perturbation label to the list of perturbations.
+            if len(perturbation_covariate_rep) > 0:
+                # now we iterate over the different representation and verify that 
+                # they share the same keys (i.e.: the unique values of the current perturbation)
+                # using the first representation as reference
+                reference_keys = list(self.adata.uns[perturbation_covariate_rep[0]].keys())
+                for rep in perturbation_covariate_rep:
+                    # retrieving the covariates and their representations
+                    covariate_reps_keys = list(self.adata.uns[rep].keys())
+                    # sanity check, we should have the same keys for each representation
+                    # associated to the current perturbation
+                    msg = "" # probably should do this check within the `self.__init__` method like the other ones
+                    assert covariate_reps_keys == reference_keys, msg
+                # now we can append the dictionary that maps the current perturbation to its unique values.
+                perturbations_with_rep[perturbation] = reference_keys
+        return perturbations_with_rep
+
     def __get_state_data(
         self,
         adata: anndata.AnnData,
@@ -279,4 +321,4 @@ class DataManager:
         target_perturbation_repr = None
         if self.use_perturbation_target_repr:
             target_perturbation_repr = self.__get_perturbation_target_rep_data(adata)
-        return TrainData(adata, self.control_key, state_data, perturbation_data, target_perturbation_repr)
+        return TrainData(adata, self.control_key, state_data, perturbation_data, target_perturbation_repr, self.perturbations_with_rep)
