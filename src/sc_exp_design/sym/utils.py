@@ -4,7 +4,7 @@ import itertools
 
 import numpy as np
 import torch
-from sc_exp_design.sym.gmm import AnnotatedGaussianMixtureModel
+from sc_exp_design.sym.gmm import AnnotatedGaussianMixtureModel, DoseResolvedAnnotatedGaussianMixtureModel
 from sc_exp_design.utils import set_reproducibility
 
 __all__ = ["generate_annotated_perturbation_data"]
@@ -24,6 +24,9 @@ def generate_annotated_perturbation_data(sigma,
                                          heteroskedastic=False,
                                          max_var=5.0,
                                          min_var=1e-4,
+                                         dose_resolved=False,
+                                         dosage_prior=torch.rand,
+                                         interpolation_fn=None,
                                          ):
     """
     Generate annotated perturbation data using a Gaussian Mixture Model (GMM).
@@ -79,15 +82,29 @@ def generate_annotated_perturbation_data(sigma,
     params_array = [{"mean": mu, "cov": trtms_covs[idx]} for idx, mu in enumerate(mu_array)]
     cat_logits_lm = torch.rand(d, n_cat) * uniform_range  # logits defining class of interest
 
-    gmm = AnnotatedGaussianMixtureModel(params=params_array,
-                       n_cat=n_cat,  
-                       cat_logit_lm=cat_logits_lm) 
+    if dose_resolved:
+        gmm = DoseResolvedAnnotatedGaussianMixtureModel(
+            params=params_array,
+            n_cat=n_cat,
+            cat_logit_lm=cat_logits_lm,
+            dosage_prior=dosage_prior,
+            interpolation_fn=interpolation_fn,
+        )
+    else:
+        gmm = AnnotatedGaussianMixtureModel(
+            params=params_array,
+            n_cat=n_cat,  
+            cat_logit_lm=cat_logits_lm,
+        ) 
 
     perturbation_ids = torch.concatenate([torch.ones((Nu,), dtype=int) * i for i in range(1, U+1)],
                                         dim=0)
     
     # Sample observations 
-    target_samples, target_categories = gmm.sample(comps=(perturbation_ids - 1))  # sampling from the perturbed population
+    if dose_resolved:
+        target_samples, target_categories, target_dosages = gmm.sample(comps=(perturbation_ids - 1))  # sampling from the perturbed population
+    else:
+        target_samples, target_categories = gmm.sample(comps=(perturbation_ids - 1))  # sampling from the perturbed population
     source_samples = torch.randn((N0, d))*sigma  # sampling from the control population
     source_categories = gmm.sample_categories(source_samples)
 
@@ -108,6 +125,14 @@ def generate_annotated_perturbation_data(sigma,
          target_categories, # target states
         ), dim=0)
 
+    # dosages
+    if dose_resolved:
+        dosages = torch.concatenate(
+        (torch.zeros((N0, )),  # id for no perturbation (control)
+            perturbation_ids,  # rest of perturbations
+        ), dim=0
+        )
+
     random_perm_idx = torch.randperm(states.shape[0])
     states = states[random_perm_idx].numpy()
     perturbation_ids = perturbation_ids[random_perm_idx].numpy()
@@ -118,7 +143,14 @@ def generate_annotated_perturbation_data(sigma,
                                    torch.tensor(sampled_means)], dim=0)
         perturbation_representation = sampled_means[perturbation_ids]
 
-    if return_perturbation_representation:
-        return gmm, states, perturbation_ids, categories, perturbation_representation
+    if dose_resolved:
+        if return_perturbation_representation:
+            return gmm, states, perturbation_ids, categories, dosages, perturbation_representation
+        else:
+            return gmm, states, perturbation_ids, categories, dosages
+
     else:
-        return gmm, states, perturbation_ids, categories
+        if return_perturbation_representation:
+            return gmm, states, perturbation_ids, categories, perturbation_representation
+        else:
+            return gmm, states, perturbation_ids, categories

@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 
 import numpy as np
 import torch
@@ -129,6 +129,7 @@ class GaussianMixtureModel:
         ind_log_probs = torch.stack(ind_log_probs, axis=0)
         return torch.sum(ind_log_probs, axis=0)
 
+
 class AnnotatedGaussianMixtureModel(GaussianMixtureModel):
     """
     A Gaussian Mixture Model (GMM) with categorical annotations.
@@ -223,3 +224,102 @@ class AnnotatedGaussianMixtureModel(GaussianMixtureModel):
         samples = torch.stack([self.distributions[comp].sample() for comp in comps])
         sampled_categories = self.sample_categories(samples)
         return samples, sampled_categories
+
+
+class DoseResolvedAnnotatedGaussianMixtureModel(AnnotatedGaussianMixtureModel):
+    """"""
+    def __init__(
+        self,
+        params: Sequence[dict[str, TensorLike]],
+        n_cat: int,
+        cat_logit_lm: TensorLike,
+        weights: Sequence[float] | None = None,
+        dosage_prior: Callable[[Any], TensorLike] | None = None,
+        interpolation_fn: Callable[[float, TensorLike, TensorLike], TensorLike] | None = None,
+        control_mean: TensorLike | None = None
+    ) -> None:
+        """"""
+        super().__init__(params, n_cat, cat_logit_lm, weights=weights)
+        # setting additional attributes
+        if dosage_prior is None:
+            dosage_prior = torch.rand
+        self.dosage_prior = dosage_prior
+
+        if interpolation_fn is None:
+            interpolation_fn = lambda dose, source, target: (1 - dose)*source + dose*target
+        self.interpolation_fn = interpolation_fn
+        
+        if control_mean is None:
+            control_mean = torch.zeros(self.dimensionality)
+        self.control_mean = control_mean
+    
+    def __interpolate_distributions(
+        self,
+        comps: list[int],
+        dosages: TensorLike,
+    ) -> Sequence[MultivariateNormal]:
+        """"""
+        # converting dosages array to list
+        if isinstance(dosages, np.ndarray | torch.Tensor):
+            dosages = dosages.tolist()
+
+        # defining list of dose-resolved components
+        dose_resolved_comps = []
+
+        # iterating over the components (one for each sample)
+        for obs_id, comp in enumerate(comps):
+            # retrieving corresponding component params dictionary
+            comp_params = self.params[comp]
+            # parsing params dictionary
+            comp_mean = comp_params["mean"]
+            comp_cov = comp_params["cov"]
+
+            # retrieving corresponding dosage
+            obs_dosage = dosages[obs_id]
+
+            # interpolating with control mean
+            interpolated_mean = self.interpolation_fn(
+                obs_dosage,
+                self.control_mean,
+                comp_mean,
+            )
+
+            # updating components with new normal distribution
+            dose_resolved_comps.append(
+                MultivariateNormal(interpolated_mean, comp_cov)
+            )
+        return dose_resolved_comps
+
+    def sample(
+        self,
+        dosages: np.ndarray | None = None,
+        num_samples: int | None = None,
+        comps: np.ndarray | None = None,
+    ) -> tuple[TensorLike, TensorLike, TensorLike]:
+        """"""
+        # overriding the num_samples argument if
+        # the components are explicitly paxssed
+        if comps is not None:
+            num_samples = comps.shape[0]
+        else:
+            # only one sample by default
+            if num_samples is None:
+                num_samples = 1
+            # Sample mixture components based on the weights 
+            comps = np.random.choice(self.num_components, size=num_samples, p=self.weights)
+        
+        # converting components array to list
+        if isinstance(comps, np.ndarray | torch.Tensor):
+            comps = comps.tolist()
+        
+        # sampling from dosage prior if not explicitly passed
+        if dosages is None:
+            dosages = self.dosage_prior((num_samples, ))
+        
+        # retrieving dose-resolved interpolated distributions
+        distributions = self.__interpolate_distributions(comps, dosages)
+
+        # sampling
+        samples = torch.stack([distribution.sample() for distribution in distributions])
+        sampled_categories = self.sample_categories(samples)
+        return samples, sampled_categories, dosages
