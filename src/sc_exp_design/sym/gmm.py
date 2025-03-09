@@ -1,4 +1,5 @@
 from collections.abc import Callable, Sequence
+from typing import Any
 
 import numpy as np
 import torch
