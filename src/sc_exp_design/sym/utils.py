@@ -22,6 +22,7 @@ def generate_annotated_perturbation_data(sigma,
                                          seed=None, 
                                          return_perturbation_representation=False,
                                          heteroskedastic=False,
+                                         sigma_prior=np.random.rand,
                                          max_var=5.0,
                                          min_var=1e-4,
                                          dose_resolved=False,
@@ -69,7 +70,7 @@ def generate_annotated_perturbation_data(sigma,
     # sampling the variances when heteroskedastic == True
     trtms_covs = None
     if heteroskedastic:
-        sigmas = [min_var + np.random.rand()*(max_var - min_var) for _ in range(U)]
+        sigmas = [min_var + sigma_prior()*(max_var - min_var) for _ in range(U)]
         trtms_covs = [torch.eye(d)*sigma for sigma in sigmas]
 
     cov = torch.eye(d) * sigma  # covariance matrix for perturbed distributions
