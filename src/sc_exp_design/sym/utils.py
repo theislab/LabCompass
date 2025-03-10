@@ -58,17 +58,17 @@ def __generate_perturbation_data(
         trtm_covs = [sigma*torch.eye(d) for _ in range(U)]
     elif covariance_type == "isotropic": # isotropic gaussians
         trtm_covs = [
-            min_var + cov_prior()(max_var - min_var) for _ in range(U)
+            min_var + cov_prior()*(max_var - min_var) for _ in range(U)
         ]
         trtm_covs = [
             sigma*torch.eye(d) for sigma in trtm_covs
         ]
     elif covariance_type == "anisotropic": # anisotropic gaussians
         trtm_covs = [
-            min_var + cov_prior(d)(max_var - min_var) for _ in range(U)
+            min_var + cov_prior(d)*(max_var - min_var) for _ in range(U)
         ]
         trtm_covs = [
-            np.diag(cov) for cov in trtm_covs
+            torch.from_numpy(np.diag(cov)) for cov in trtm_covs
         ]
     elif covariance_type == "full_covariance": # full covariance matrix
         trtm_covs = ...
@@ -214,7 +214,7 @@ def get_annotated_perturbation_data(
     control_label: str = "control",
     treatment_label: str = "treatment",
     category_label: str = "cell_type",
-) -> anndata.AnnData:
+) -> tuple[anndata.AnnData, dict[str, Any]]:
     """"""
     # generating data
     sym_dictionary = __generate_perturbation_data(
@@ -296,4 +296,4 @@ def get_annotated_perturbation_data(
         obs=obs,
         uns=uns,
     )
-    return adata
+    return adata, sym_dictionary
