@@ -1,157 +1,299 @@
+from collections.abc import Callable
+from typing import Any, Literal
+
+import anndata
 import numpy as np
 import torch
 import itertools
 
 import numpy as np
 import torch
+
+from sc_exp_design.types import TensorLike
 from sc_exp_design.sym.gmm import AnnotatedGaussianMixtureModel, DoseResolvedAnnotatedGaussianMixtureModel
 from sc_exp_design.utils import set_reproducibility
 
-__all__ = ["generate_annotated_perturbation_data"]
+__all__ = ["get_annotated_perturbation_data"] 
 
 
-def generate_annotated_perturbation_data(sigma, 
-                                         d, 
-                                         U, 
-                                         n_cat, 
-                                         N0, 
-                                         Nu, 
-                                         mean_range=5, 
-                                         linespace_width=10, 
-                                         uniform_range=5, 
-                                         seed=None, 
-                                         return_perturbation_representation=False,
-                                         heteroskedastic=False,
-                                         sigma_prior=np.random.rand,
-                                         max_var=5.0,
-                                         min_var=1e-4,
-                                         dose_resolved=False,
-                                         dosage_prior=torch.rand,
-                                         interpolation_fn=None,
-                                         ):
-    """
-    Generate annotated perturbation data using a Gaussian Mixture Model (GMM).
+def __generate_perturbation_data(
+    sigma: float,
+    d: int,
+    U: int,
+    n_cat: int,
+    N0: int,
+    Nu: int,
+    mean_range: float = 5.0,
+    linespace_width: int = 10,
+    uniform_range: float = 5.0,
+    seed: int | None = None,
+    return_perturbation_representation: bool = False,
+    homoskedastic: bool = True,
+    covariance_type: Literal["isotropic", "anisotropic", "full_covariance"] = "isotropic",
+    cov_prior: Callable[[Any], TensorLike] = np.random.rand,
+    min_var: float = 1e-4,
+    max_var: float = 5.0,
+    dose_resolved: bool = False,
+    dosage_prior: Callable[[Any], TensorLike] = torch.rand,
+    interpolation_fn: Callable[[float, TensorLike, TensorLike], TensorLike] | None = None,
+) -> dict[str, Any]:
+    """"""
 
-    Parameters:
-    sigma (float): Standard deviation for the perturbation noise.
-    d (int): Dimensionality of the feature space.
-    U (int): Number of perturbation categories.
-    n_cat (int): Number of categorical labels for the Gaussian Mixture Model.
-    N0 (int): Number of samples for the control (unperturbed) population.
-    Nu (int): Number of samples for each perturbed category.
-    mean_range (float, optional): Range for selecting mean values of Gaussians. Default is 5.
-    linespace_width (int, optional): Number of points in the linspace for mean selection. Default is 10.
-    uniform_range (float, optional): Range for sampling category logits. Default is 5.
-    seed (int, optional): Random seed for reproducibility. Default is None.
-
-    Returns:
-    tuple: (gmm, states, perturbation_ids, categories)
-        - gmm (AnnotatedGaussianMixtureModel): The Gaussian Mixture Model instance.
-        - states (numpy.ndarray): Array of sampled feature vectors.
-        - perturbation_ids (numpy.ndarray): Array indicating perturbation category for each sample.
-        - categories (numpy.ndarray): Array of categorical labels for each sample.
-    """
-    
-    # if specified, set the seed for both torch and numpy
+    # reproducibility
     if seed is not None:
         set_reproducibility(seed)
-        
-    N = Nu*d + N0  # total number of samples
-    cov = torch.eye(d)*sigma  # covariance matrix for perturbed distributions
 
-    # Collect mean perturbation shifts
+    # total number of samples
+    N = N0 + d*Nu
+
+    # mean for perturbations
     feature_range = np.linspace(-mean_range, mean_range, linespace_width)
     combinations = np.array(list(itertools.permutations(feature_range.tolist(), 2)))
+    trtm_means = np.random.choice(len(combinations), U)  # sample combinations of dimension means 
+    trtm_means = combinations[trtm_means]
+    trtm_means = torch.from_numpy(trtm_means).float()
 
-    # Randomly select `n` combinations
-    sampled_means = np.random.choice(len(combinations), U)  # sample combinations of dimension means 
-    sampled_means = combinations[sampled_means]
+    # covariance matrix perturbed distribution
+    if homoskedastic: # same covariance as control
+        trtm_covs = [sigma*torch.eye(d) for _ in range(U)]
+    elif covariance_type == "isotropic": # isotropic gaussians
+        trtm_covs = [
+            min_var + cov_prior()(max_var - min_var) for _ in range(U)
+        ]
+        trtm_covs = [
+            sigma*torch.eye(d) for sigma in trtm_covs
+        ]
+    elif covariance_type == "anisotropic": # anisotropic gaussians
+        trtm_covs = [
+            min_var + cov_prior(d)(max_var - min_var) for _ in range(U)
+        ]
+        trtm_covs = [
+            np.diag(cov) for cov in trtm_covs
+        ]
+    elif covariance_type == "full_covariance": # full covariance matrix
+        trtm_covs = ...
+        raise NotImplementedError
+    else:
+        msg = f"{covariance_type=} is not supported, choose among `[\"isotropic\", \"anisotropic\", \"full_covariance\"]`"
+        raise ValueError
 
-    # sampling the variances when heteroskedastic == True
-    trtms_covs = None
-    if heteroskedastic:
-        sigmas = [min_var + sigma_prior()*(max_var - min_var) for _ in range(U)]
-        trtms_covs = [torch.eye(d)*sigma for sigma in sigmas]
+    # initializing the parameters
+    trtm_params = [
+        {
+            "mean": trtm_means[u].float(),
+            "cov": trtm_covs[u].float(),
+        }  for u in range(U)
+    ]
 
-    cov = torch.eye(d) * sigma  # covariance matrix for perturbed distributions
+    # sampling the logits
+    cat_logit_lm = torch.rand(d, n_cat) * uniform_range  # logits defining class of interest
 
-    # if not trtms covs if found, use control by default
-    if trtms_covs is None:
-        trtms_covs = [cov for _ in range(U)]
-
-    mu_array = [torch.tensor(mu).float() for mu in sampled_means]
-    params_array = [{"mean": mu, "cov": trtms_covs[idx]} for idx, mu in enumerate(mu_array)]
-    cat_logits_lm = torch.rand(d, n_cat) * uniform_range  # logits defining class of interest
-
+    # initializing GMM
     if dose_resolved:
         gmm = DoseResolvedAnnotatedGaussianMixtureModel(
-            params=params_array,
+            params=trtm_params,
             n_cat=n_cat,
-            cat_logit_lm=cat_logits_lm,
+            cat_logit_lm=cat_logit_lm,
             dosage_prior=dosage_prior,
             interpolation_fn=interpolation_fn,
         )
     else:
         gmm = AnnotatedGaussianMixtureModel(
-            params=params_array,
-            n_cat=n_cat,  
-            cat_logit_lm=cat_logits_lm,
-        ) 
-
-    perturbation_ids = torch.concatenate([torch.ones((Nu,), dtype=int) * i for i in range(1, U+1)],
-                                        dim=0)
-    
-    # Sample observations 
-    if dose_resolved:
-        target_samples, target_categories, target_dosages = gmm.sample(comps=(perturbation_ids - 1))  # sampling from the perturbed population
-    else:
-        target_samples, target_categories = gmm.sample(comps=(perturbation_ids - 1))  # sampling from the perturbed population
-    source_samples = torch.randn((N0, d))*sigma  # sampling from the control population
-    source_categories = gmm.sample_categories(source_samples)
-
-    perturbation_ids = torch.concatenate(
-        (torch.zeros((N0, ), dtype=int),  # id for no perturbation (control)
-            perturbation_ids,  # rest of perturbations
-        ), dim=0)
-    
-    # sample ids 
-    states = torch.concatenate(
-        (source_samples,  # source states
-         target_samples,  # target states
-        ), dim=0)
-    
-    # categories 
-    categories = torch.concatenate(
-        (source_categories, # source states
-         target_categories, # target states
-        ), dim=0)
-
-    # dosages
-    if dose_resolved:
-        dosages = torch.concatenate(
-        (torch.zeros((N0, )),  # id for no perturbation (control)
-            perturbation_ids,  # rest of perturbations
-        ), dim=0
+            params=trtm_params,
+            n_cat=n_cat,
+            cat_logit_lm=cat_logit_lm,
         )
 
+    # handling perturbation identifiers
+    trtm_perturbation_ids = torch.concatenate(
+        [
+            torch.ones((Nu,), dtype=int) * i for i in range(1, U+1)
+        ],
+        dim=0,
+    )
+    perturbation_ids = torch.concatenate(
+        (
+            torch.zeros((N0, ), dtype=int),
+            trtm_perturbation_ids,
+        ),
+        dim=0,
+    )
+
+    # sampling the treatment data
+    if dose_resolved:
+        target_states, target_categories, target_dosages = gmm.sample(comps=(trtm_perturbation_ids - 1))
+    else:
+        target_states, target_categories = gmm.sample(comps=(trtm_perturbation_ids - 1))
+
+    # sampling the control data
+    source_states = torch.randn((N0, d))*sigma
+    source_categories = gmm.sample_categories(source_states)
+
+    # handling the states
+    states = torch.concatenate(
+        (
+            source_states,
+            target_states,
+        ),
+        dim=0,
+    )
+
+    # handling the categories
+    categories = torch.concatenate(
+        (
+            source_categories,
+            target_categories,
+        ),
+        dim=0,
+    )
+
+    # (optional) handling the perturbation representation
+    if return_perturbation_representation:
+        trtm_means = torch.concatenate(
+            (
+                torch.zeros(1, d),
+                trtm_means,
+            ),
+            dim=0,
+        ) 
+
+    # (optional) hadling the dosages
+    if dose_resolved:
+        dosages = torch.concatenate(
+            (
+                torch.zeros((N0, )),
+                target_dosages,
+            ),
+            dim=0,
+        )
+
+    # shuffling the data
     random_perm_idx = torch.randperm(states.shape[0])
     states = states[random_perm_idx].numpy()
     perturbation_ids = perturbation_ids[random_perm_idx].numpy()
     categories = categories[random_perm_idx].numpy()
-    
     if return_perturbation_representation:
-        sampled_means = torch.cat([torch.zeros(1, d), 
-                                   torch.tensor(sampled_means)], dim=0)
-        perturbation_representation = sampled_means[perturbation_ids]
-
+        trtm_means = trtm_means[perturbation_ids].numpy()
     if dose_resolved:
-        if return_perturbation_representation:
-            return gmm, states, perturbation_ids, categories, dosages, perturbation_representation
-        else:
-            return gmm, states, perturbation_ids, categories, dosages
+        dosages = dosages[random_perm_idx].numpy()
+    
+    # constructing output dictionary
+    out = {
+        "gmm": gmm,
+        "states": states,
+        "perturbation_ids": perturbation_ids,
+        "categories": categories,
+    }
+    if return_perturbation_representation:
+        out["treatment_means"] = trtm_means
+    if dose_resolved:
+        out["dosages"] = dosages
+    return out
 
-    else:
-        if return_perturbation_representation:
-            return gmm, states, perturbation_ids, categories, perturbation_representation
-        else:
-            return gmm, states, perturbation_ids, categories
+
+def get_annotated_perturbation_data(
+    sigma: float,
+    d: int,
+    U: int,
+    n_cat: int,
+    N0: int,
+    Nu: int,
+    mean_range: float = 5.0,
+    linespace_width: int = 10,
+    uniform_range: float = 5.0,
+    seed: int | None = None,
+    return_perturbation_representation: bool = False,
+    homoskedastic: bool = True,
+    covariance_type: Literal["isotropic", "anisotropic", "full_covariance"] = "isotropic",
+    cov_prior: Callable[[Any], TensorLike] = np.random.rand,
+    min_var: float = 1e-4,
+    max_var: float = 5.0,
+    dose_resolved: bool = False,
+    dosage_prior: Callable[[Any], TensorLike] = torch.rand,
+    interpolation_fn: Callable[[float, TensorLike, TensorLike], TensorLike] | None = None,
+    control_label: str = "control",
+    treatment_label: str = "treatment",
+    category_label: str = "cell_type",
+) -> anndata.AnnData:
+    """"""
+    # generating data
+    sym_dictionary = __generate_perturbation_data(
+        sigma,
+        d,
+        U,
+        n_cat,
+        N0,
+        Nu,
+        mean_range=mean_range,
+        linespace_width=linespace_width,
+        uniform_range=uniform_range,
+        seed=seed,
+        return_perturbation_representation=return_perturbation_representation,
+        homoskedastic=homoskedastic,
+        covariance_type=covariance_type,
+        cov_prior=cov_prior,
+        min_var=min_var,
+        max_var=max_var,
+        dose_resolved=dose_resolved,
+        dosage_prior=dosage_prior,
+        interpolation_fn=interpolation_fn,
+    )
+
+    # parsing output dictionary
+    gmm = sym_dictionary["gmm"]
+    states = sym_dictionary["states"]
+    perturbation_ids = sym_dictionary["perturbation_ids"]
+    categories = sym_dictionary["categories"]
+    if return_perturbation_representation:
+        treatment_means = sym_dictionary["treatment_means"]
+    if dose_resolved:
+        dosages = sym_dictionary["dosages"]
+
+    # annotating the perturbation data
+    perturbation_ids_to_labels = {
+        0: control_label,
+        **{
+            idx: f"{treatment_label}_{idx}" for idx in range(1, U + 1)
+        }
+    }
+    perturbation_labels_to_ids = {v:np.array([k]) for k, v in perturbation_ids_to_labels.items()}
+    perturbation_labels = np.vectorize(perturbation_ids_to_labels.get)(perturbation_ids)
+
+    # annotating the category data
+    category_ids_to_labels = {
+        idx: f"{category_label}_{idx}" for idx in range(n_cat)
+    }
+    category_labels_to_ids = {v:np.array([k]) for k, v in category_ids_to_labels.items()}
+    category_labels = np.vectorize(category_ids_to_labels.get)(categories)
+
+    # retrieving perturbation shift
+    perturbation_shift = {
+        control_label: torch.zeros((d)),
+        **{
+            perturbation_ids_to_labels[(idx + 1)]: comp["mean"] for idx, comp in enumerate(gmm.params)
+        }
+    }
+
+    # handling obs attribute of annotated data
+    obs = {
+        treatment_label: perturbation_labels,
+        category_label: category_labels,
+        control_label: (perturbation_labels=="control").astype(int),
+    }
+    if dose_resolved:
+        obs["dose"] = dosages
+
+    # handling uns attribute of annotated data
+    uns = {
+        f"{treatment_label}_labels": perturbation_labels_to_ids,
+        f"{treatment_label}_shift": perturbation_shift,
+        f"{category_label}_label": category_labels_to_ids,
+    }
+
+    # initializing annotated data
+    adata = anndata.AnnData(
+        X=states,
+        obs=obs,
+        uns=uns,
+    )
+    return adata
