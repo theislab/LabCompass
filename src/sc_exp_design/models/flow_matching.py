@@ -170,7 +170,6 @@ class FlowMatching:
 
     def prepare_model(
         self,
-        flow_dim: int,
         cvf_config: NeuralVelocityFieldConfig,
         optimizer_class: torch.optim.Optimizer = torch.optim.AdamW,
         lr_scheduler_class: torch.optim.lr_scheduler.LRScheduler | None = None,
@@ -219,12 +218,10 @@ class FlowMatching:
         :param solver_kwargs: Dictionary containining the keyword arguments used to initialize the :param:`solver_class`, defaults to `None`.
         :type solver_kwargs: class:`dict[str, Any] | None`
         """
-        self.flow_dim = flow_dim
         self.cvf_config = cvf_config
         
         # given a dimensionality and a configuration of hparams, initialize a flow model 
         self.velocity_field = NeuralVelocityField(
-            self.flow_dim,
             config=self.cvf_config,
         )
         self.velocity_field = self.velocity_field.float()
