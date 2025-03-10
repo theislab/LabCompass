@@ -141,6 +141,7 @@ class FlowMatching:
         :type perturbation_target_covariates_kwargs: class `dict[str, Any] | None`
         """
         data_manager = DataManager(
+            train_adata,
             sample_rep=sample_rep,
             control_key=control_key,
             perturbations=perturbations,
