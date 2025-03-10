@@ -76,7 +76,10 @@ class CFMTrainer:
         # parsing batch dictionary
         source = batch[DataFields.SOURCE_STATE]
         target = batch[DataFields.TARGET_STATE]
-        condition = batch[DataFields.PERTURBATION_DATA]
+        # optional condition key
+        condition = None
+        if DataFields.PERTURBATION_DATA in batch.keys():
+            condition = batch[DataFields.PERTURBATION_DATA]
         # retrieving batch size and ode time
         batch_size = source.shape[0]
         t = self.time_sampler((batch_size,), device=source.device)
@@ -181,7 +184,10 @@ class CFMTrainer:
         # parsing batch dictionary
         source = batch[DataFields.SOURCE_STATE]
         target = batch[DataFields.TARGET_STATE]
-        condition = batch[DataFields.PERTURBATION_DATA]
+        # optional condition key
+        condition = None
+        if DataFields.PERTURBATION_DATA in batch.keys():
+            condition = batch[DataFields.PERTURBATION_DATA]
         # defining velocity function
         vf = self.velocity_field.get_vf_fn(condition, gamma_fn=self.gamma_fn)
         # initializing the sampler clss
