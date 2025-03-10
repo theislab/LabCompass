@@ -121,11 +121,13 @@ class NeuralVelocityField(BaseModule):
         Initializes all necessary neural network modules including encoders, decoders, and inference models.
         """
         # state encoder
-        self.x_encoder = MLPBlock(
-            self.config.flow_dim,
-            self.config.state_encoder_output_dim,
-            **self.config.state_encoder_mlp_kwargs,
-        )
+        self.x_encoder = None
+        if self.config.encode_state:
+            self.x_encoder = MLPBlock(
+                self.config.flow_dim,
+                self.config.state_encoder_output_dim,
+                **self.config.state_encoder_mlp_kwargs,
+            )
         # time encoder
         self.time_encoder = None
         if self.config.encode_time:
@@ -234,7 +236,9 @@ class NeuralVelocityField(BaseModule):
             condition_original = condition_latent
         
         # encoding states
-        xt_latent = self.x_encoder(xt)
+        xt_latent = xt
+        if self.config.encode_state:
+            xt_latent = self.x_encoder(xt)
 
         # concatenating original and latent representations
         if self.config.use_guidance:

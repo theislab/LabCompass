@@ -310,6 +310,7 @@ class NeuralVelocityFieldConfig:
     """
 
     flow_dim: int
+    encode_state: bool = True
     state_encoder_output_dim: int = 10
     state_encoder_mlp_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
     encode_time: bool = False
@@ -381,11 +382,11 @@ class NeuralVelocityFieldConfig:
             
         # sanity check on condition encoder
         if self.use_guidance:
+            msg = f"With {self.use_guidance=} you need to pass a dictionary in the proper format as the `self.perturbation_layers_before_pooling` attribute, found `None`"
+            assert self.perturbation_layers_before_pooling is not None, msg
             if self.encode_conditions:
                 msg = f"With {self.encode_conditions=} you need to pass an integer value as the `self.perturbation_latent_dim` attribute, found `None`"
                 assert self.perturbation_latent_dim is not None, msg
-                msg = f"With {self.encode_conditions=} you need to pass a dictionary in the proper format as the `self.perturbation_layers_before_pooling` attribute, found `None`"
-                assert self.perturbation_layers_before_pooling is not None, msg
                 for condition, layers_dict in self.perturbation_layers_before_pooling.items():
                     if isinstance(layers_dict, dict):
                         LayersDict.verify_keys(layers_dict)
@@ -460,8 +461,10 @@ class NeuralVelocityFieldConfig:
         time_latent_dim = self.time_encoder_input_dim
         if self.encode_time:
             time_latent_dim = self.time_encoder_output_dim
-        return self.state_encoder_output_dim + time_latent_dim + perturbation_latent_dim
-    
+        if self.encode_state:
+            return self.state_encoder_output_dim + time_latent_dim + perturbation_latent_dim
+        return self.flow_dim + time_latent_dim + perturbation_latent_dim
+
     @property
     def joint_original_dim(
         self,
