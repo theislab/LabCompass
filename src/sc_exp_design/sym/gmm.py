@@ -1,4 +1,5 @@
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
+from typing import Any
 
 import numpy as np
 import torch
@@ -7,7 +8,7 @@ from torch.distributions.categorical import Categorical
 
 from sc_exp_design.types import TensorLike
 
-__all__ = ["GaussianMixtureModel"]
+__all__ = ["GaussianMixtureModel", "AnnotatedGaussianMixtureModel", "MultiAttributeAnnotatedGaussianMixtureModel", "DoseResolvedAnnotatedGaussianMixtureModel"]
 
 
 class GaussianMixtureModel:
@@ -18,6 +19,7 @@ class GaussianMixtureModel:
     The distributions are weighted, and the class allows sampling from the mixture, as well as calculating
     the log probability of given samples under the mixture model.    
     """
+    _initialize_distributions: bool = True
 
     def __init__(
         self,
@@ -39,7 +41,8 @@ class GaussianMixtureModel:
         assert len(params) == len(weights)
         self.params = params
         self.weights = weights
-        self.__init_distributions()
+        if self._initialize_distributions:
+            self.__init_distributions()
 
     @property
     def num_components(self) -> int:
@@ -61,8 +64,18 @@ class GaussianMixtureModel:
         Returns:
             int: The dimensionality of the samples.
         """
-        mean = self.params[0]["mean"]
+        if self.is_multi_attribute:
+            mean = list(self.params.values())[0][0]["mean"]
+        else:
+            mean = self.params[0]["mean"]
         return mean.shape
+
+    @property
+    def is_multi_attribute(
+        self,
+    ) -> bool:
+        """"""
+        return isinstance(self.params, dict)
 
     def __init_distributions(
         self,
@@ -129,6 +142,7 @@ class GaussianMixtureModel:
         ind_log_probs = torch.stack(ind_log_probs, axis=0)
         return torch.sum(ind_log_probs, axis=0)
 
+
 class AnnotatedGaussianMixtureModel(GaussianMixtureModel):
     """
     A Gaussian Mixture Model (GMM) with categorical annotations.
@@ -136,6 +150,7 @@ class AnnotatedGaussianMixtureModel(GaussianMixtureModel):
     This class extends the standard Gaussian Mixture Model by incorporating categorical labels
     for each sample based on a learned linear transformation of the feature space.
     """
+    _initialize_distributions: bool = True
 
     def __init__(
         self,
@@ -223,3 +238,290 @@ class AnnotatedGaussianMixtureModel(GaussianMixtureModel):
         samples = torch.stack([self.distributions[comp].sample() for comp in comps])
         sampled_categories = self.sample_categories(samples)
         return samples, sampled_categories
+
+
+class MultiAttributeAnnotatedGaussianMixtureModel(AnnotatedGaussianMixtureModel):
+    """"""
+    _initialize_distributions: bool = False
+
+    def __init__(
+        self,
+        params: dict[str, Sequence[dict[str, TensorLike]]],
+        n_cat: int,
+        cat_logit_lm: TensorLike,
+        weights: Sequence[float] | None = None,
+    ) -> None:
+        """"""
+        super().__init__(
+            params,
+            n_cat,
+            cat_logit_lm,
+            weights=weights,
+        )
+
+    def sample_categories(
+        self,
+        features: TensorLike,
+    ) -> dict[str, TensorLike]:
+        """"""
+        # computing the logits
+        cov_logits = torch.matmul(features, self.cat_logit_lm)
+        # sampling categories according to the logits
+        return Categorical(logits=cov_logits).sample()
+
+    def get_params(
+        self,
+        comps: tuple[int],
+    ) -> Sequence[dict[str, TensorLike]]:
+        """"""
+        # retrieving the perturbation identifiers
+        perturbation_ids = list(self.params.keys())
+        # mapping the identifier to the integer index
+        pert_ids = {idx: pert_id for idx, pert_id in enumerate(perturbation_ids)}
+        # defining list to append the retrieved param
+        params = []
+        # iterating over the components of each perturbation
+        for idx, comp in enumerate(comps):
+            # this will give the identifier of the current component
+            pert_id = pert_ids[idx]
+            # this will retrieve the corresponding parameters
+            pert_params = self.params[pert_id]
+            # appending the current component params to the return list 
+            params.append(pert_params[comp])
+        return params
+
+    def sample(
+        self,
+        num_samples: int | None = None,
+        comps: np.ndarray | None = None,
+    ) -> tuple[TensorLike, dict[str, TensorLike]]:
+        """"""
+        # overriding the num_samples argument if
+        # the components are explicitly paxssed
+        if comps is not None:
+            # checking that all components have the same number of samples
+            # by using the first one as reference
+            reference_num_samples = len(list(comps.values())[0])
+            for comp_cov, comp_ids in comps.items():
+                num_samples = len(comp_ids)
+                msg = f""
+                assert num_samples == reference_num_samples, msg
+        else:
+            # only one sample by default
+            if num_samples is None:
+                num_samples = 1
+            # Sample mixture components based on the weights 
+            comps = { 
+                comp_cov: np.random.choice(len(comp_params), size=num_samples, p=self.weights)
+                    for comp_cov, comp_params in self.params.items()
+            }
+
+        # converting components array to list
+        comps_copy = {}
+        for comp_cov, comp_ids in comps.items():
+            if isinstance(comps, np.ndarray | torch.Tensor):
+                comp_ids = comp_ids.tolist()
+            comps_copy[comp_cov] = comp_ids
+        comps = comps_copy
+
+        # zipping components together
+        comps_zipped = list(zip(*list(comps.values())))
+
+        # initializing store for distribution params
+        states = []
+        # iterating over the components of each observation
+        for comp in comps_zipped:
+            # retrieving the parameters for current components
+            params = self.get_params(comp)
+            # retrieving the mean for current components
+            means = torch.stack([param["mean"] for param in params], dim=0)
+            # computing the mean for current observations 
+            # by summing the means of each perturbation feature
+            mean = torch.sum(means, dim=0)
+
+            # retrieving the mean for current components
+            covs = torch.stack([param["cov"] for param in params], dim=0)
+            # computing the mean for current observations 
+            # by summing the means of each perturbation feature
+            cov = torch.sum(covs, dim=0)
+
+            # instantiating distribution for current observation
+            states.append(
+                MultivariateNormal(mean, cov).sample()
+            )
+        # concatenating the states
+        states = torch.stack(states, dim=0)
+        # sampling categories
+        sampled_categories = self.sample_categories(states)
+        return states, sampled_categories
+
+
+class DoseResolvedAnnotatedGaussianMixtureModel(MultiAttributeAnnotatedGaussianMixtureModel):
+    """"""
+    _initialize_distributions: bool = False
+
+    def __init__(
+        self,
+        params: dict[str, Sequence[dict[str, TensorLike]]] | Sequence[dict[str, TensorLike]],
+        n_cat: int,
+        cat_logit_lm: TensorLike,
+        weights: Sequence[float] | None = None,
+        dosage_prior: Callable[[Any], TensorLike] | None = None,
+        interpolation_fn: Callable[[float, TensorLike, TensorLike], TensorLike] | None = None,
+        control_mean: TensorLike | None = None
+    ) -> None:
+        """"""
+        super().__init__(params, n_cat, cat_logit_lm, weights=weights)
+        # setting additional attributes
+        if dosage_prior is None:
+            dosage_prior = torch.rand
+        self.dosage_prior = dosage_prior
+
+        if interpolation_fn is None:
+            interpolation_fn = lambda dose, source, target: (1 - dose)*source + dose*target
+        self.interpolation_fn = interpolation_fn
+        
+        if control_mean is None:
+            control_mean = torch.zeros(self.dimensionality)
+        self.control_mean = control_mean
+
+        # handling parameters type in case is not multi-attribute 
+        # to make it compatible with the methods of the parent class
+        if not self.is_multi_attribute:
+            self.params = {
+                "pert": self.params,
+            }
+
+    def __interpolate_distributions(
+        self,
+        comps: dict[str, list[int]],
+        dosages: dict[str, TensorLike],
+    ) -> Sequence[MultivariateNormal]:
+        """"""
+        # converting dosages array to list
+        dosages_copy = {}
+        for pert_id, dosage in dosages.items():
+            if isinstance(dosage, np.ndarray | torch.Tensor):
+                dosage = dosage.tolist()
+            dosages_copy[pert_id] = dosage
+        dosages = dosages_copy
+
+        # defining list of dose-resolved components
+        dose_resolved_comps = []
+
+        # zipping components together
+        comps_zipped = list(zip(*list(comps.values())))
+
+        # retrieving the perturbation identifiers
+        perturbation_ids = list(self.params.keys())
+        # mapping the identifier to the integer index
+        pert_ids = {idx: pert_id for idx, pert_id in enumerate(perturbation_ids)}
+
+        # iterating over the components of each observation
+        for obs_id, comp in enumerate(comps_zipped):
+            # retrieving the parameters for current components
+            params = self.get_params(comp)
+
+            # defining list to store interpolated means
+            interpolated_means = []
+            interpolated_covs = []
+
+            # iterating over the perturbation covariates
+            for covariate_idx, covariate_param in enumerate(params):
+                # parsing params dictionary
+                covariate_mean = covariate_param["mean"]
+                covariate_cov = covariate_param["cov"]
+
+                # retrieving the perturbation covariante
+                pert_covariate = pert_ids[covariate_idx] 
+                # retrieving corresponding dosage
+                obs_dosage = dosages[pert_covariate][obs_id]
+
+                # interpolating with control mean
+                interpolated_mean = self.interpolation_fn(
+                    obs_dosage,
+                    self.control_mean,
+                    covariate_mean,
+                )
+
+                # appending to interpolated mean
+                interpolated_means.append(interpolated_mean)
+                interpolated_covs.append(covariate_cov)
+
+            # stacking the interpolated means and summing them
+            interpolated_means = torch.stack(interpolated_means, dim=0)
+            interpolated_mean = torch.sum(interpolated_means, dim=0)
+
+            # stacking the interpolated covariances and summing them
+            interpolated_covs = torch.stack(interpolated_covs, dim=0)
+            interpolated_cov = torch.sum(interpolated_covs, dim=0)
+
+            # updating components with new normal distribution
+            dose_resolved_comps.append(
+                MultivariateNormal(interpolated_mean, interpolated_cov)
+            )
+        return dose_resolved_comps
+
+    def sample(
+        self,
+        dosages: np.ndarray | None = None,
+        num_samples: int | None = None,
+        comps: np.ndarray | None = None,
+    ) -> tuple[TensorLike, TensorLike, TensorLike]:
+        """"""
+
+        # handling components type in case is not multi-attribute 
+        # to make it compatible with the methods of the parent class
+        if not isinstance(comps, dict):
+            comps = {
+                key: comps for key in self.params.keys()
+            }
+
+        # overriding the num_samples argument if
+        # the components are explicitly paxssed
+        if comps is not None:
+            # checking that all components have the same number of samples
+            # by using the first one as reference
+            reference_num_samples = len(list(comps.values())[0])
+            for comp_cov, comp_ids in comps.items():
+                num_samples = len(comp_ids)
+                msg = f""
+                assert num_samples == reference_num_samples, msg
+        else:
+            # only one sample by default
+            if num_samples is None:
+                num_samples = 1
+            # Sample mixture components based on the weights 
+            comps = { 
+                comp_cov: np.random.choice(len(comp_params), size=num_samples, p=self.weights)
+                    for comp_cov, comp_params in self.params.items()
+            }
+
+        # converting components array to list
+        comps_copy = {}
+        for comp_cov, comp_ids in comps.items():
+            if isinstance(comps, np.ndarray | torch.Tensor):
+                comp_ids = comp_ids.tolist()
+            comps_copy[comp_cov] = comp_ids
+        comps = comps_copy
+
+        # sampling from dosage prior if not specified        
+        if dosages is None:
+            dosages = {
+                key: self.dosage_prior((num_samples, )) for key in self.params.keys()
+            }
+        
+        # handling dosages type in case is not multi-attribute 
+        # to make it compatible with the methods of the parent class
+        if not isinstance(dosages, dict):
+            dosages = {
+                key: dosages for key in self.params.keys()
+            }
+        
+        # retrieving dose-resolved interpolated distributions
+        distributions = self.__interpolate_distributions(comps, dosages)
+
+        # sampling
+        samples = torch.stack([distribution.sample() for distribution in distributions])
+        sampled_categories = self.sample_categories(samples)
+        return samples, sampled_categories, dosages
