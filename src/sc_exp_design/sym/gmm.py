@@ -340,7 +340,9 @@ class MultiAttributeAnnotatedGaussianMixtureModel(AnnotatedGaussianMixtureModel)
             )
         # concatenating the states
         states = torch.stack(states, dim=0)
-        return states
+        # sampling categories
+        sampled_categories = self.sample_categories(states)
+        return states, sampled_categories
 
 
 class DoseResolvedAnnotatedGaussianMixtureModel(AnnotatedGaussianMixtureModel):
