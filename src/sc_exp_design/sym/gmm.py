@@ -504,10 +504,12 @@ class DoseResolvedAnnotatedGaussianMixtureModel(MultiAttributeAnnotatedGaussianM
                 comp_ids = comp_ids.tolist()
             comps_copy[comp_cov] = comp_ids
         comps = comps_copy
-        
-        # sampling from dosage prior if not explicitly passed
+
+        # sampling from dosage prior if not specified        
         if dosages is None:
-            dosages = self.dosage_prior((num_samples, ))
+            dosages = {
+                key: self.dosage_prior((num_samples, )) for key in self.params.keys()
+            }
         
         # handling dosages type in case is not multi-attribute 
         # to make it compatible with the methods of the parent class
