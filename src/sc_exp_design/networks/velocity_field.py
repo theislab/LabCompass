@@ -220,9 +220,15 @@ class NeuralVelocityField(BaseModule):
         # encoding conditions
         condition_latent = cond
         if self.config.use_guidance and self.config.encode_conditions:
+            # sanity check (condition should be not None)
+            msg = f""
+            assert cond is not None, msg
             condition_latent = self.condition_encoder(cond)
             condition_original = torch.concatenate(list(cond.values()), dim=-1)
         elif self.config.use_guidance and (not self.config.encode_conditions):
+            # sanity check (condition should be not None)
+            msg = f""
+            assert cond is not None, msg
             cond_values = [val for key, val in cond.items() if key in self.config.perturbation_layers_before_pooling]
             condition_latent = torch.concatenate(cond_values, dim=-1)
             condition_original = condition_latent
@@ -232,6 +238,9 @@ class NeuralVelocityField(BaseModule):
 
         # concatenating original and latent representations
         if self.config.use_guidance:
+            # sanity check (condition should be not None)
+            msg = f""
+            assert cond is not None, msg
             latent_concat = torch.cat([t_latent, xt_latent, condition_latent], dim=1)
             original_concat = torch.cat([t, xt, condition_original], dim=1)
         else:
