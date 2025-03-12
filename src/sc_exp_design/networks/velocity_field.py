@@ -26,7 +26,6 @@ class NeuralVelocityField(BaseModule):
 
     def __init__(
         self,
-        flow_dim: int,
         config: NeuralVelocityFieldConfig,
     ) -> None:
         """
@@ -37,7 +36,6 @@ class NeuralVelocityField(BaseModule):
             config (NeuralVelocityFieldConfig): Configuration settings for the model.
         """
         super().__init__()
-        self.flow_dim = flow_dim
         self.config = config
 
         # initializing modules
@@ -116,57 +114,6 @@ class NeuralVelocityField(BaseModule):
             self.condition_encoder = self.condition_encoder.eval()
         return self
 
-    @property
-    def joint_original_dim(
-        self,
-    ) -> int:
-        """
-        Collect dimensionality in the original space
-        """
-        perturbation_dim = 0
-        if self.config.use_guidance:
-            perturbation_dim = self.config.condition_input_dim
-        return self.flow_dim + self.config.time_encoder_input_dim + perturbation_dim
-
-    @property
-    def cond_vars_input_dim(
-        self,
-    ) -> int:
-        """
-        Computes the input dimension for the inference network on conditioning variables.
-        
-        Returns:
-            int: Input dimension for conditioning variable inference.
-        """
-        # retrieving the input dimension for the inference network on the conditioning variables
-        if self.config.endpoints_approximate_posterior_use_latent_repr:
-            return self.config.joint_latent_dim
-        return self.joint_original_dim
-        
-    @property
-    def pert_input_dim(
-        self,
-    ) -> int:
-        """
-        Computes the input dimension for the inference network on perturbations.
-        
-        Returns:
-            int: Input dimension for perturbation inference.
-        
-        Raises:
-            ValueError: If an unsupported perturbation input type is provided.
-        """
-        # retrieving the input dimension for the inference network on the conditioning variables
-        if self.config.pert_approximate_posterior_input_type == "latent":
-            return self.config.joint_latent_dim
-        elif self.config.pert_approximate_posterior_input_type in ["endpoints", "one_step_prediction"]:
-            return self.flow_dim * 2
-        elif self.config.pert_approximate_posterior_input_type == "original":
-            return self.joint_original_dim
-        else:
-            msg = f"{self.config.pert_approximate_posterior_input_type=} is not supported, possible values are `['latent', 'endpoints', 'one_step_prediction', 'original']`"
-            raise ValueError(msg)
-
     def _init_modules(
         self,
     ) -> None:
@@ -175,7 +122,7 @@ class NeuralVelocityField(BaseModule):
         """
         # state encoder
         self.x_encoder = MLPBlock(
-            self.flow_dim,
+            self.config.flow_dim,
             self.config.state_encoder_output_dim,
             **self.config.state_encoder_mlp_kwargs,
         )
@@ -201,7 +148,7 @@ class NeuralVelocityField(BaseModule):
         # decoder
         self.decoder = MLPBlock(
             self.config.joint_latent_dim,
-            self.flow_dim,
+            self.config.flow_dim,
             **self.config.decoder_mlp_kwargs
         )
         # score
@@ -209,15 +156,15 @@ class NeuralVelocityField(BaseModule):
         if self.config.learn_score_field:
             self.score_decoder = MLPBlock(
                 self.config.joint_latent_dim,
-                self.flow_dim,
+                self.config.flow_dim,
                 **self.config.score_mlp_kwargs,
             )
         # inference on conditioning vars 
         self.endpoints_approximate_posterior = None
         if self.config.learn_posterior_on_cond_vars:
             self.endpoints_approximate_posterior = EndpointsApproximatePosterior(
-                self.cond_vars_input_dim,
-                self.flow_dim,
+                self.config.cond_vars_input_dim,
+                self.config.flow_dim,
                 freeze_grads=self.config.endpoints_approximate_posterior_freeze_grads,
                 src_noise_model=self.config.src_noise_model,
                 src_approximate_posterior_kwargs=self.config.src_approximate_posterior_kwargs,
@@ -228,7 +175,7 @@ class NeuralVelocityField(BaseModule):
         self.pert_approximate_posterior = None
         if self.config.learn_posterior_on_perts:
             self.pert_approximate_posterior = PerturbationApproximatePosterior(
-                self.pert_input_dim,
+                self.config.pert_input_dim,
                 freeze_grads=self.config.pert_approximate_posterior_freeze_grads,
                 target_output_dims=self.config.pert_target_covariates_output_dims,
                 noise_models=self.config.pert_noise_model,
@@ -238,7 +185,7 @@ class NeuralVelocityField(BaseModule):
         self.latent_pert_approximate_posterior = None
         if self.config.learn_posterior_on_latent_perts:
             self.latent_pert_approximate_posterior = MLPGaussianNoiseModel(
-                2 * self.flow_dim,
+                2 * self.config.flow_dim,
                 self.condition_encoder.latent_dim,
                 **self.config.latent_perts_approximate_posterior_kwargs,
             )
