@@ -3,7 +3,7 @@ from typing import Any, Literal
 
 import torch
 from torch import Tensor, linspace, nn
-from torchdyn.core import NeuralODE
+from torchdiffeq import odeint
 from torchsde import sdeint
 
 __all__ = ["ODESolver"]
@@ -178,8 +178,7 @@ class ODESolver:
         # default values for the solver arguments
         if solver_kwargs is None:
             solver_kwargs = {}
-        solver_kwargs.setdefault("solver", "dopri5")
-        solver_kwargs.setdefault("sensitivity", "adjoint")
+        solver_kwargs.setdefault("method", "euler")
         solver_kwargs.setdefault("atol", 1e-5)
         solver_kwargs.setdefault("rtol", 1e-5)
 
@@ -222,8 +221,7 @@ class ODESolver:
             )
             trajectory = sdeint(sde, source, self.time)
         else:
-            ode = NeuralODE(vf, **self.solver_kwargs)
-            trajectory = ode.trajectory(source, t_span=self.time)
+            trajectory = odeint(vf, source, self.time, **self.solver_kwargs)
         if return_trajectory:
             return trajectory
         else:
