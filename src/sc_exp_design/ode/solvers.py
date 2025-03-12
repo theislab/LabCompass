@@ -191,7 +191,7 @@ class ODESolver:
         self.device_id = device_id
 
         self.device = torch.device(self.device_id)
-        self.time = linspace(0.0, 1.0, self.num_time_steps)
+        self.time = linspace(0.0, 1.0, self.num_time_steps).to(self.device)
 
     def integrate(
         self,
