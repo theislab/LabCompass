@@ -357,6 +357,7 @@ class FlowMatching:
         batch: dict[str, Tensor | dict[str, Tensor]],
         return_trajectory: bool = False,
         gamma_fn: Callable[[Tensor, Tensor], Tensor] | None = None,
+        no_grad: bool = True,
     ) -> dict[str, Tensor]:
         """Generates the predictions by integrating the dynamics with the learnt velocity field for a given initial condition
 
@@ -383,13 +384,16 @@ class FlowMatching:
         # defining velocity function
         vf = self.velocity_field.get_vf_fn(condition, gamma_fn=gamma_fn)
         # initializing the sampler clss
-        ode_sampler = self.solver_class(
+        ode_solver = self.solver_class(
             vf,
             gamma_fn=gamma_fn,
             num_time_steps=self.num_time_steps,
             solver_kwargs=self.solver_kwargs,
             device_id=self.device_id,
         )
-        with torch.no_grad():
-            predictions = ode_sampler.integrate(source, return_trajectory=return_trajectory)
+        if no_grad:
+            with torch.no_grad():
+                predictions = ode_solver.integrate(source, return_trajectory=return_trajectory)
+        else:
+            predictions = ode_solver.integrate(source, return_trajectory=return_trajectory)
         return predictions
