@@ -77,6 +77,13 @@ class GaussianMixtureModel:
         """"""
         return isinstance(self.params, dict)
 
+    @property
+    def parameters(
+        self,
+    ) -> Sequence[dict[str, TensorLike]]:
+        """"""
+        return self.params
+
     def __init_distributions(
         self,
     ) -> None:
@@ -368,7 +375,8 @@ class DoseResolvedAnnotatedGaussianMixtureModel(MultiAttributeAnnotatedGaussianM
         weights: Sequence[float] | None = None,
         dosage_prior: Callable[[Any], TensorLike] | None = None,
         interpolation_fn: Callable[[float, TensorLike, TensorLike], TensorLike] | None = None,
-        control_mean: TensorLike | None = None
+        control_mean: TensorLike | None = None,
+        multi_attribute: bool = False,
     ) -> None:
         """"""
         super().__init__(params, n_cat, cat_logit_lm, weights=weights)
@@ -384,6 +392,7 @@ class DoseResolvedAnnotatedGaussianMixtureModel(MultiAttributeAnnotatedGaussianM
         if control_mean is None:
             control_mean = torch.zeros(self.dimensionality)
         self.control_mean = control_mean
+        self.multi_attribute = multi_attribute
 
         # handling parameters type in case is not multi-attribute 
         # to make it compatible with the methods of the parent class
@@ -391,6 +400,23 @@ class DoseResolvedAnnotatedGaussianMixtureModel(MultiAttributeAnnotatedGaussianM
             self.params = {
                 "pert": self.params,
             }
+    
+    @property
+    def num_perturbations(
+        self,
+    ) -> int:
+        """"""
+        return len(self.params)
+
+    @property
+    def parameters(
+        self,
+    ) -> dict[str, Sequence[str, TensorLike]] | Sequence[str, TensorLike]:
+        """"""
+        if self.num_perturbations == 1:
+            return list(self.params.values())[0]
+        else:
+            return self.params
 
     def __interpolate_distributions(
         self,
@@ -524,4 +550,10 @@ class DoseResolvedAnnotatedGaussianMixtureModel(MultiAttributeAnnotatedGaussianM
         # sampling
         samples = torch.stack([distribution.sample() for distribution in distributions])
         sampled_categories = self.sample_categories(samples)
+        if self.multi_attribute:
+            return samples, sampled_categories, dosages
+        # sanity check on output
+        msg = f"{dosages}"
+        assert len(dosages) == 1, msg
+        dosages = list(dosages.values())[0]
         return samples, sampled_categories, dosages

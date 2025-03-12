@@ -179,6 +179,7 @@ def __generate_perturbation_data(
             cat_logit_lm=cat_logit_lm,
             dosage_prior=dosage_prior,
             interpolation_fn=interpolation_fn,
+            multi_attribute=multi_attribute,
         )
     elif multi_attribute:
         gmm = MultiAttributeAnnotatedGaussianMixtureModel(
@@ -452,7 +453,7 @@ def get_annotated_perturbation_data(
             covariate_label: {
                 control_label: torch.zeros((d)),
                 **{
-                    perturbation_ids_to_label[(idx + 1)]: comp["mean"] for idx, comp in enumerate(gmm.params[covariate_label])
+                    perturbation_ids_to_label[(idx + 1)]: comp["mean"] for idx, comp in enumerate(gmm.parameters[covariate_label])
                 } 
             } for covariate_label, perturbation_ids_to_label in perturbation_ids_to_labels.items()
         }
@@ -460,7 +461,7 @@ def get_annotated_perturbation_data(
         perturbation_shift = {
             control_label: torch.zeros((d)),
             **{
-                perturbation_ids_to_labels[(idx + 1)]: comp["mean"] for idx, comp in enumerate(gmm.params)
+                perturbation_ids_to_labels[(idx + 1)]: comp["mean"] for idx, comp in enumerate(gmm.parameters)
             }
         }
 
