@@ -502,7 +502,7 @@ def get_annotated_perturbation_data(
                 for covariate_label, covariate_perturbation_shift in perturbation_shift.items()
             },
             **{
-                f"{covariate_label}_shift": covariate_label_id
+                f"{covariate_label}_label": covariate_label_id
                 for covariate_label, covariate_label_id in perturbation_labels_to_ids.items()
             }
         }
