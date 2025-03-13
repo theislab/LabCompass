@@ -7,22 +7,6 @@ from torchdiffeq import odeint
 import sc_exp_design
 
 class BaseOptimizer(torch.nn.Module):
-    """
-    Base class for optimization methods using conditional vector fields.
-
-    :param optimal_condition: The target condition for optimization.
-    :type optimal_condition: torch.Tensor
-    :param linear_classifier: The classifier used to predict outcomes based on perturbed data.
-    :type linear_classifier: torch.nn.Module
-    :param v_field: The trained velocity field used to model dynamics.
-    :type v_field: torch.nn.Module
-    :param cond_dim: Dimensionality of the condition vector.
-    :type cond_dim: int
-    :param prior: Optional prior distribution on the condition vector.
-    :type prior: torch.distributions.Distribution | None
-    :param prior_weight: Weight applied to the prior term in the loss function.
-    :type prior_weight: float | None
-    """
     def __init__(self, 
                  optimal_condition, 
                  linear_classifier, 
@@ -44,9 +28,6 @@ class BaseOptimizer(torch.nn.Module):
         self.prior_weight = prior_weight if prior_weight else 1.0
         
     def compute_loss(self, pred, target, e_optimized):
-        """
-        Compute the loss function, including optional prior regularization.
-        """
         loss = self.loss_fn(pred, target)
         if self.prior:
             for key in self.prior: 
@@ -57,11 +38,7 @@ class BaseOptimizer(torch.nn.Module):
     def forward(self):
         pass
 
-
 class MAPConditionOptimizer(BaseOptimizer):
-    """
-    Performs Maximum A Posteriori (MAP) optimization to find the best condition vector.
-    """
     def __init__(self, 
                  optimal_condition, 
                  linear_classifier, 
@@ -118,17 +95,10 @@ class MAPConditionOptimizer(BaseOptimizer):
         return loss
 
     def get_optimized_e(self):
-        """
-        Returns the optimized condition vector.
-        """
         optimized_perturbation_data_tmp = [self.optimized_perturbation_data[pert].detach() for pert in self.optimized_perturbation_data]        
         return optimized_perturbation_data_tmp
     
-
 class LangevinSampler(BaseOptimizer):
-    """
-    Performs Langevin dynamics sampling to estimate the optimal condition vector distribution.
-    """
     def __init__(self, 
                  optimal_condition, 
                  linear_classifier, 
@@ -190,3 +160,4 @@ class LangevinSampler(BaseOptimizer):
             self.optimized_perturbation_data[pert].detach_()  # Remove gradients on the just updated element for memory efficiency 
             self.optimized_perturbation_data[pert].requires_grad_()  # Re-enable gradient tracking
         return loss
+    
