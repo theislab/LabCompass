@@ -1,20 +1,31 @@
+import abc
+from collections.abc import Callable, Sequence
+
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 
-import sc_exp_design
+from sc_exp_design.networks.blocks import BaseModule
 
-class BaseOptimizer(torch.nn.Module):
-    def __init__(self, 
-                 optimal_condition, 
-                 linear_classifier, 
-                 perturbation_predictor,
-                 cond_dim, 
-                 loss_fn, 
-                 prior=None,
-                 prior_weight=None):
-        
+__all__ = ["BaseConditionOptimizer", "MAPConditionOptimizer", "LangevinSampler"]
+
+
+class BaseConditionOptimizer(BaseModule):
+    def __init__(
+        self, 
+        optimal_condition: torch.Tensor, 
+        linear_classifier: nn.Module,
+        perturbation_predictor: nn.Module,
+        loss_fn: Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
+        cond_dim: int | dict[str, int],
+        perturbation_representation_keys: Sequence[str],
+        is_discrete_dict: dict[str, bool],
+        prior: torch.nn.Module | None = None,
+        prior_weight: float | None = None,
+    ) -> None:
+        """"""
         super().__init__()
     
         self.optimal_condition = optimal_condition
@@ -26,7 +37,18 @@ class BaseOptimizer(torch.nn.Module):
         self.prior = prior
         self.prior_weight = prior_weight if prior_weight else 1.0
         
-    def compute_loss(self, pred, target, e_optimized):
+    def _init_modules(
+        self
+    ) -> None:
+        """"""
+        self.net = None
+
+    def compute_loss(
+            self,
+            pred: torch.Tensor,
+            target: torch.Tensor,
+            e_optimized: nn.Parameter,
+        ) -> torch.Tensor:
         loss = self.loss_fn(pred, target)
         if self.prior:
             for key in self.prior: 
@@ -34,14 +56,25 @@ class BaseOptimizer(torch.nn.Module):
                 loss = loss - self.prior_weight * log_prior
         return loss
 
-    def forward(self):
-        pass
+    @abc.abstractmethod
+    def forward(
+            self,
+        ) -> torch.Tensor:
+        """"""
+        raise NotImplementedError
     
-    def get_optimized_e(self):
+    def get_optimized_e(
+            self,
+        ) -> Sequence[torch.nn.Parameter]:
         optimized_perturbation_data_tmp = [self.optimized_perturbation_data[pert].detach() for pert in self.optimized_perturbation_data]        
         return optimized_perturbation_data_tmp
-    
-    def differentiable_categorical(self, logits, tau=1.0, hard=False):
+
+    @staticmethod    
+    def differentiable_categorical(
+            logits: torch.Tensor,
+            tau: float = 1.0,
+            hard: bool = False,
+        ) -> torch.Tensor:
         # Sample Gumbel noise
         gumbel_noise = -torch.log(-torch.log(torch.rand_like(logits) + 1e-10) + 1e-10)
 
@@ -57,27 +90,32 @@ class BaseOptimizer(torch.nn.Module):
 
 
 class MAPConditionOptimizer(BaseOptimizer):
-    def __init__(self, 
-                 optimal_condition, 
-                 linear_classifier, 
-                 perturbation_predictor, 
-                 cond_dim, 
-                 loss_fn, 
-                 perturbation_representation_keys, 
-                 is_discrete_dict, 
-                 prior=None, 
-                 prior_weight=None, 
-                 lr=1e-1, 
-                 tau=1.0, 
-                 hard=True):
+    def __init__(
+        self, 
+        optimal_condition: torch.Tensor, 
+        linear_classifier: nn.Module,
+        perturbation_predictor: nn.Module,
+        loss_fn: Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
+        cond_dim: int | dict[str, int],
+        perturbation_representation_keys: Sequence[str],
+        is_discrete_dict: dict[str, bool],
+        prior: torch.nn.Module | None = None,
+        prior_weight: float | None = None,
+        lr: float = 1e-1,
+        tau: float = 1.0,
+        hard: bool = True,
+    ) -> None:
+        """"""
         
-        super().__init__(optimal_condition, 
-                         linear_classifier,
-                         perturbation_predictor, 
-                         cond_dim,
-                         loss_fn, 
-                         prior,
-                         prior_weight)
+        super().__init__(
+            optimal_condition, 
+            linear_classifier,
+            perturbation_predictor, 
+            cond_dim,
+            loss_fn, 
+            prior,
+            prior_weight
+        )
         
         self.is_discrete_dict = is_discrete_dict
         self.tau = tau
@@ -94,7 +132,10 @@ class MAPConditionOptimizer(BaseOptimizer):
         self.e_optimizer = optim.Adam([self.optimized_perturbation_data[perturbation_representation] for perturbation_representation in self.optimized_perturbation_data], 
                                       lr=lr)
     
-    def forward(self, X_controls):
+    def forward(
+            self,
+            X_controls: torch.Tensor,
+        ) -> torch.Tensor:
         # prepare batch information cellFlow           
         batch_dict = {
             sc_exp_design.constants.DataFields.SOURCE_STATE: X_controls,
@@ -128,29 +169,35 @@ class MAPConditionOptimizer(BaseOptimizer):
     
     
 class LangevinSampler(BaseOptimizer):
-    def __init__(self, 
-                 optimal_condition, 
-                 linear_classifier, 
-                 perturbation_predictor, 
-                 cond_dim,
-                 loss_fn, 
-                 perturbation_representation_keys,
-                 is_discrete_dict, 
-                 prior,
-                 prior_weight,
-                 n_samples,
-                 eta=1e-1, 
-                 noise_scale=1e-1, 
-                 tau=1.0, 
-                 hard=True):
+    """"""
+    def __init__(
+        self,
+        optimal_condition: torch.Tensor, 
+        linear_classifier: nn.Module,
+        perturbation_predictor: nn.Module,
+        loss_fn: Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
+        cond_dim: int | dict[str, int],
+        perturbation_representation_keys: Sequence[str],
+        is_discrete_dict: dict[str, bool],
+        prior: torch.nn.Module | None = None,
+        prior_weight: float | None = None,
+        n_samples: int | None = None,
+        eta: float = 1e-1,
+        noise_scale: float = 1e-1, 
+        tau: float = 1.0,
+        hard: bool = True,
+    ) -> None:
+        """"""
         
-        super().__init__(optimal_condition, 
-                            linear_classifier,
-                            perturbation_predictor, 
-                            cond_dim,
-                            loss_fn, 
-                            prior,
-                            prior_weight)
+        super().__init__(
+            optimal_condition, 
+            linear_classifier,
+            perturbation_predictor, 
+            cond_dim,
+            loss_fn, 
+            prior,
+            prior_weight
+        )
             
         self.eta = eta
         self.noise_scale = noise_scale
@@ -166,7 +213,10 @@ class LangevinSampler(BaseOptimizer):
         for perturbation_representation in self.perturbation_representation_keys:
             self.optimized_perturbation_data[perturbation_representation] = torch.randn(n_samples, cond_dim[perturbation_representation])
 
-    def forward(self, X_controls):
+    def forward(
+            self,
+            X_controls: torch.Tensor,
+        ) -> torch.Tensor:
         # Expand target  and controls
         target = self.optimal_condition.repeat(self.n_samples, X_controls.shape[0], -1)
         X_controls = X_controls.unsqueeze(0).expand(self.n_samples, -1, -1) 
