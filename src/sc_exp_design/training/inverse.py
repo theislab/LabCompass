@@ -52,16 +52,18 @@ class TargetPredictionTrainer:
         batch: dict[str, TensorLike],
     ) -> tuple[Tensor, dict[str, Tensor]]:
         """"""
-        loss, log_dict = ..., ...
-        return loss, log_dict
+        # loss, log_dict = ..., ...
+        # return loss, log_dict
+        raise NotImplementedError
     
     def __validation_step_(
         self,
         batch: dict[str, TensorLike],
     ) -> tuple[TensorLike]:
         """"""
-        predictions, target = ..., ...
-        return predictions, target
+        # predictions, target = ..., ...
+        # return predictions, target
+        raise NotImplementedError
 
 
 class InverseModelTrainer:
@@ -77,13 +79,15 @@ class InverseModelTrainer:
         batch: dict[str, TensorLike],
     ) -> tuple[Tensor, dict[str, Tensor]]:
         """"""
-        loss, log_dict = ..., ...
-        return loss, log_dict
-    
+        # loss, log_dict = ..., ...
+        # return loss, log_dict
+        raise NotImplementedError
+
     def __validation_step_(
         self,
         batch: dict[str, TensorLike],
     ) -> tuple[TensorLike]:
         """"""
-        predictions, target = ..., ...
-        return predictions, target
+        # predictions, target = ..., ...
+        # return predictions, target
+        raise NotImplementedError
