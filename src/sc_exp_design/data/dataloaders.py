@@ -1,3 +1,4 @@
+import abc
 from collections.abc import Sequence
 from typing import Literal
 
@@ -11,10 +12,23 @@ from sc_exp_design.transforms import Transform
 from sc_exp_design.types import TensorLike
 
 __all__ = [
+    "BaseDataLoader",
     "TrainDataLoader",
     "ValidationDataLoader",
     "PredictionDataLoader",
 ]
+
+
+class BaseDataLoader(abc.ABC):
+    """"""
+
+    @abc.abstractmethod
+    def sample(
+        self,
+    ) -> dict[str, TensorLike | dict[str, TensorLike]]:
+        """"""
+        raise NotImplementedError
+
 
 class TrainDataLoader:
     """
