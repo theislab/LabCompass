@@ -4,6 +4,8 @@ from sc_exp_design.data.data import (
     TrainData,
 )
 from sc_exp_design.data.dataloaders import (
+    BaseDataLoader,
+    SequentialDataLoader,
     PredictionDataLoader,
     TrainDataLoader,
     ValidationDataLoader,

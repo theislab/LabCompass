@@ -12,6 +12,7 @@ from sc_exp_design.transforms import Transform
 from sc_exp_design.types import TensorLike
 
 __all__ = [
+    "SequentialDataLoader",
     "BaseDataLoader",
     "TrainDataLoader",
     "ValidationDataLoader",
@@ -30,7 +31,59 @@ class BaseDataLoader(abc.ABC):
         raise NotImplementedError
 
 
-class TrainDataLoader:
+class SequentialDataLoader(BaseDataLoader):
+    """"""
+    def __init__(
+        self,
+        data: TrainData,
+        batch_size: int,
+        state_transforms: Transform | None = None,
+        device_id: Literal["cuda", "cpu"] = "cuda"
+    ) -> None:
+        """"""
+        self.data = data
+        self.batch_size = batch_size
+        self.state_transforms = state_transforms
+        self.device_id = device_id
+        self.device = torch.device(self.device_id)
+    
+    def sample(
+        self,
+    ) -> dict[str, TensorLike]:
+        """"""
+        # sampling batch indices
+        batch_idxs = np.random.choice(self.data.state_data.shape[0], size=batch_size)
+        # slicing the state data
+        states = self.data.state_data[batch_idxs]
+
+        # moving states to torch tensors
+        states = torch.from_numpy(states).to(self.device).float()
+        # handling transformations
+        if self.state_transforms is not None:
+            states = self.state_transforms.transform(states)
+
+        # constructing output dictionary
+        out = {
+            DataFields.STATE_DATA: states,
+        }
+
+        # retrieving optional petrurbation data
+        if self.data.perturbation_data is not None:
+            perturbation_data = {}
+            for covariate, covariate_data in self.data.perturbation_data.items():
+                perturbation_data[covariate] = torch.from_numpy(covariate_data[batch_idxs]).to(self.device).float()
+            out[DataFields.PERTURBATION_DATA] = perturbation_data
+        
+        # retrieving optional target covariates
+        if self.data.target_perturbation_repr is not None:
+            target_data = {}
+            for covariate, covariate_data in self.target_perturbation_reprd.items():
+                target_data[covariate] = torch.from_numpy(covariate_data[batch_idxs]).to(self.device).float()
+            out[DataFields.TARGET_CATEGORIES] = target_data
+        return out
+
+
+class TrainDataLoader(BaseDataLoader):
     """
     Data loader for training that samples matched control and perturbed cell states.
     """
@@ -130,7 +183,8 @@ class TrainDataLoader:
         
         return out_dict
 
-class ValidationDataLoader:
+
+class ValidationDataLoader(BaseDataLoader):
     """
     Data loader for validation that samples matched control and perturbed cell states.
     """
@@ -209,5 +263,6 @@ class ValidationDataLoader:
         
         return out_dict
 
-class PredictionDataLoader:
+
+class PredictionDataLoader(BaseDataLoader):
     """"""

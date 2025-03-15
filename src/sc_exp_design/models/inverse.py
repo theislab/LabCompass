@@ -1,0 +1,268 @@
+import logging
+from collections.abc import Callable, Mapping, Sequence
+from typing import Any, Literal
+
+import torch
+
+from sc_exp_design.data.dataloaders import TrainData, SequentialDataLoader
+from sc_exp_design.models.flow_matching import FlowMatching
+from sc_exp_design.networks.inverse import (
+    BaseConditionOptimizer,
+    MAPConditionOptimizer,
+    LangevinSampler,
+)
+from sc_exp_design.networks.inference_networks import PerturbationApproximatePosterior
+from sc_exp_design.training import CallBack, TargetPredictionTrainer, InverseModelTrainer
+from sc_exp_design.transforms import Transform
+
+logger = logging.getLogger(__name__)
+
+__all__ = ["InverseModel"]
+
+
+class InverseModel:
+    """"""
+    def __init__(
+        self,
+        forward_model: FlowMatching | None = None,
+        state_dim: int | None = None,
+        inverse_method: Literal["map", "langevin", "mlp", "vi"] = "map",
+        device_id: Literal["cuda", "cpu"] = "cuda",
+    ) -> None:
+        """"""
+        # sanity check on the input 
+        if state_dim is None:
+            msg = f""
+            assert forward_model is not None, msg
+            state_dim = forward_model.cvf_config.flow_dim
+        else:
+            msg = f""
+            assert isinstance(state_dim, int), msg
+            # if we pass the forward model we take the dimensionality from there
+            if (forward_model is not None) and state_dim != forward_model.cvf_config.flow_dim:
+                msg = f""
+                logger.warning(msg)
+                state_dim = forward_model.cvf_config.flow_dim
+
+        self.forward_model = forward_model
+        self.state_dim = state_dim
+
+        if inverse_method == "map":
+            inverse_method_class = MAPConditionOptimizer
+        elif inverse_method == "langevin":
+            inverse_method_class = LangevinSampler
+        elif inverse_method == "mlp":
+            inverse_method_class = ... # initialize with class reference here
+            raise NotImplementedError
+        elif inverse_method == "vi":
+            inverse_method_class = ... # initialize with class reference here
+            raise NotImplementedError
+        else:
+            msg = f""
+            raise ValueError(msg)
+
+        self.inverse_method = inverse_method
+        self.inverse_method_class = inverse_method_class
+
+        self.device_id = device_id
+        self.device = torch.device(self.device_id)
+
+        self.target_prediction_model = None
+        self.target_prediction_model_trained = False
+
+
+    def prepare_target_prediction_model(
+        self,
+        target_covariates: str | Sequence[str],
+        target_covariates_dims: int | dict[str, int],
+        target_covariates_noise_models: Literal["gaussian", "neg_bin"] | dict[str, None | Literal["gaussian", "neg_bin"]] | None = None,
+        target_covariates_predictor_kwargs: dict[str, dict[str, Any]] | None = None,
+        optimizer_class: torch.optim.Optimizer = torch.optim.AdamW,
+        lr_scheduler_class: torch.optim.lr_scheduler.LRScheduler | None = None,
+        optimizer_kwargs: Mapping[str, Any] = {"lr": 0.001},
+        lr_scheduler_kwargs: Mapping[str, Any] | None = None,
+        lr_scheduler_step: Literal["grad_step", "epoch"] = "grad_step",
+    ) -> None:
+        """"""
+        # preparing input with some sanity checks
+        if isinstance(target_covariates, str):
+            target_covariates = (target_covariates, )
+        if isinstance(target_covariates_dims, int):
+            msg = f"When `target_covariates_dims` is of type `int`, the respective perturbations should contain only one element, found {len(target_covariates)}"
+            assert len(target_covariates) == 1, msg
+            target_covariates_dims = {target_covariates[0]: target_covariates_dims}
+        if isinstance(target_covariates_noise_models, str):
+            msg = f"When `target_covariates_noise_models` is of type `str`, the respective perturbations should contain only one element, found {len(target_covariates)}"
+            assert len(target_covariates) == 1, msg
+        if target_covariates_noise_models is None:
+            target_covariates_noise_models = {target_covariate: None for target_covariate in target_covariates}
+
+        # setting the optional keyword arguments to a dictionary when not passed
+        if target_covariates_predictor_kwargs is None:
+            target_covariates_predictor_kwargs = {
+                target_covariate: {} for target_covariate in target_covariates
+            }
+
+        # storing the settings here as attributes
+        self.target_covariates = target_covariates
+        self.target_covariates_dims = target_covariates_dims
+        self.target_covariates_noise_models = target_covariates_noise_models
+        self.target_covariates_predictor_kwargs = target_covariates_predictor_kwargs
+
+        # initializing the predictor for each target covariate
+        self.target_prediction_model = PerturbationApproximatePosterior(
+            self.state_dim,
+            freeze_grads=False, # we want to backpropagate the gradients from its input
+            target_output_dims=self.target_covariates_dims,
+            noise_models=self.target_covariates_noise_models,
+            covariate_kwargs=self.target_covariates_predictor_kwargs,
+        )
+        self.target_prediction_model = self.target_prediction_model.float()
+        self.target_prediction_model = self.target_prediction_model.to(self.device)
+
+        # optimizer and scheduler 
+        self.optimizer = optimizer_class(
+            self.target_prediction_model.parameters(),
+            **optimizer_kwargs,
+        )
+
+        self.lr_scheduler = None
+        self.lr_scheduler_step = None
+        if lr_scheduler_kwargs is None:
+            lr_scheduler_kwargs = {}
+        if lr_scheduler_class is not None:
+            self.lr_scheduler = lr_scheduler_class(self.optimizer, **lr_scheduler_kwargs)
+            self.lr_scheduler_step = lr_scheduler_step
+
+    def train_target_prediction_model(
+        self,
+        train_data: TrainData | None = None,
+        validation_data: TrainData | None = None,
+        num_training_steps: int = 500,
+        valid_freq: int | None = None,
+        train_batch_size: int = 1024,
+        validation_batch_size: int = 512,
+        state_transforms: Transform | None = None,
+        callbacks: CallBack | None = None,
+        grad_step_interval_log: int = 100,
+    ) -> None:
+        """"""
+        # sanity checks
+        msg = f"You need to have instantitated the target predictor model by calling `prepare_target_prediction_model`"
+        assert self.target_prediction_model is not None, msg
+
+        if train_data is None:
+            msg = f""
+            assert self.forward_model is not None, msg
+            train_data = self.forward_model.train_data
+
+        msg = f""
+        assert isinstance(train_data, TrainData), msg
+
+        msg = f""
+        assert train_data.target_perturbation_repr is not None, msg
+
+        # initializing data loader
+        self.train_data = train_data
+        self.train_dataloader = SequentialDataLoader(
+            self.train_data,
+            train_batch_size,
+            state_transforms=state_transforms,
+            device_id=self.device_id
+        )
+
+        # initialize trainer
+        self.trainer = TargetPredictionTrainer(
+            self.target_prediction_model,
+            self.optimizer,
+            lr_scheduler=self.lr_scheduler,
+            lr_scheduler_step=self.lr_scheduler_step,
+            callbacks=callbacks,
+            grad_step_interval_log=grad_step_interval_log,
+        )
+
+
+        self.validation_dataloader = None
+        if validation_data is not None:
+            self.validation_dataloader = SequentialDataLoader(
+                validation_data,
+                validation_batch_size,
+                state_transforms=state_transforms,
+                device_id=self.device_id,
+            )
+
+        # fitting the trainer
+        self.trainer.fit(
+            num_training_steps,
+            self.train_dataloader,
+            self.validation_dataloader,
+            valid_freq,
+        )
+
+        self.target_predictor_trained = True
+
+    def prepare_inverse_model(
+        self,
+        optimal_condition: torch.Tensor, 
+        loss_fn: Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
+        cond_dim: int | dict[str, int],
+        perturbation_representation_keys: str | Sequence[str],
+        forward_model: None | torch.nn.Module = None,
+        prior: None | torch.nn.Module = None,
+        prior_weight: None | float = None,
+        **kwargs,
+    ) -> None:
+        """"""
+        # we need trained target predictor
+        msg = f"You need to have trained the target predictor model by calling `train_target_prediction_model`."
+        assert self.target_prediction_model_trained, msg
+
+        # we need to have at least one forward model
+        if forward_model is None:
+            msg = f""
+            assert self.forward_model is not None, msg
+            forward_model = self.forward_model
+
+        # preparing input with some sanity checks
+        if isinstance(perturbation_representation_keys, str):
+            perturbation_representation_keys = (perturbation_representation_keys, )
+        if isinstance(cond_dim, int):
+            msg = f"When `cond_dim` is of type `int`, the respective perturbations should contain only one element, found {len(perturbation_representation_keys)}"
+            assert len(perturbation_representation_keys) == 1, msg
+            cond_dim = {perturbation_representation_keys[0]: cond_dim}
+
+        msg = f"`cond_dim` needs to be a dictionary mapping each condition to its dimensionality, found {type(cond_dim)}"
+        assert isinstance(cond_dim, dict), msg
+        msg = f"`perturbation_keys` nees to be a sequence of perturbation covatiate identifiers, found {type(perturbation_keys)}"
+        assert isinstance(perturbation_keys, Sequence)
+
+        # we want all the keys to be in condition dim
+        for perturbation_key in perturbation_keys:
+            msg = f"{perturbation_key=} not found in `cond_dim.keys()`, you need to specify a corresponding dimensionality."
+            assert perturbation_key in cond_dim.keys(), msg
+
+        # when we pass the prior on the perturbations        
+        if prior is not None:
+            if prior_weight is None:
+                msg = f"`prior` is not None, but prior_weight was not passed. Setting to 1.0 by default."
+                logger.warning(msg)
+                prior_weight = 1.0
+        
+        # storing the attributes here
+        self.optimal_condition = optimal_condition
+        self.loss_fn = loss_fn
+        self.cond_dim = cond_dim
+        self.perturbation_representation_keys = perturbation_representation_keys
+        self.prior = prior
+        self.prior_weight = prior_weight
+
+        # initializing the inverse model
+        self.inverse_model = self.inverse_method_class(
+            self.optimal_condition,
+            self.target_prediction_model,
+            forward_model,
+            self.loss_fn,
+            self.cond_dim,
+            self.perturbation_representation_keys,
+            **kwargs
+        )
