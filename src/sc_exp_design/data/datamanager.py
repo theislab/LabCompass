@@ -285,6 +285,8 @@ class DataManager:
                         covariate_target_rep_data = covariate_rep_encoder.transform(covariate_data)
                     else:
                         covariate_target_rep_data = covariate_rep_encoder.fit_transform(covariate_data)
+                elif covariate_target_rep == "identity":
+                    covariate_target_rep_data = covariate_data
                 else:
                     msg = f"{covariate_target_rep=} not currently supported (avaiable options are `['one_hot', 'label', 'identity']`)"
                     raise NotImplementedError(msg)

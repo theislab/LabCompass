@@ -8,17 +8,19 @@ from matplotlib.figure import Figure
 from torch import Tensor
 from tqdm import tqdm
 
-from sc_exp_design.constants import DataFields, LossFields
+from sc_exp_design.constants import DataFields, LossFields, VFStepFields
 from sc_exp_design.data import SequentialDataLoader
 from sc_exp_design.networks.blocks import BaseModule
+from sc_exp_design.training.base import BaseTrainer
 from sc_exp_design.training.callbacks import CallBack
+from sc_exp_design.training.utils import compute_pert_inference_loss
 from sc_exp_design.types import TensorLike
 
 
 __all__ = ["TargetPredictionTrainer", "InverseModelTrainer", ]
 
 
-class TargetPredictionTrainer:
+class TargetPredictionTrainer(BaseTrainer):
     """"""
     _require_solver_for_validation: bool = False
 
@@ -46,17 +48,30 @@ class TargetPredictionTrainer:
         """"""
         return self.target_prediction_model
 
-    def __train_step_(
+    def _train_step(
         self,
         step_idx: int,
         batch: dict[str, TensorLike],
     ) -> tuple[Tensor, dict[str, Tensor]]:
         """"""
-        # loss, log_dict = ..., ...
-        # return loss, log_dict
-        raise NotImplementedError
+        # parsing batch dictonary
+        states = batch[DataFields.STATE_DATA]
+        targets = batch[DataFields.TARGET_CATEGORIES]
+        # forward pass on the model
+        predictions = self.target_prediction_model(states)[VFStepFields.PERTURBATION_PARAMS]
+        # computing loss
+        loss = torch.zeros((), requires_grad=True)
+        loss, log_dict = compute_pert_inference_loss(
+            loss,
+            predictions,
+            targets,
+            self.target_prediction_model.noise_models,
+            pert_cov_estimation_modes=..., # we dont need it for the moment but we will need to pass it at some point.
+            add_loss=True,
+        )
+        return loss, {LossFields.LOSS: loss, **log_dict}
     
-    def __validation_step_(
+    def _validation_step(
         self,
         batch: dict[str, TensorLike],
     ) -> tuple[TensorLike]:

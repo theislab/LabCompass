@@ -2,6 +2,7 @@ import abc
 from collections.abc import Sequence
 from typing import Literal
 
+import numpy as np
 import random
 import torch
 
@@ -52,7 +53,7 @@ class SequentialDataLoader(BaseDataLoader):
     ) -> dict[str, TensorLike]:
         """"""
         # sampling batch indices
-        batch_idxs = np.random.choice(self.data.state_data.shape[0], size=batch_size)
+        batch_idxs = np.random.choice(self.data.state_data.shape[0], size=self.batch_size)
         # slicing the state data
         states = self.data.state_data[batch_idxs]
 
@@ -77,7 +78,7 @@ class SequentialDataLoader(BaseDataLoader):
         # retrieving optional target covariates
         if self.data.target_perturbation_repr is not None:
             target_data = {}
-            for covariate, covariate_data in self.target_perturbation_reprd.items():
+            for covariate, covariate_data in self.data.target_perturbation_repr.items():
                 target_data[covariate] = torch.from_numpy(covariate_data[batch_idxs]).to(self.device).float()
             out[DataFields.TARGET_CATEGORIES] = target_data
         return out
