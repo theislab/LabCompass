@@ -295,16 +295,16 @@ class NeuralVelocityField(BaseModule):
             pert_output_dict = {}
             # with endpoints
             if (endpoints is not None) and (self.config.pert_approximate_posterior_input_type == "endpoints"):
-                pert_output_dict = self.pert_approximate_posterior(endpoints)
+                pert_output_dict[VFStepFields.PERTURBATION_PARAMS] = self.pert_approximate_posterior(endpoints)
             # with original representation
             if (original_concat is not None) and (self.config.pert_approximate_posterior_input_type == "original"):
-                pert_output_dict = self.pert_approximate_posterior(original_concat)
+                pert_output_dict[VFStepFields.PERTURBATION_PARAMS] = self.pert_approximate_posterior(original_concat)
             # with latent representation
             if (latent_concat is not None) and (self.config.pert_approximate_posterior_input_type == "latent"):
-                pert_output_dict = self.pert_approximate_posterior(latent_concat)
+                pert_output_dict[VFStepFields.PERTURBATION_PARAMS] = self.pert_approximate_posterior(latent_concat)
             # with one step prediction
             if (one_step_prediction is not None) and (self.config.pert_approximate_posterior_input_type == "one_step_prediction"):
-                pert_output_dict = self.pert_approximate_posterior(one_step_prediction)
+                pert_output_dict[VFStepFields.PERTURBATION_PARAMS] = self.pert_approximate_posterior(one_step_prediction)
             output_dict.update(pert_output_dict)
 
         return output_dict

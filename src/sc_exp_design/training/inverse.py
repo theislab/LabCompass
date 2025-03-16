@@ -58,7 +58,7 @@ class TargetPredictionTrainer(BaseTrainer):
         states = batch[DataFields.STATE_DATA]
         targets = batch[DataFields.TARGET_CATEGORIES]
         # forward pass on the model
-        predictions = self.target_prediction_model(states)[VFStepFields.PERTURBATION_PARAMS]
+        predictions = self.target_prediction_model(states)
         # computing loss
         loss = torch.zeros((), requires_grad=True)
         loss, log_dict = compute_pert_inference_loss(
