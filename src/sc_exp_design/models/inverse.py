@@ -2,6 +2,7 @@ import logging
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any, Literal
 
+import numpy as np
 import torch
 
 from sc_exp_design.data.dataloaders import TrainData, SequentialDataLoader
@@ -196,7 +197,7 @@ class InverseModel:
             valid_freq,
         )
 
-        self.target_predictor_trained = True
+        self.target_prediction_model_trained = True
 
     def prepare_inverse_model(
         self,
@@ -204,9 +205,11 @@ class InverseModel:
         loss_fn: Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
         cond_dim: int | dict[str, int],
         perturbation_representation_keys: Sequence[str],
-        is_discrete_dict: dict[str, bool],
+        is_discrete_dict: bool | dict[str, bool],
+        forward_model: torch.nn.Module | None = None, 
         prior: torch.nn.Module | None = None,
         prior_weight: float | None = None,
+        hard: bool = False,
         optimizer_class: torch.optim.Optimizer = torch.optim.AdamW,
         optimizer_kwargs: Mapping[str, Any] = {"lr": 0.001},
         lr_scheduler_class: torch.optim.lr_scheduler.LRScheduler | None = None,
@@ -232,14 +235,20 @@ class InverseModel:
             msg = f"When `cond_dim` is of type `int`, the respective perturbations should contain only one element, found {len(perturbation_representation_keys)}"
             assert len(perturbation_representation_keys) == 1, msg
             cond_dim = {perturbation_representation_keys[0]: cond_dim}
+        if isinstance(is_discrete_dict, bool):
+            msg = f"When `cond_dim` is of type `int`, the respective perturbations should contain only one element, found {len(perturbation_representation_keys)}"
+            assert len(perturbation_representation_keys) == 1, msg
+            is_discrete_dict = {perturbation_representation_keys[0]: is_discrete_dict}
 
         msg = f"`cond_dim` needs to be a dictionary mapping each condition to its dimensionality, found {type(cond_dim)}"
         assert isinstance(cond_dim, dict), msg
-        msg = f"`perturbation_keys` nees to be a sequence of perturbation covatiate identifiers, found {type(perturbation_keys)}"
-        assert isinstance(perturbation_keys, Sequence)
+        msg = f"`perturbation_representation_keys` nees to be a sequence of perturbation covatiate identifiers, found {type(perturbation_representation_keys)}"
+        assert isinstance(perturbation_representation_keys, Sequence)
+        msg = f""
+        assert isinstance(is_discrete_dict, dict)
 
         # we want all the keys to be in condition dim
-        for perturbation_key in perturbation_keys:
+        for perturbation_key in perturbation_representation_keys:
             msg = f"{perturbation_key=} not found in `cond_dim.keys()`, you need to specify a corresponding dimensionality."
             assert perturbation_key in cond_dim.keys(), msg
 
@@ -255,8 +264,10 @@ class InverseModel:
         self.loss_fn = loss_fn
         self.cond_dim = cond_dim
         self.perturbation_representation_keys = perturbation_representation_keys
+        self.is_discrete_dict = is_discrete_dict
         self.prior = prior
         self.prior_weight = prior_weight
+        self.hard = hard
 
         # initializing the inverse model
         self.inverse_model = self.inverse_method_class(
@@ -266,6 +277,11 @@ class InverseModel:
             self.loss_fn,
             self.cond_dim,
             self.perturbation_representation_keys,
+            self.is_discrete_dict,
+            prior=self.prior,
+            prior_weight=self.prior_weight,
+            hard=self.hard,
+            state_dim=self.state_dim,
             **kwargs
         )
         self.inverse_model = self.inverse_model.float()
@@ -300,11 +316,11 @@ class InverseModel:
     ) -> None:
         """"""
         # sanity checks
+        msg = f"You need to have instantitated the target predictor model by calling `prepare_inverse_model`"
+        assert self.inverse_model is not None, msg
+
         msg = f""
         assert not self.inverse_model.training_free, msg
-
-        msg = f"You need to have instantitated the target predictor model by calling `prepare_target_prediction_model`"
-        assert self.inverse_model is not None, msg
 
         if train_data is None:
             msg = f""
@@ -318,8 +334,10 @@ class InverseModel:
         assert train_data.target_perturbation_repr is not None, msg
 
         # initialize trainer
-        self.iverse_model_trainer = InverseModelTrainer(
+        self.inverse_model_trainer = InverseModelTrainer(
             self.inverse_model,
+            self.forward_model,
+            self.target_prediction_model,
             self.inverse_model_optimizer,
             lr_scheduler=self.inverse_model_lr_scheduler,
             lr_scheduler_step=self.inverse_model_lr_scheduler_step,
@@ -328,7 +346,7 @@ class InverseModel:
         )
 
         # retrieving control indices
-        contol_idxs = np.argwhere(train_data.adata.obs[train_data.control_key].values == True)[:, 0]
+        control_idxs = np.argwhere(train_data.adata.obs[train_data.control_key].values == True)[:, 0]
         # initializing data loader with only control states
         self.inverse_model_train_data = train_data[control_idxs]
         self.inverse_model_train_dataloader = SequentialDataLoader(
@@ -341,7 +359,7 @@ class InverseModel:
         # optional validation data
         self.inverse_model_validation_dataloader = None
         if validation_data is not None:
-            contol_idxs = np.argwhere(validation_data.adata.obs[validation_data.control_key].values == True)[:, 0]
+            control_idxs = np.argwhere(validation_data.adata.obs[validation_data.control_key].values == True)[:, 0]
             self.inverse_model_validation_data = validation_data[control_idxs] 
             self.inverse_model_validation_dataloader = SequentialDataLoader(
                 self.inverse_model_train_data,
@@ -351,7 +369,7 @@ class InverseModel:
             )
         
         # fitting the trainer
-        self.trainer.fit(
+        self.inverse_model_trainer.fit(
             num_training_steps,
             self.inverse_model_train_dataloader,
             self.inverse_model_validation_dataloader,

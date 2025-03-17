@@ -66,7 +66,7 @@ class TargetPredictionTrainer(BaseTrainer):
             predictions,
             targets,
             self.target_prediction_model.noise_models,
-            pert_cov_estimation_modes=..., # we dont need it for the moment but we will need to pass it at some point.
+            pert_cov_estimation_modes=..., # TODO: we dont need it for the moment but we will need to pass it at some point.
             add_loss=True,
         )
         return loss, {LossFields.LOSS: loss.item(), **log_dict}
@@ -81,16 +81,41 @@ class TargetPredictionTrainer(BaseTrainer):
         raise NotImplementedError
 
 
-class InverseModelTrainer:
+class InverseModelTrainer(BaseTrainer):
     """"""
     _require_solver_for_validation: bool = False
 
     def __init__(
         self,
+        inverse_model: BaseModule,
+        forward_model: BaseModule,
+        target_prediction_model: BaseModule,
+        optimizer: torch.optim.Optimizer,
+        lr_scheduler: torch.optim.lr_scheduler.LRScheduler | None = None,
+        lr_scheduler_step: Literal["grad_step", "valid_step"] = "grad_step",
+        callbacks: CallBack | None = None,
+        grad_step_interval_log: int = 1000,
     ) -> None:
         """"""
+        super().__init__()
+        
+        self.inverse_model = inverse_model
+        self.forward_model = forward_model
+        self.target_prediction_model = target_prediction_model
+        self.optimizer = optimizer
+        self.lr_scheduler = lr_scheduler
+        self.lr_scheduler_step = lr_scheduler_step
+        self.callbacks = callbacks
+        self.grad_step_interval_log = grad_step_interval_log 
 
-    def __train_step_(
+    @property
+    def model(
+        self,
+    ) -> BaseModule:
+        """"""
+        return self.inverse_model
+
+    def _train_step(
         self,
         step_idx: int,
         batch: dict[str, TensorLike],
@@ -100,7 +125,7 @@ class InverseModelTrainer:
         # return loss, log_dict
         raise NotImplementedError
 
-    def __validation_step_(
+    def _validation_step(
         self,
         batch: dict[str, TensorLike],
     ) -> tuple[TensorLike]:

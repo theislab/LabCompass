@@ -1,5 +1,5 @@
 import abc
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from typing import Any, Literal
 
 import torch
@@ -30,6 +30,7 @@ class BaseConditionOptimizer(BaseModule):
         prior: torch.nn.Module | None = None,
         prior_weight: float | None = None,
         hard: bool = True,
+        **kwargs
     ) -> None:
         """"""
         super().__init__()
@@ -112,15 +113,18 @@ class MAPConditionOptimizer(BaseConditionOptimizer):
         hard: bool = True,
         lr: float = 1e-1,
         tau: float = 1.0,
+        **kwargs,
     ) -> None:
         """"""
         
         super().__init__(
             optimal_condition, 
             linear_classifier,
-            perturbation_predictor, 
-            cond_dim,
+            perturbation_predictor,
             loss_fn, 
+            cond_dim,
+            perturbation_representation_keys,
+            is_discrete_dict,
             prior,
             prior_weight,
             hard,
@@ -145,8 +149,8 @@ class MAPConditionOptimizer(BaseConditionOptimizer):
         """"""
         self.optimized_perturbation_data = {}
         
-        for perturbation_representation in self.perturbation_representation_keys:
-            self.optimized_perturbation_data[perturbation_representation] = nn.Parameter(torch.randn(1, cond_dim[perturbation_representation]))
+        for perturbation_representation, cond_dim in self.cond_dim.items():
+            self.optimized_perturbation_data[perturbation_representation] = nn.Parameter(torch.randn(1, cond_dim))
 
     def forward(
             self,
@@ -204,15 +208,18 @@ class LangevinSampler(BaseConditionOptimizer):
         eta: float = 1e-1,
         noise_scale: float = 1e-1, 
         tau: float = 1.0,
+        **kwargs,
     ) -> None:
         """"""
         
         super().__init__(
             optimal_condition, 
             linear_classifier,
-            perturbation_predictor, 
-            cond_dim,
+            perturbation_predictor,
             loss_fn, 
+            cond_dim,
+            perturbation_representation_keys,
+            is_discrete_dict,
             prior,
             prior_weight,
             hard,
@@ -296,30 +303,39 @@ class NeuralInverseModel(BaseConditionOptimizer):
         prior_weight: float | None = None,
         hard: bool = True,
         state_dim: int | None = None,
+        perturbation_covariates: Sequence[str] | None = None,
         perturbation_covariates_noise_models: Literal["gaussian", "neg_bin"] | dict[str, None | Literal["gaussian", "neg_bin"]] | None = None,
         perturbation_covariates_predictor_kwargs: dict[str, dict[str, Any]] | None = None,
+        **kwargs,
     ) -> None:
         """"""
 
         super().__init__(
             optimal_condition, 
             linear_classifier,
-            perturbation_predictor, 
-            cond_dim,
+            perturbation_predictor,
             loss_fn, 
+            cond_dim,
+            perturbation_representation_keys,
+            is_discrete_dict,
             prior,
             prior_weight,
             hard,
         )
-    
+
         # preparing input with some sanity checks
-        if target_covariates_noise_models is None:
-            target_covariates_noise_models = {target_covariate: None for target_covariate in target_covariates}
+        msg = f""
+        assert perturbation_representation_keys is not None, msg
+        if isinstance(perturbation_representation_keys, str):
+            perturbation_representation_keys = (perturbation_representation_keys, )
+
+        if perturbation_covariates_noise_models is None:
+            perturbation_covariates_noise_models = {covariate: None for covariate in perturbation_representation_keys}
 
         # setting the optional keyword arguments to a dictionary when not passed
-        if target_covariates_predictor_kwargs is None:
-            target_covariates_predictor_kwargs = {
-                target_covariate: {} for target_covariate in target_covariates
+        if perturbation_covariates_predictor_kwargs is None:
+            perturbation_covariates_predictor_kwargs = {
+                covariate: {} for covariate in perturbation_representation_keys
             }
         msg = f""
         assert perturbation_covariates_noise_models is not None, msg
@@ -355,6 +371,12 @@ class NeuralInverseModel(BaseConditionOptimizer):
             noise_models=self.perturbation_covariates_noise_models,
             covariate_kwargs=self.perturbation_covariates_predictor_kwargs,
         )
+
+    def parameters(
+        self,
+    ) -> Iterator[nn.Parameter]:
+        """"""
+        return self.perturbation_prediction_model.parameters()
 
     def __prepare_perturbation_data(
         self,
