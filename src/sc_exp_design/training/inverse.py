@@ -121,10 +121,12 @@ class InverseModelTrainer(BaseTrainer):
         batch: dict[str, TensorLike],
     ) -> tuple[Tensor, dict[str, Tensor]]:
         """"""
-        # loss, log_dict = ..., ...
-        # return loss, log_dict
-        raise NotImplementedError
+        # parsing batch dictonary
+        source_states = batch[DataFields.STATE_DATA]
 
+        loss = self.inverse_model(source_states)         
+        return loss, {LossFields.LOSS: loss.item()}
+        
     def _validation_step(
         self,
         batch: dict[str, TensorLike],

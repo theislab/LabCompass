@@ -201,8 +201,8 @@ class InverseModel:
 
     def prepare_inverse_model(
         self,
-        optimal_condition: torch.Tensor, 
-        loss_fn: Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
+        optimal_condition: torch.Tensor | dict[str, torch.Tensor], 
+        loss_fn: dict[str, Callable[[torch.Tensor, torch.Tensor], torch.Tensor]] | Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
         cond_dim: int | dict[str, int],
         perturbation_representation_keys: Sequence[str],
         is_discrete_dict: bool | dict[str, bool],
@@ -229,6 +229,14 @@ class InverseModel:
             forward_model = self.forward_model
 
         # preparing input with some sanity checks
+        if isinstance(optimal_condition, torch.Tensor):
+            msg = f""
+            assert len(self.target_covariates) == 1, msg
+            optimal_condition = {self.target_covariates[0]: optimal_condition}
+        if isinstance(loss_fn, Callable):
+            msg = f""
+            assert len(self.target_covariates) == 1, msg
+            loss_fn = {self.target_covariates[0]: loss_fn}
         if isinstance(perturbation_representation_keys, str):
             perturbation_representation_keys = (perturbation_representation_keys, )
         if isinstance(cond_dim, int):

@@ -8,7 +8,7 @@ import torch.optim as optim
 import torch.nn.functional as F
 
 from sc_exp_design.networks.blocks import BaseModule
-from sc_exp_design.constants import ParamsFields
+from sc_exp_design.constants import DataFields, ParamsFields
 from sc_exp_design.networks.inference_networks import PerturbationApproximatePosterior
 
 __all__ = ["BaseConditionOptimizer", "MAPConditionOptimizer", "LangevinSampler", "NeuralInverseModel"]
@@ -20,11 +20,11 @@ class BaseConditionOptimizer(BaseModule):
 
     def __init__(
         self, 
-        optimal_condition: torch.Tensor, 
+        optimal_condition: dict[str, torch.Tensor], 
         linear_classifier: nn.Module,
         perturbation_predictor: nn.Module,
-        loss_fn: Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
-        cond_dim: int | dict[str, int],
+        loss_fn: dict[str, Callable[[torch.Tensor, torch.Tensor], torch.Tensor]],
+        cond_dim: dict[str, int],
         perturbation_representation_keys: Sequence[str],
         is_discrete_dict: dict[str, bool],
         prior: torch.nn.Module | None = None,
@@ -40,23 +40,25 @@ class BaseConditionOptimizer(BaseModule):
         self.perturbation_predictor = perturbation_predictor
         self.cond_dim = cond_dim
         self.loss_fn = loss_fn
-        
+        self.perturbation_representation_keys = perturbation_representation_keys
+        self.is_discrete_dict = is_discrete_dict
         self.prior = prior
-        self.prior_weight = prior_weight if prior_weight else 1.0
-
+        self.prior_weight = prior_weight
         self.hard = hard
 
 
     def compute_loss(
         self,
-        pred: torch.Tensor,
-        target: torch.Tensor,
-        e_optimized: nn.Parameter,
+        pred: dict[str, torch.Tensor],
+        target: dict[str, torch.Tensor],
+        e_optimized: dict[str, nn.Parameter],
     ) -> torch.Tensor:
         """"""
-        loss = self.loss_fn(pred, target)
+        loss = torch.zeros((), requires_grad=True, device=list(target.values())[0].device)
+        for covariate, loss_fn in self.loss_fn.items():
+            loss = loss + loss_fn(pred[covariate], target[covariate])
         if self.prior:
-            for key in self.prior: 
+            for key in self.prior:
                 log_prior = self.prior[key].log_prob(e_optimized[key]).sum()
                 loss = loss - self.prior_weight * log_prior
         return loss
@@ -101,7 +103,7 @@ class MAPConditionOptimizer(BaseConditionOptimizer):
 
     def __init__(
         self, 
-        optimal_condition: torch.Tensor, 
+        optimal_condition: dict[str, torch.Tensor], 
         linear_classifier: nn.Module,
         perturbation_predictor: nn.Module,
         loss_fn: Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
@@ -158,7 +160,7 @@ class MAPConditionOptimizer(BaseConditionOptimizer):
         ) -> torch.Tensor:
         # prepare batch information cellFlow           
         batch_dict = {
-            sc_exp_design.constants.DataFields.SOURCE_STATE: X_controls,
+            DataFields.SOURCE_STATE: X_controls,
         }
         
         expanded_perturbation_data = {}
@@ -168,7 +170,7 @@ class MAPConditionOptimizer(BaseConditionOptimizer):
             else:
                 expanded_perturbation_data[pert_key] = self.differentiable_categorical(self.optimized_perturbation_data[pert_key].expand(X_controls.shape[0], -1))
             
-        batch_dict[sc_exp_design.constants.DataFields.PERTURBATION_DATA] = expanded_perturbation_data
+        batch_dict[DataFields.PERTURBATION_DATA] = expanded_perturbation_data
 
         # pushing forward the particles 
         X_pert_pred = self.perturbation_predictor.predict(batch_dict,
@@ -194,7 +196,7 @@ class LangevinSampler(BaseConditionOptimizer):
 
     def __init__(
         self,
-        optimal_condition: torch.Tensor, 
+        optimal_condition: dict[str, torch.Tensor], 
         linear_classifier: nn.Module,
         perturbation_predictor: nn.Module,
         loss_fn: Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
@@ -255,7 +257,7 @@ class LangevinSampler(BaseConditionOptimizer):
         
         # prepare batch information cellFlow           
         batch_dict = {
-            sc_exp_design.constants.DataFields.SOURCE_STATE: X_controls,
+            DataFields.SOURCE_STATE: X_controls,
         }
         expanded_perturbation_data = {}
         for pert_key in self.optimized_perturbation_data:
@@ -264,7 +266,7 @@ class LangevinSampler(BaseConditionOptimizer):
             else:
                 expanded_perturbation_data[pert_key] = self.differentiable_categorical(self.optimized_perturbation_data[pert_key].unsqueeze(1).expand(-1, X_controls.shape[0], -1))
                        
-        batch_dict[sc_exp_design.constants.DataFields.PERTURBATION_DATA] = expanded_perturbation_data
+        batch_dict[DataFields.PERTURBATION_DATA] = expanded_perturbation_data
         
         # pushing forward the particles 
         X_pert_pred = self.perturbation_predictor.predict(
@@ -292,7 +294,7 @@ class NeuralInverseModel(BaseConditionOptimizer):
 
     def __init__(
         self,
-        optimal_condition: torch.Tensor, 
+        optimal_condition: dict[str, torch.Tensor], 
         linear_classifier: nn.Module,
         perturbation_predictor: nn.Module,
         loss_fn: Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
@@ -357,7 +359,10 @@ class NeuralInverseModel(BaseConditionOptimizer):
         self,
     ) -> int:
         """"""
-        return self.state_dim + self.optimal_condition.shape[0]
+        input_dim = self.state_dim
+        for optimal_covariate in self.optimal_condition.values():
+            input_dim = input_dim + optimal_covariate.shape[0] 
+        return input_dim
 
     def _init_modules(
         self,
@@ -377,6 +382,14 @@ class NeuralInverseModel(BaseConditionOptimizer):
     ) -> Iterator[nn.Parameter]:
         """"""
         return self.perturbation_prediction_model.parameters()
+    
+    def to(
+        self,
+        device: torch.device,
+    ) -> nn.Module:
+        """"""
+        self.perturbation_prediction_model = self.perturbation_prediction_model.to(device)
+        return self
 
     def __prepare_perturbation_data(
         self,
@@ -411,11 +424,15 @@ class NeuralInverseModel(BaseConditionOptimizer):
             elif covariate_noise_model == "neg_bin":
                 raise NotImplementedError
             
+            elif covariate_noise_model is None:
+                pass
+
             else:
                 msg = f""
                 raise ValueError(msg)
             
             perturbation_data[covariate] = covariate_data
+        return perturbation_data
 
     def forward(
         self,
@@ -423,29 +440,31 @@ class NeuralInverseModel(BaseConditionOptimizer):
     ) -> torch.Tensor:
         """"""
         # handling the shape of the optimal condition
-        target = self.optimal_condition.repeat(control_states.shape[0], 1)
-
+        target = {
+            covariate: covariate_data.repeat(control_states.shape[0], 1).to(control_states.device)
+            for covariate, covariate_data in self.optimal_condition.items()
+        }
         # predicting the optimal perturbation
-        input_tensor = torch.concatenate((control_states, target), dim=1)
+        input_tensor = torch.concatenate((control_states, *target.values()), dim=1)
         pert_params = self.perturbation_prediction_model(input_tensor)
 
         # preparing perturbation params
-        pert_data = self.__prepare_perturbation_params(pert_params)
+        pert_data = self.__prepare_perturbation_data(pert_params)
 
         # prepare batch information cellFlow           
         batch_dict = {
-            sc_exp_design.constants.DataFields.SOURCE_STATE: control_states,
-            sc_exp_design.constants.DataFields.PERTURBATION_DATA: pert_data,
+            DataFields.SOURCE_STATE: control_states,
+            DataFields.PERTURBATION_DATA: pert_data,
         }
 
         # predict perturbation effetc
-        x1_hat = self.forward_model.predict(
+        x1_hat = self.perturbation_predictor.predict(
             batch_dict,
             no_grad=False,
         )
 
         # predicting target response
         class_pred = self.linear_classifier(x1_hat)
-        loss = self.compute_loss(class_pred, target, self.optimized_perturbation_data)
+        loss = self.compute_loss(class_pred, target, pert_data)
 
         return loss
