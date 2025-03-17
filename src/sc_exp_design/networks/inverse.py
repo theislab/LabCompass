@@ -1,6 +1,6 @@
 import abc
 from collections.abc import Callable, Sequence
-
+from typing import Any, Literal
 
 import torch
 import torch.nn as nn
@@ -8,12 +8,15 @@ import torch.optim as optim
 import torch.nn.functional as F
 
 from sc_exp_design.networks.blocks import BaseModule
+from sc_exp_design.constants import ParamsFields
+from sc_exp_design.networks.inference_networks import PerturbationApproximatePosterior
 
-__all__ = ["BaseConditionOptimizer", "MAPConditionOptimizer", "LangevinSampler"]
+__all__ = ["BaseConditionOptimizer", "MAPConditionOptimizer", "LangevinSampler", "NeuralInverseModel"]
 
 
 class BaseConditionOptimizer(BaseModule):
     """"""
+    training_free: bool
 
     def __init__(
         self, 
@@ -26,6 +29,7 @@ class BaseConditionOptimizer(BaseModule):
         is_discrete_dict: dict[str, bool],
         prior: torch.nn.Module | None = None,
         prior_weight: float | None = None,
+        hard: bool = True,
     ) -> None:
         """"""
         super().__init__()
@@ -38,12 +42,9 @@ class BaseConditionOptimizer(BaseModule):
         
         self.prior = prior
         self.prior_weight = prior_weight if prior_weight else 1.0
-        
-    def _init_modules(
-        self
-    ) -> None:
-        """"""
-        self.net = None
+
+        self.hard = hard
+
 
     def compute_loss(
         self,
@@ -94,6 +95,9 @@ class BaseConditionOptimizer(BaseModule):
 
 
 class MAPConditionOptimizer(BaseConditionOptimizer):
+    """"""
+    training_free: bool = True
+
     def __init__(
         self, 
         optimal_condition: torch.Tensor, 
@@ -105,9 +109,9 @@ class MAPConditionOptimizer(BaseConditionOptimizer):
         is_discrete_dict: dict[str, bool],
         prior: torch.nn.Module | None = None,
         prior_weight: float | None = None,
+        hard: bool = True,
         lr: float = 1e-1,
         tau: float = 1.0,
-        hard: bool = True,
     ) -> None:
         """"""
         
@@ -118,24 +122,32 @@ class MAPConditionOptimizer(BaseConditionOptimizer):
             cond_dim,
             loss_fn, 
             prior,
-            prior_weight
+            prior_weight,
+            hard,
         )
         
         self.is_discrete_dict = is_discrete_dict
         self.tau = tau
-        self.hard = hard
         
         # perturbation representation keys 
         self.perturbation_representation_keys = perturbation_representation_keys
-        self.optimized_perturbation_data = {}
-        
-        for perturbation_representation in self.perturbation_representation_keys:
-            self.optimized_perturbation_data[perturbation_representation] = nn.Parameter(torch.randn(1, cond_dim[perturbation_representation]))
-                
+
+        # initializing modules
+        self._init_modules()
+
         # Set up optimizer for the conditions 
         self.e_optimizer = optim.Adam([self.optimized_perturbation_data[perturbation_representation] for perturbation_representation in self.optimized_perturbation_data], 
                                       lr=lr)
     
+    def _init_modules(
+        self,
+    ) -> None:
+        """"""
+        self.optimized_perturbation_data = {}
+        
+        for perturbation_representation in self.perturbation_representation_keys:
+            self.optimized_perturbation_data[perturbation_representation] = nn.Parameter(torch.randn(1, cond_dim[perturbation_representation]))
+
     def forward(
             self,
             X_controls: torch.Tensor,
@@ -174,6 +186,8 @@ class MAPConditionOptimizer(BaseConditionOptimizer):
     
 class LangevinSampler(BaseConditionOptimizer):
     """"""
+    training_free: bool = True
+
     def __init__(
         self,
         optimal_condition: torch.Tensor, 
@@ -185,11 +199,11 @@ class LangevinSampler(BaseConditionOptimizer):
         is_discrete_dict: dict[str, bool],
         prior: torch.nn.Module | None = None,
         prior_weight: float | None = None,
+        hard: bool = True,
         n_samples: int | None = None,
         eta: float = 1e-1,
         noise_scale: float = 1e-1, 
         tau: float = 1.0,
-        hard: bool = True,
     ) -> None:
         """"""
         
@@ -200,7 +214,8 @@ class LangevinSampler(BaseConditionOptimizer):
             cond_dim,
             loss_fn, 
             prior,
-            prior_weight
+            prior_weight,
+            hard,
         )
             
         self.eta = eta
@@ -209,8 +224,14 @@ class LangevinSampler(BaseConditionOptimizer):
         self.is_discrete_dict = is_discrete_dict
         self.n_samples = n_samples
         self.tau = tau
-        self.hard = hard
-        
+
+        # initializing modules
+        self._init_modules()
+
+    def _init_modules(
+        self,
+    ) -> None:
+        """"""
         # Optimized perturbation representation data 
         self.optimized_perturbation_data = {} 
         
@@ -239,8 +260,10 @@ class LangevinSampler(BaseConditionOptimizer):
         batch_dict[sc_exp_design.constants.DataFields.PERTURBATION_DATA] = expanded_perturbation_data
         
         # pushing forward the particles 
-        X_pert_pred = self.perturbation_predictor.predict(batch_dict,
-                                                          no_grad=False)
+        X_pert_pred = self.perturbation_predictor.predict(
+            batch_dict,
+            no_grad=False,
+        )
         
         class_pred = self.linear_classifier(X_pert_pred)
         loss = self.compute_loss(class_pred, target, self.optimized_perturbation_data)
@@ -254,4 +277,153 @@ class LangevinSampler(BaseConditionOptimizer):
             self.optimized_perturbation_data[pert].detach_()  # Remove gradients on the just updated element for memory efficiency 
             self.optimized_perturbation_data[pert].requires_grad_()  # Re-enable gradient tracking
         return loss
+
+
+class NeuralInverseModel(BaseConditionOptimizer):
+    """"""
+    training_free: bool = False
+
+    def __init__(
+        self,
+        optimal_condition: torch.Tensor, 
+        linear_classifier: nn.Module,
+        perturbation_predictor: nn.Module,
+        loss_fn: Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
+        cond_dim: int | dict[str, int],
+        perturbation_representation_keys: Sequence[str],
+        is_discrete_dict: dict[str, bool],
+        prior: torch.nn.Module | None = None,
+        prior_weight: float | None = None,
+        hard: bool = True,
+        state_dim: int | None = None,
+        perturbation_covariates_noise_models: Literal["gaussian", "neg_bin"] | dict[str, None | Literal["gaussian", "neg_bin"]] | None = None,
+        perturbation_covariates_predictor_kwargs: dict[str, dict[str, Any]] | None = None,
+    ) -> None:
+        """"""
+
+        super().__init__(
+            optimal_condition, 
+            linear_classifier,
+            perturbation_predictor, 
+            cond_dim,
+            loss_fn, 
+            prior,
+            prior_weight,
+            hard,
+        )
     
+        # preparing input with some sanity checks
+        if target_covariates_noise_models is None:
+            target_covariates_noise_models = {target_covariate: None for target_covariate in target_covariates}
+
+        # setting the optional keyword arguments to a dictionary when not passed
+        if target_covariates_predictor_kwargs is None:
+            target_covariates_predictor_kwargs = {
+                target_covariate: {} for target_covariate in target_covariates
+            }
+        msg = f""
+        assert perturbation_covariates_noise_models is not None, msg
+        msg = f""
+        assert perturbation_covariates_predictor_kwargs is not None, msg
+        msg = f""
+        assert state_dim is not None, msg
+
+        # setting additional attributes
+        self.state_dim = state_dim
+        self.perturbation_covariates_noise_models = perturbation_covariates_noise_models
+        self.perturbation_covariates_predictor_kwargs = perturbation_covariates_predictor_kwargs
+
+        # initializing modules
+        self._init_modules()
+
+    @property
+    def input_dim(
+        self,
+    ) -> int:
+        """"""
+        return self.state_dim + self.optimal_condition.shape[0]
+
+    def _init_modules(
+        self,
+    ) -> None:
+        """"""
+        # initializing the predictor for each target covariate
+        self.perturbation_prediction_model = PerturbationApproximatePosterior(
+            self.input_dim,
+            freeze_grads=False, # we want to backpropagate the gradients from its input
+            target_output_dims=self.cond_dim,
+            noise_models=self.perturbation_covariates_noise_models,
+            covariate_kwargs=self.perturbation_covariates_predictor_kwargs,
+        )
+
+    def __prepare_perturbation_data(
+        self,
+        pert_data: dict[str, torch.Tensor],
+    ) -> dict[str, torch.Tensor]:
+        """"""
+        perturbation_data = {}
+        for covariate, covariate_data in pert_data.items():
+            # retrieving covariate settings
+            covariate_noise_model = self.perturbation_prediction_model.noise_models[covariate]
+            is_discrete_covariate = self.is_discrete_dict[covariate]
+            covariate_network = self.perturbation_prediction_model.pert_approximate_posterior[covariate]
+
+            # when discrete
+            if is_discrete_covariate:
+                self.differentiable_categorical(covariate_params)
+            
+            # gaussian noise model
+            if covariate_noise_model == "gaussian":
+                # parsing parameter dictionaries
+                mean = covariate_data[ParamsFields.MEAN]
+                covariance = covariate_data[ParamsFields.COVARIANCE]
+
+                # reparametrization trick
+                z = torch.randn_like(mean)
+                if covariate_network.cov_estimation_mode == "isotropic":
+                    covariate_data = mean + covariance*z
+                elif covariate_network.cov_estimation_mode == "anisotropic":
+                    covariate_data = ...
+                    raise NotImplementedError
+
+            elif covariate_noise_model == "neg_bin":
+                raise NotImplementedError
+            
+            else:
+                msg = f""
+                raise ValueError(msg)
+            
+            perturbation_data[covariate] = covariate_data
+
+    def forward(
+        self,
+        control_states: torch.Tensor,
+    ) -> torch.Tensor:
+        """"""
+        # handling the shape of the optimal condition
+        target = self.optimal_condition.repeat(control_states.shape[0], 1)
+
+        # predicting the optimal perturbation
+        input_tensor = torch.concatenate((control_states, target), dim=1)
+        pert_params = self.perturbation_prediction_model(input_tensor)
+
+        # preparing perturbation params
+        pert_data = self.__prepare_perturbation_params(pert_params)
+
+        # prepare batch information cellFlow           
+        batch_dict = {
+            sc_exp_design.constants.DataFields.SOURCE_STATE: control_states,
+            sc_exp_design.constants.DataFields.PERTURBATION_DATA: pert_data,
+        }
+
+        # predict perturbation effetc
+        x1_hat = self.forward_model.predict(
+            batch_dict,
+            no_grad=False,
+        )
+
+        # predicting target response
+        class_pred = self.linear_classifier(x1_hat)
+        loss = self.compute_loss(class_pred, target, self.optimized_perturbation_data)
+
+        return loss

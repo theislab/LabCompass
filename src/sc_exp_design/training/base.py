@@ -73,7 +73,7 @@ class BaseTrainer(abc.ABC):
             self.lr_scheduler.step()
         # running callbacks
         if self.callbacks is not None:
-            self.callbacks.run_on_grad_step()
+            self.callbacks.run_on_valid_step()
         return val_preds, val_gt
 
     def __update_logs(
@@ -141,8 +141,12 @@ class BaseTrainer(abc.ABC):
         """"""
         fig, axes = plt.subplots(1, len(self.training_logs), figsize=figsize)
         for idx, (loss_id, loss_history) in enumerate(self.training_logs.items()):
-            axes[idx].set_title(loss_id)
-            axes[idx].plot(loss_history)
+            if len(self.training_logs) == 1:
+                current_axes = axes
+            else:
+                current_axes = axes[idx]
+            current_axes.set_title(loss_id)
+            current_axes.plot(loss_history)
         if show:
             fig.show()
         return fig, axes

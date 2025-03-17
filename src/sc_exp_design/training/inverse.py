@@ -69,7 +69,7 @@ class TargetPredictionTrainer(BaseTrainer):
             pert_cov_estimation_modes=..., # we dont need it for the moment but we will need to pass it at some point.
             add_loss=True,
         )
-        return loss, {LossFields.LOSS: loss, **log_dict}
+        return loss, {LossFields.LOSS: loss.item(), **log_dict}
     
     def _validation_step(
         self,
@@ -83,6 +83,8 @@ class TargetPredictionTrainer(BaseTrainer):
 
 class InverseModelTrainer:
     """"""
+    _require_solver_for_validation: bool = False
+
     def __init__(
         self,
     ) -> None:

@@ -173,11 +173,10 @@ class FlowMatching:
         self,
         cvf_config: NeuralVelocityFieldConfig,
         optimizer_class: torch.optim.Optimizer = torch.optim.AdamW,
-        lr_scheduler_class: torch.optim.lr_scheduler.LRScheduler | None = None,
         optimizer_kwargs: Mapping[str, Any] = {"lr": 0.001},
+        lr_scheduler_class: torch.optim.lr_scheduler.LRScheduler | None = None,
         lr_scheduler_kwargs: Mapping[str, Any] | None = None,
         lr_scheduler_step: Literal["grad_step", "epoch"] = "grad_step",
-        solver_class: ODESolver | None = ODESolver,
         num_time_steps: int = 100,
         solver_kwargs: dict[str, Any] | None = None,
     ) -> None:
@@ -209,10 +208,6 @@ class FlowMatching:
             Otherwise when set to `"epoch"`, the learning rate will be updated after each validation step, defaults to `"grad_step"`.
         :type lr_scheduler_step: class: `Literal["grad_step", "epoch"]`
 
-        :param solver_class: Reference to a solver used to integrate the dynamics during inference (not an instance). Should provide the method
-            :method:`integrate`, needed to simulate the dynamics over time for a given initial condition and guidance term, defaults to :class:`ODESolver`.
-        :type solver_class: class:`ODESolver`
-
         :param num_time_steps: Number of time steps which to integrate the dynamics over during inference, defaults to `100`.
         :type num_time_steps: class:`int`
 
@@ -242,7 +237,6 @@ class FlowMatching:
             self.lr_scheduler = lr_scheduler_class(self.optimizer, **lr_scheduler_kwargs)
             self.lr_scheduler_step = lr_scheduler_step
 
-        self.solver_class = solver_class
         self.num_time_steps = num_time_steps
         self.solver_kwargs = solver_kwargs
 
@@ -318,7 +312,6 @@ class FlowMatching:
             time_sampler=self.time_sampler,
             callbacks=callbacks,
             grad_step_interval_log=grad_step_interval_log,
-            solver_class=self.solver_class,
             num_time_steps=self.num_time_steps,
             gamma_fn=gamma_fn,
             solver_kwargs=self.solver_kwargs,
@@ -384,7 +377,7 @@ class FlowMatching:
         # defining velocity function
         vf = self.velocity_field.get_vf_fn(condition, gamma_fn=gamma_fn)
         # initializing the sampler clss
-        ode_solver = self.solver_class(
+        ode_solver = ODESolver(
             vf,
             gamma_fn=gamma_fn,
             num_time_steps=self.num_time_steps,

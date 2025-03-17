@@ -10,6 +10,7 @@ from sc_exp_design.networks.inverse import (
     BaseConditionOptimizer,
     MAPConditionOptimizer,
     LangevinSampler,
+    NeuralInverseModel,
 )
 from sc_exp_design.networks.inference_networks import PerturbationApproximatePosterior
 from sc_exp_design.training import CallBack, TargetPredictionTrainer, InverseModelTrainer
@@ -26,7 +27,7 @@ class InverseModel:
         self,
         forward_model: FlowMatching | None = None,
         state_dim: int | None = None,
-        inverse_method: Literal["map", "langevin", "mlp", "vi"] = "map",
+        inverse_method: Literal["map", "langevin", "neural"] = "map",
         device_id: Literal["cuda", "cpu"] = "cuda",
     ) -> None:
         """"""
@@ -51,12 +52,8 @@ class InverseModel:
             inverse_method_class = MAPConditionOptimizer
         elif inverse_method == "langevin":
             inverse_method_class = LangevinSampler
-        elif inverse_method == "mlp":
-            inverse_method_class = ... # initialize with class reference here
-            raise NotImplementedError
-        elif inverse_method == "vi":
-            inverse_method_class = ... # initialize with class reference here
-            raise NotImplementedError
+        elif inverse_method == "neural":
+            inverse_method_class = NeuralInverseModel
         else:
             msg = f""
             raise ValueError(msg)
@@ -69,7 +66,7 @@ class InverseModel:
 
         self.target_prediction_model = None
         self.target_prediction_model_trained = False
-
+        self.inverse_model = None
 
     def prepare_target_prediction_model(
         self,
@@ -78,8 +75,8 @@ class InverseModel:
         target_covariates_noise_models: Literal["gaussian", "neg_bin"] | dict[str, None | Literal["gaussian", "neg_bin"]] | None = None,
         target_covariates_predictor_kwargs: dict[str, dict[str, Any]] | None = None,
         optimizer_class: torch.optim.Optimizer = torch.optim.AdamW,
-        lr_scheduler_class: torch.optim.lr_scheduler.LRScheduler | None = None,
         optimizer_kwargs: Mapping[str, Any] = {"lr": 0.001},
+        lr_scheduler_class: torch.optim.lr_scheduler.LRScheduler | None = None,
         lr_scheduler_kwargs: Mapping[str, Any] | None = None,
         lr_scheduler_step: Literal["grad_step", "epoch"] = "grad_step",
     ) -> None:
@@ -121,18 +118,18 @@ class InverseModel:
         self.target_prediction_model = self.target_prediction_model.to(self.device)
 
         # optimizer and scheduler 
-        self.optimizer = optimizer_class(
+        self.target_prediction_optimizer = optimizer_class(
             self.target_prediction_model.parameters(),
             **optimizer_kwargs,
         )
 
-        self.lr_scheduler = None
-        self.lr_scheduler_step = None
+        self.target_prediction_lr_scheduler = None
+        self.target_prediction_lr_scheduler_step = None
         if lr_scheduler_kwargs is None:
             lr_scheduler_kwargs = {}
         if lr_scheduler_class is not None:
-            self.lr_scheduler = lr_scheduler_class(self.optimizer, **lr_scheduler_kwargs)
-            self.lr_scheduler_step = lr_scheduler_step
+            self.target_prediction_lr_scheduler = lr_scheduler_class(self.target_prediction_optimizer, **lr_scheduler_kwargs)
+            self.target_prediction_lr_scheduler_step = lr_scheduler_step
 
     def train_target_prediction_model(
         self,
@@ -174,14 +171,14 @@ class InverseModel:
         # initialize trainer
         self.trainer = TargetPredictionTrainer(
             self.target_prediction_model,
-            self.optimizer,
-            lr_scheduler=self.lr_scheduler,
-            lr_scheduler_step=self.lr_scheduler_step,
+            self.target_prediction_optimizer,
+            lr_scheduler=self.target_prediction_lr_scheduler,
+            lr_scheduler_step=self.target_prediction_lr_scheduler_step,
             callbacks=callbacks,
             grad_step_interval_log=grad_step_interval_log,
         )
 
-
+        # optional validation data
         self.validation_dataloader = None
         if validation_data is not None:
             self.validation_dataloader = SequentialDataLoader(
@@ -206,10 +203,15 @@ class InverseModel:
         optimal_condition: torch.Tensor, 
         loss_fn: Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
         cond_dim: int | dict[str, int],
-        perturbation_representation_keys: str | Sequence[str],
-        forward_model: None | torch.nn.Module = None,
-        prior: None | torch.nn.Module = None,
-        prior_weight: None | float = None,
+        perturbation_representation_keys: Sequence[str],
+        is_discrete_dict: dict[str, bool],
+        prior: torch.nn.Module | None = None,
+        prior_weight: float | None = None,
+        optimizer_class: torch.optim.Optimizer = torch.optim.AdamW,
+        optimizer_kwargs: Mapping[str, Any] = {"lr": 0.001},
+        lr_scheduler_class: torch.optim.lr_scheduler.LRScheduler | None = None,
+        lr_scheduler_kwargs: Mapping[str, Any] | None = None,
+        lr_scheduler_step: Literal["grad_step", "epoch"] = "grad_step",
         **kwargs,
     ) -> None:
         """"""
@@ -266,3 +268,98 @@ class InverseModel:
             self.perturbation_representation_keys,
             **kwargs
         )
+        self.inverse_model = self.inverse_model.float()
+        self.inverse_model = self.inverse_model.to(self.device)
+
+        # optimizer and scheduler 
+        if not self.inverse_model.training_free:
+            self.inverse_model_optimizer = optimizer_class(
+                self.inverse_model.parameters(),
+                **optimizer_kwargs,
+            )
+
+            self.inverse_model_lr_scheduler = None
+            self.inverse_model_lr_scheduler_step = None
+            if lr_scheduler_kwargs is None:
+                lr_scheduler_kwargs = {}
+            if lr_scheduler_class is not None:
+                self.inverse_model_lr_scheduler = lr_scheduler_class(self.inverse_model_optimizer, **lr_scheduler_kwargs)
+                self.inverse_model_lr_scheduler_step = lr_scheduler_step
+
+    def train_inverse_model(
+        self,
+        train_data: TrainData | None = None,
+        validation_data: TrainData | None = None,
+        num_training_steps: int = 500,
+        valid_freq: int | None = None,
+        train_batch_size: int = 1024,
+        validation_batch_size: int = 512,
+        state_transforms: Transform | None = None,
+        callbacks: CallBack | None = None,
+        grad_step_interval_log: int = 100,
+    ) -> None:
+        """"""
+        # sanity checks
+        msg = f""
+        assert not self.inverse_model.training_free, msg
+
+        msg = f"You need to have instantitated the target predictor model by calling `prepare_target_prediction_model`"
+        assert self.inverse_model is not None, msg
+
+        if train_data is None:
+            msg = f""
+            assert self.forward_model is not None, msg
+            train_data = self.forward_model.train_data
+
+        msg = f""
+        assert isinstance(train_data, TrainData), msg
+
+        msg = f""
+        assert train_data.target_perturbation_repr is not None, msg
+
+        # initialize trainer
+        self.iverse_model_trainer = InverseModelTrainer(
+            self.inverse_model,
+            self.inverse_model_optimizer,
+            lr_scheduler=self.inverse_model_lr_scheduler,
+            lr_scheduler_step=self.inverse_model_lr_scheduler_step,
+            callbacks=callbacks,
+            grad_step_interval_log=grad_step_interval_log,
+        )
+
+        # retrieving control indices
+        contol_idxs = np.argwhere(train_data.adata.obs[train_data.control_key].values == True)[:, 0]
+        # initializing data loader with only control states
+        self.inverse_model_train_data = train_data[control_idxs]
+        self.inverse_model_train_dataloader = SequentialDataLoader(
+            self.inverse_model_train_data,
+            train_batch_size,
+            state_transforms=state_transforms,
+            device_id=self.device_id,
+        )
+
+        # optional validation data
+        self.inverse_model_validation_dataloader = None
+        if validation_data is not None:
+            contol_idxs = np.argwhere(validation_data.adata.obs[validation_data.control_key].values == True)[:, 0]
+            self.inverse_model_validation_data = validation_data[control_idxs] 
+            self.inverse_model_validation_dataloader = SequentialDataLoader(
+                self.inverse_model_train_data,
+                validation_batch_size,
+                state_transforms=state_transforms,
+                device_id=self.device_id,
+            )
+        
+        # fitting the trainer
+        self.trainer.fit(
+            num_training_steps,
+            self.inverse_model_train_dataloader,
+            self.inverse_model_validation_dataloader,
+            valid_freq,
+        )
+
+    def predict(
+        self,
+    ) -> torch.Tensor:
+        """"""
+        
