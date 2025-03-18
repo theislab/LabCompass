@@ -245,6 +245,8 @@ class NeuralVelocityField(BaseModule):
             # sanity check (condition should be not None)
             msg = f""
             assert cond is not None, msg
+            print(f"{t_latent.shape=}, {xt_latent.shape=}, {condition_latent.shape=}")
+            print(f"{t.shape=}, {xt.shape=}, {condition_original.shape=}")
             latent_concat = torch.cat([t_latent, xt_latent, condition_latent], dim=1)
             original_concat = torch.cat([t, xt, condition_original], dim=1)
         else:

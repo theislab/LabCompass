@@ -92,6 +92,7 @@ class InverseModel:
         if isinstance(target_covariates_noise_models, str):
             msg = f"When `target_covariates_noise_models` is of type `str`, the respective perturbations should contain only one element, found {len(target_covariates)}"
             assert len(target_covariates) == 1, msg
+            target_covariates_noise_models = {target_covariates[0]: target_covariates_noise_models}
         if target_covariates_noise_models is None:
             target_covariates_noise_models = {target_covariate: None for target_covariate in target_covariates}
 
@@ -210,6 +211,9 @@ class InverseModel:
         prior: torch.nn.Module | None = None,
         prior_weight: float | None = None,
         hard: bool = False,
+        perturbation_initializer: Callable[[Any], torch.Tensor] | dict[str, Callable[[Any], torch.Tensor]] | None = None,
+        perturbation_non_linearities: Callable[[torch.Tensor], torch.Tensor] | dict[str, Callable[[torch.Tensor], torch.Tensor]] | None = None,
+        n_samples: int | None = None,
         optimizer_class: torch.optim.Optimizer = torch.optim.AdamW,
         optimizer_kwargs: Mapping[str, Any] = {"lr": 0.001},
         lr_scheduler_class: torch.optim.lr_scheduler.LRScheduler | None = None,
@@ -247,18 +251,32 @@ class InverseModel:
             msg = f"When `cond_dim` is of type `int`, the respective perturbations should contain only one element, found {len(perturbation_representation_keys)}"
             assert len(perturbation_representation_keys) == 1, msg
             is_discrete_dict = {perturbation_representation_keys[0]: is_discrete_dict}
+        if isinstance(perturbation_initializer, Callable):
+            msg = f"When `perturbation_initializer` is of type `Callable`, the respective perturbations should contain only one element, found {len(perturbation_representation_keys)}"
+            assert len(perturbation_representation_keys) == 1, msg
+            perturbation_initializer = {perturbation_representation_keys[0]: perturbation_initializer}
+        if perturbation_initializer is None:
+            perturbation_initializer = {perturbation_covariate:torch.randn for perturbation_covariate in perturbation_representation_keys}
 
         msg = f"`cond_dim` needs to be a dictionary mapping each condition to its dimensionality, found {type(cond_dim)}"
         assert isinstance(cond_dim, dict), msg
         msg = f"`perturbation_representation_keys` nees to be a sequence of perturbation covatiate identifiers, found {type(perturbation_representation_keys)}"
-        assert isinstance(perturbation_representation_keys, Sequence)
+        assert isinstance(perturbation_representation_keys, Sequence), msg
         msg = f""
-        assert isinstance(is_discrete_dict, dict)
+        assert isinstance(is_discrete_dict, dict), msgs
+        msg = f""
+        assert isinstance(perturbation_initializer, dict), msg
 
         # we want all the keys to be in condition dim
         for perturbation_key in perturbation_representation_keys:
             msg = f"{perturbation_key=} not found in `cond_dim.keys()`, you need to specify a corresponding dimensionality."
             assert perturbation_key in cond_dim.keys(), msg
+            msg = f""
+            assert perturbation_key in is_discrete_dict.keys(), msg
+            msg = f""
+            assert perturbation_key in perturbation_initializer.keys(), msg
+            if perturbation_initializer[perturbation_key] is None:
+                perturbation_initializer[perturbation_key] = torch.randn
 
         # when we pass the prior on the perturbations        
         if prior is not None:
@@ -267,6 +285,12 @@ class InverseModel:
                 logger.warning(msg)
                 prior_weight = 1.0
         
+        # when we use langevin we need to pass the number of samples
+        if n_samples is None and self.inverse_method == "langevin":
+            msg = f""
+            logger.warning(msg)
+            n_samples = 1
+
         # storing the attributes here
         self.optimal_condition = optimal_condition
         self.loss_fn = loss_fn
@@ -276,6 +300,8 @@ class InverseModel:
         self.prior = prior
         self.prior_weight = prior_weight
         self.hard = hard
+        self.perturbation_initializer = perturbation_initializer
+        self.n_samples = n_samples
 
         # initializing the inverse model
         self.inverse_model = self.inverse_method_class(
@@ -289,6 +315,8 @@ class InverseModel:
             prior=self.prior,
             prior_weight=self.prior_weight,
             hard=self.hard,
+            perturbation_initializer=self.perturbation_initializer,
+            n_samples=self.n_samples,
             state_dim=self.state_dim,
             **kwargs
         )

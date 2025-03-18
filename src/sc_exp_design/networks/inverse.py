@@ -1,5 +1,6 @@
 import abc
 from collections.abc import Callable, Iterator, Sequence
+import itertools
 from typing import Any, Literal
 
 import torch
@@ -30,7 +31,9 @@ class BaseConditionOptimizer(BaseModule):
         prior: torch.nn.Module | None = None,
         prior_weight: float | None = None,
         hard: bool = True,
-        **kwargs
+        perturbation_initializer: dict[str, Callable[[Any], torch.Tensor]] = None,
+        device_id: Literal["cpu", "cuda"] = "cuda",
+        **kwargs,
     ) -> None:
         """"""
         super().__init__()
@@ -45,7 +48,9 @@ class BaseConditionOptimizer(BaseModule):
         self.prior = prior
         self.prior_weight = prior_weight
         self.hard = hard
-
+        self.perturbation_initializer = perturbation_initializer
+        self.device_id = device_id
+        self.device = torch.device(self.device_id)
 
     def compute_loss(
         self,
@@ -99,7 +104,7 @@ class BaseConditionOptimizer(BaseModule):
 
 class MAPConditionOptimizer(BaseConditionOptimizer):
     """"""
-    training_free: bool = True
+    training_free: bool = False
 
     def __init__(
         self, 
@@ -115,6 +120,8 @@ class MAPConditionOptimizer(BaseConditionOptimizer):
         hard: bool = True,
         lr: float = 1e-1,
         tau: float = 1.0,
+        perturbation_initializer: dict[str, Callable[[Any], torch.Tensor]] | None = None,
+        device_id: Literal["cpu", "cuda"] = "cuda",
         **kwargs,
     ) -> None:
         """"""
@@ -127,12 +134,14 @@ class MAPConditionOptimizer(BaseConditionOptimizer):
             cond_dim,
             perturbation_representation_keys,
             is_discrete_dict,
-            prior,
-            prior_weight,
-            hard,
+            prior=prior,
+            prior_weight=prior_weight,
+            hard=hard,
+            perturbation_initializer=perturbation_initializer,
+            device_id=device_id,
         )
         
-        self.is_discrete_dict = is_discrete_dict
+        self.lr = lr
         self.tau = tau
         
         # perturbation representation keys 
@@ -141,10 +150,13 @@ class MAPConditionOptimizer(BaseConditionOptimizer):
         # initializing modules
         self._init_modules()
 
-        # Set up optimizer for the conditions 
-        self.e_optimizer = optim.Adam([self.optimized_perturbation_data[perturbation_representation] for perturbation_representation in self.optimized_perturbation_data], 
-                                      lr=lr)
-    
+    def parameters(
+        self,
+    ) -> Iterator[torch.nn.Parameter]:
+        """"""
+        # return itertools.chain(*self.optimized_perturbation_data.values())
+        return list(self.optimized_perturbation_data.values())
+
     def _init_modules(
         self,
     ) -> None:
@@ -152,7 +164,8 @@ class MAPConditionOptimizer(BaseConditionOptimizer):
         self.optimized_perturbation_data = {}
         
         for perturbation_representation, cond_dim in self.cond_dim.items():
-            self.optimized_perturbation_data[perturbation_representation] = nn.Parameter(torch.randn(1, cond_dim))
+            covariate_initializer = self.perturbation_initializer[perturbation_representation]
+            self.optimized_perturbation_data[perturbation_representation] = nn.Parameter(covariate_initializer(1, cond_dim, requires_grad=True, device=self.device_id))
 
     def forward(
             self,
@@ -179,14 +192,13 @@ class MAPConditionOptimizer(BaseConditionOptimizer):
         # simulation
         class_pred = self.linear_classifier(X_pert_pred)
         
+        # handling shape of optimal condition
+        optimal_condition = {
+            covariate: covariate_data.repeat(X_controls.shape[0], 1).to(X_controls.device) for covariate, covariate_data in self.optimal_condition.items()
+        }
+
         # compute loss 
-        loss = self.compute_loss(class_pred, self.optimal_condition.repeat(class_pred.shape[0], 1), 
-                                 self.optimized_perturbation_data)
-        
-        # optimize step 
-        self.e_optimizer.zero_grad()
-        loss.backward()
-        self.e_optimizer.step()
+        loss = self.compute_loss(class_pred, optimal_condition, self.optimized_perturbation_data)
         return loss
     
     
@@ -210,6 +222,8 @@ class LangevinSampler(BaseConditionOptimizer):
         eta: float = 1e-1,
         noise_scale: float = 1e-1, 
         tau: float = 1.0,
+        perturbation_initializer: dict[str, Callable[[Any], torch.Tensor]] = None,
+        device_id: Literal["cpu", "cuda"] = "cuda",
         **kwargs,
     ) -> None:
         """"""
@@ -222,9 +236,11 @@ class LangevinSampler(BaseConditionOptimizer):
             cond_dim,
             perturbation_representation_keys,
             is_discrete_dict,
-            prior,
-            prior_weight,
-            hard,
+            prior=prior,
+            prior_weight=prior_weight,
+            hard=hard,
+            perturbation_initializer=perturbation_initializer,
+            device_id=device_id,
         )
             
         self.eta = eta
@@ -244,15 +260,19 @@ class LangevinSampler(BaseConditionOptimizer):
         # Optimized perturbation representation data 
         self.optimized_perturbation_data = {} 
         
-        for perturbation_representation in self.perturbation_representation_keys:
-            self.optimized_perturbation_data[perturbation_representation] = torch.randn(n_samples, cond_dim[perturbation_representation])
+        for perturbation_representation, cond_dim in self.cond_dim.items():
+            covariate_initializer = self.perturbation_initializer[perturbation_representation]
+            # self.optimized_perturbation_data[perturbation_representation] = covariate_initializer(self.n_samples, cond_dim, requires_grad=True, device=self.device_id)
+            self.optimized_perturbation_data[perturbation_representation] = covariate_initializer(self.n_samples, cond_dim, device=self.device_id)
 
     def forward(
             self,
             X_controls: torch.Tensor,
         ) -> torch.Tensor:
         # Expand target  and controls
-        target = self.optimal_condition.repeat(self.n_samples, X_controls.shape[0], -1)
+        target = {
+            covariate: covariate_data.repeat(self.n_samples, X_controls.shape[0], 1).to(X_controls.device) for covariate, covariate_data in self.optimal_condition.items()
+        }
         X_controls = X_controls.unsqueeze(0).expand(self.n_samples, -1, -1) 
         
         # prepare batch information cellFlow           
@@ -268,6 +288,15 @@ class LangevinSampler(BaseConditionOptimizer):
                        
         batch_dict[DataFields.PERTURBATION_DATA] = expanded_perturbation_data
         
+        print(batch_dict.keys())
+        for k, v in batch_dict.items():
+            if isinstance(v, torch.Tensor):
+                print(k, v.shape)
+            elif isinstance(v, dict):
+                for key, value in v.items():
+                    print(k, key, value.shape)
+
+
         # pushing forward the particles 
         X_pert_pred = self.perturbation_predictor.predict(
             batch_dict,
@@ -308,6 +337,7 @@ class NeuralInverseModel(BaseConditionOptimizer):
         perturbation_covariates: Sequence[str] | None = None,
         perturbation_covariates_noise_models: Literal["gaussian", "neg_bin"] | dict[str, None | Literal["gaussian", "neg_bin"]] | None = None,
         perturbation_covariates_predictor_kwargs: dict[str, dict[str, Any]] | None = None,
+        device_id: Literal["cpu", "cuda"] = "cuda",
         **kwargs,
     ) -> None:
         """"""
@@ -320,9 +350,10 @@ class NeuralInverseModel(BaseConditionOptimizer):
             cond_dim,
             perturbation_representation_keys,
             is_discrete_dict,
-            prior,
-            prior_weight,
-            hard,
+            prior=prior,
+            prior_weight=prior_weight,
+            hard=hard,
+            device_id=device_id,
         )
 
         # preparing input with some sanity checks
