@@ -249,6 +249,7 @@ class LangevinSampler(BaseConditionOptimizer):
         self.is_discrete_dict = is_discrete_dict
         self.n_samples = n_samples
         self.tau = tau
+        self.sqrt_eta = torch.sqrt(torch.tensor(self.eta, device=self.device))
 
         # initializing modules
         self._init_modules()
@@ -262,8 +263,12 @@ class LangevinSampler(BaseConditionOptimizer):
         
         for perturbation_representation, cond_dim in self.cond_dim.items():
             covariate_initializer = self.perturbation_initializer[perturbation_representation]
-            # self.optimized_perturbation_data[perturbation_representation] = covariate_initializer(self.n_samples, cond_dim, requires_grad=True, device=self.device_id)
-            self.optimized_perturbation_data[perturbation_representation] = covariate_initializer(self.n_samples, cond_dim, device=self.device_id)
+            self.optimized_perturbation_data[perturbation_representation] = covariate_initializer(
+                self.n_samples,
+                cond_dim,
+                requires_grad=True,
+                device=self.device_id
+            )
 
     def forward(
             self,
@@ -282,20 +287,11 @@ class LangevinSampler(BaseConditionOptimizer):
         expanded_perturbation_data = {}
         for pert_key in self.optimized_perturbation_data:
             if not self.is_discrete_dict:
-                expanded_perturbation_data[pert_key] = self.optimized_perturbation_data[pert_key].unsqueeze(1).expand(-1, X_controls.shape[0], -1) 
+                expanded_perturbation_data[pert_key] = self.optimized_perturbation_data[pert_key].unsqueeze(1).expand(-1, X_controls.shape[1], -1) 
             else:
-                expanded_perturbation_data[pert_key] = self.differentiable_categorical(self.optimized_perturbation_data[pert_key].unsqueeze(1).expand(-1, X_controls.shape[0], -1))
+                expanded_perturbation_data[pert_key] = self.differentiable_categorical(self.optimized_perturbation_data[pert_key].unsqueeze(1).expand(-1, X_controls.shape[1], -1))
                        
         batch_dict[DataFields.PERTURBATION_DATA] = expanded_perturbation_data
-        
-        print(batch_dict.keys())
-        for k, v in batch_dict.items():
-            if isinstance(v, torch.Tensor):
-                print(k, v.shape)
-            elif isinstance(v, dict):
-                for key, value in v.items():
-                    print(k, key, value.shape)
-
 
         # pushing forward the particles 
         X_pert_pred = self.perturbation_predictor.predict(
@@ -309,11 +305,9 @@ class LangevinSampler(BaseConditionOptimizer):
         for pert in self.optimized_perturbation_data:
             grad = torch.autograd.grad(loss, self.optimized_perturbation_data[pert], create_graph=False, retain_graph=True)[0]
             
-            # Langevin update
-            noise = torch.randn_like(self.optimized_perturbation_data[pert]) * self.noise_scale
-            self.optimized_perturbation_data[pert] -= (self.eta / 2) * grad + torch.sqrt(torch.tensor(self.eta)) * noise  # In-place update
-            self.optimized_perturbation_data[pert].detach_()  # Remove gradients on the just updated element for memory efficiency 
-            self.optimized_perturbation_data[pert].requires_grad_()  # Re-enable gradient tracking
+            with torch.no_grad():  # Fix: Avoid unnecessary detaching/reseting requires_grad
+                noise = torch.randn_like(self.optimized_perturbation_data[pert]) * self.noise_scale
+                self.optimized_perturbation_data[pert] -= (self.eta / 2) * grad + self.sqrt_eta * noise
         return loss
 
 
