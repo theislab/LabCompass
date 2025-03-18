@@ -212,7 +212,7 @@ class InverseModel:
         prior_weight: float | None = None,
         hard: bool = False,
         perturbation_initializer: Callable[[Any], torch.Tensor] | dict[str, Callable[[Any], torch.Tensor]] | None = None,
-        perturbation_non_linearities: Callable[[torch.Tensor], torch.Tensor] | dict[str, Callable[[torch.Tensor], torch.Tensor]] | None = None,
+        perturbation_non_linearities: torch.nn.Module | Callable[[torch.Tensor], torch.Tensor] | dict[str, torch.nn.Module | Callable[[torch.Tensor], torch.Tensor]] | None = None,
         n_samples: int | None = None,
         optimizer_class: torch.optim.Optimizer = torch.optim.AdamW,
         optimizer_kwargs: Mapping[str, Any] = {"lr": 0.001},
@@ -257,6 +257,12 @@ class InverseModel:
             perturbation_initializer = {perturbation_representation_keys[0]: perturbation_initializer}
         if perturbation_initializer is None:
             perturbation_initializer = {perturbation_covariate:torch.randn for perturbation_covariate in perturbation_representation_keys}
+        if isinstance(perturbation_non_linearities, Callable | torch.nn.Module):
+            msg = f"When `perturbation_non_linearities` is of type `Callable | torch.nn.Module`, the respective perturbations should contain only one element, found {len(perturbation_representation_keys)}"
+            assert len(perturbation_representation_keys) == 1, msg
+            perturbation_non_linearities = {perturbation_representation_keys[0]: perturbation_non_linearities}
+        if perturbation_non_linearities is None:
+            perturbation_non_linearities = {perturbation_covariate: torch.nn.Identity() for perturbation_covariate in perturbation_representation_keys}
 
         msg = f"`cond_dim` needs to be a dictionary mapping each condition to its dimensionality, found {type(cond_dim)}"
         assert isinstance(cond_dim, dict), msg
@@ -266,6 +272,8 @@ class InverseModel:
         assert isinstance(is_discrete_dict, dict), msgs
         msg = f""
         assert isinstance(perturbation_initializer, dict), msg
+        msg = f""
+        assert isinstance(perturbation_non_linearities, dict), msg
 
         # we want all the keys to be in condition dim
         for perturbation_key in perturbation_representation_keys:
@@ -277,6 +285,10 @@ class InverseModel:
             assert perturbation_key in perturbation_initializer.keys(), msg
             if perturbation_initializer[perturbation_key] is None:
                 perturbation_initializer[perturbation_key] = torch.randn
+            msg = f""
+            assert perturbation_key in perturbation_non_linearities.keys(), msg
+            if perturbation_non_linearities[perturbation_key] is None:
+                perturbation_non_linearities[perturbation_key] = torch.nn.Identity()
 
         # when we pass the prior on the perturbations        
         if prior is not None:
@@ -301,6 +313,7 @@ class InverseModel:
         self.prior_weight = prior_weight
         self.hard = hard
         self.perturbation_initializer = perturbation_initializer
+        self.perturbation_non_linearities = perturbation_non_linearities
         self.n_samples = n_samples
 
         # initializing the inverse model
@@ -316,6 +329,7 @@ class InverseModel:
             prior_weight=self.prior_weight,
             hard=self.hard,
             perturbation_initializer=self.perturbation_initializer,
+            perturbation_non_linearities=self.perturbation_non_linearities,
             n_samples=self.n_samples,
             state_dim=self.state_dim,
             **kwargs

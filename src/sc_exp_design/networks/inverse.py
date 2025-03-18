@@ -32,6 +32,7 @@ class BaseConditionOptimizer(BaseModule):
         prior_weight: float | None = None,
         hard: bool = True,
         perturbation_initializer: dict[str, Callable[[Any], torch.Tensor]] = None,
+        perturbation_non_linearities: dict[str, torch.nn.Module | Callable[[torch.Tensor], torch.Tensor]] = None,
         device_id: Literal["cpu", "cuda"] = "cuda",
         **kwargs,
     ) -> None:
@@ -49,6 +50,7 @@ class BaseConditionOptimizer(BaseModule):
         self.prior_weight = prior_weight
         self.hard = hard
         self.perturbation_initializer = perturbation_initializer
+        self.perturbation_non_linearities = perturbation_non_linearities
         self.device_id = device_id
         self.device = torch.device(self.device_id)
 
@@ -121,6 +123,7 @@ class MAPConditionOptimizer(BaseConditionOptimizer):
         lr: float = 1e-1,
         tau: float = 1.0,
         perturbation_initializer: dict[str, Callable[[Any], torch.Tensor]] | None = None,
+        perturbation_non_linearities: dict[str, torch.nn.Module | Callable[[torch.Tensor], torch.Tensor]] = None,
         device_id: Literal["cpu", "cuda"] = "cuda",
         **kwargs,
     ) -> None:
@@ -138,6 +141,7 @@ class MAPConditionOptimizer(BaseConditionOptimizer):
             prior_weight=prior_weight,
             hard=hard,
             perturbation_initializer=perturbation_initializer,
+            perturbation_non_linearities=perturbation_non_linearities,
             device_id=device_id,
         )
         
@@ -152,9 +156,8 @@ class MAPConditionOptimizer(BaseConditionOptimizer):
 
     def parameters(
         self,
-    ) -> Iterator[torch.nn.Parameter]:
+    ) -> list[torch.nn.Parameter]:
         """"""
-        # return itertools.chain(*self.optimized_perturbation_data.values())
         return list(self.optimized_perturbation_data.values())
 
     def _init_modules(
@@ -179,7 +182,10 @@ class MAPConditionOptimizer(BaseConditionOptimizer):
         expanded_perturbation_data = {}
         for pert_key in self.optimized_perturbation_data:
             if not self.is_discrete_dict:
-                expanded_perturbation_data[pert_key] = self.optimized_perturbation_data[pert_key].expand(X_controls.shape[0], -1) 
+                non_linearity = self.perturbation_non_linearities[pert_key]
+                expanded_perturbation_data[pert_key] = non_linearity(
+                    self.optimized_perturbation_data[pert_key].expand(X_controls.shape[0], -1)
+                ) 
             else:
                 expanded_perturbation_data[pert_key] = self.differentiable_categorical(self.optimized_perturbation_data[pert_key].expand(X_controls.shape[0], -1))
             
@@ -204,7 +210,7 @@ class MAPConditionOptimizer(BaseConditionOptimizer):
     
 class LangevinSampler(BaseConditionOptimizer):
     """"""
-    training_free: bool = True
+    training_free: bool = False
 
     def __init__(
         self,
@@ -223,6 +229,7 @@ class LangevinSampler(BaseConditionOptimizer):
         noise_scale: float = 1e-1, 
         tau: float = 1.0,
         perturbation_initializer: dict[str, Callable[[Any], torch.Tensor]] = None,
+        perturbation_non_linearities: dict[str, torch.nn.Module | Callable[[torch.Tensor], torch.Tensor]] = None,
         device_id: Literal["cpu", "cuda"] = "cuda",
         **kwargs,
     ) -> None:
@@ -240,6 +247,7 @@ class LangevinSampler(BaseConditionOptimizer):
             prior_weight=prior_weight,
             hard=hard,
             perturbation_initializer=perturbation_initializer,
+            perturbation_non_linearities=perturbation_non_linearities,
             device_id=device_id,
         )
             
@@ -253,6 +261,12 @@ class LangevinSampler(BaseConditionOptimizer):
 
         # initializing modules
         self._init_modules()
+
+    def parameters(
+        self,
+    ) -> list[torch.nn.Parameter]:
+        """"""
+        return list(self.optimized_perturbation_data.values())
 
     def _init_modules(
         self,
@@ -287,7 +301,10 @@ class LangevinSampler(BaseConditionOptimizer):
         expanded_perturbation_data = {}
         for pert_key in self.optimized_perturbation_data:
             if not self.is_discrete_dict:
-                expanded_perturbation_data[pert_key] = self.optimized_perturbation_data[pert_key].unsqueeze(1).expand(-1, X_controls.shape[1], -1) 
+                non_linearity = self.perturbation_non_linearities[pert_key]
+                expanded_perturbation_data[pert_key] = non_linearity( 
+                    self.optimized_perturbation_data[pert_key].unsqueeze(1).expand(-1, X_controls.shape[1], -1) 
+                )
             else:
                 expanded_perturbation_data[pert_key] = self.differentiable_categorical(self.optimized_perturbation_data[pert_key].unsqueeze(1).expand(-1, X_controls.shape[1], -1))
                        
@@ -328,7 +345,6 @@ class NeuralInverseModel(BaseConditionOptimizer):
         prior_weight: float | None = None,
         hard: bool = True,
         state_dim: int | None = None,
-        perturbation_covariates: Sequence[str] | None = None,
         perturbation_covariates_noise_models: Literal["gaussian", "neg_bin"] | dict[str, None | Literal["gaussian", "neg_bin"]] | None = None,
         perturbation_covariates_predictor_kwargs: dict[str, dict[str, Any]] | None = None,
         device_id: Literal["cpu", "cuda"] = "cuda",
