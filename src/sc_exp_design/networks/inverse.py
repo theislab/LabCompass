@@ -17,7 +17,6 @@ __all__ = ["BaseConditionOptimizer", "MAPConditionOptimizer", "LangevinSampler",
 
 class BaseConditionOptimizer(BaseModule):
     """"""
-    training_free: bool
 
     def __init__(
         self, 
@@ -31,6 +30,8 @@ class BaseConditionOptimizer(BaseModule):
         prior: torch.nn.Module | None = None,
         prior_weight: float | None = None,
         hard: bool = True,
+        tau: float = 1.0,
+        eps: float = 1e-10,
         perturbation_initializer: dict[str, Callable[[Any], torch.Tensor]] = None,
         perturbation_non_linearities: dict[str, torch.nn.Module | Callable[[torch.Tensor], torch.Tensor]] = None,
         device_id: Literal["cpu", "cuda"] = "cuda",
@@ -49,6 +50,8 @@ class BaseConditionOptimizer(BaseModule):
         self.prior = prior
         self.prior_weight = prior_weight
         self.hard = hard
+        self.tau = tau
+        self.eps = eps 
         self.perturbation_initializer = perturbation_initializer
         self.perturbation_non_linearities = perturbation_non_linearities
         self.device_id = device_id
@@ -83,20 +86,17 @@ class BaseConditionOptimizer(BaseModule):
         optimized_perturbation_data_tmp = [self.optimized_perturbation_data[pert].detach() for pert in self.optimized_perturbation_data]        
         return optimized_perturbation_data_tmp
 
-    @staticmethod    
     def differentiable_categorical(
+            self,
             logits: torch.Tensor,
-            tau: float = 1.0,
-            hard: bool = False,
-            eps: float = 1e-10
         ) -> torch.Tensor:
         # Sample Gumbel noise
-        gumbel_noise = -torch.log(-torch.log(torch.rand_like(logits) + eps) + eps)
+        gumbel_noise = -torch.log(-torch.log(torch.rand_like(logits) + self.eps) + self.eps)
 
         # Gumbel-Softmax reparameterization
-        y_soft = F.softmax((logits + gumbel_noise) / tau, dim=-1)
+        y_soft = F.softmax((logits + gumbel_noise) / self.tau, dim=-1)
 
-        if hard:
+        if self.hard:
             # Convert to hard one-hot, but keep gradients
             y_hard = torch.zeros_like(y_soft).scatter_(-1, y_soft.argmax(dim=-1, keepdim=True), 1.0)
             return y_hard + (y_soft - y_hard).detach()  # Keep gradients
@@ -106,7 +106,6 @@ class BaseConditionOptimizer(BaseModule):
 
 class MAPConditionOptimizer(BaseConditionOptimizer):
     """"""
-    training_free: bool = False
 
     def __init__(
         self, 
@@ -120,8 +119,8 @@ class MAPConditionOptimizer(BaseConditionOptimizer):
         prior: torch.nn.Module | None = None,
         prior_weight: float | None = None,
         hard: bool = True,
-        lr: float = 1e-1,
         tau: float = 1.0,
+        eps: float = 1e-10,
         perturbation_initializer: dict[str, Callable[[Any], torch.Tensor]] | None = None,
         perturbation_non_linearities: dict[str, torch.nn.Module | Callable[[torch.Tensor], torch.Tensor]] = None,
         device_id: Literal["cpu", "cuda"] = "cuda",
@@ -140,13 +139,12 @@ class MAPConditionOptimizer(BaseConditionOptimizer):
             prior=prior,
             prior_weight=prior_weight,
             hard=hard,
+            tau=tau,
+            eps=eps,
             perturbation_initializer=perturbation_initializer,
             perturbation_non_linearities=perturbation_non_linearities,
             device_id=device_id,
         )
-        
-        self.lr = lr
-        self.tau = tau
         
         # perturbation representation keys 
         self.perturbation_representation_keys = perturbation_representation_keys
@@ -210,7 +208,6 @@ class MAPConditionOptimizer(BaseConditionOptimizer):
     
 class LangevinSampler(BaseConditionOptimizer):
     """"""
-    training_free: bool = False
 
     def __init__(
         self,
@@ -224,10 +221,9 @@ class LangevinSampler(BaseConditionOptimizer):
         prior: torch.nn.Module | None = None,
         prior_weight: float | None = None,
         hard: bool = True,
-        n_samples: int | None = None,
-        eta: float = 1e-1,
-        noise_scale: float = 1e-1, 
         tau: float = 1.0,
+        eps: float = 1e-10,
+        n_samples: int | None = None,
         perturbation_initializer: dict[str, Callable[[Any], torch.Tensor]] = None,
         perturbation_non_linearities: dict[str, torch.nn.Module | Callable[[torch.Tensor], torch.Tensor]] = None,
         device_id: Literal["cpu", "cuda"] = "cuda",
@@ -246,18 +242,16 @@ class LangevinSampler(BaseConditionOptimizer):
             prior=prior,
             prior_weight=prior_weight,
             hard=hard,
+            tau=tau,
+            eps=eps,
             perturbation_initializer=perturbation_initializer,
             perturbation_non_linearities=perturbation_non_linearities,
             device_id=device_id,
         )
             
-        self.eta = eta
-        self.noise_scale = noise_scale
         self.perturbation_representation_keys = perturbation_representation_keys 
         self.is_discrete_dict = is_discrete_dict
         self.n_samples = n_samples
-        self.tau = tau
-        self.sqrt_eta = torch.sqrt(torch.tensor(self.eta, device=self.device))
 
         # initializing modules
         self._init_modules()
@@ -319,18 +313,17 @@ class LangevinSampler(BaseConditionOptimizer):
         class_pred = self.linear_classifier(X_pert_pred)
         loss = self.compute_loss(class_pred, target, self.optimized_perturbation_data)
         
-        for pert in self.optimized_perturbation_data:
-            grad = torch.autograd.grad(loss, self.optimized_perturbation_data[pert], create_graph=False, retain_graph=True)[0]
+        # for pert in self.optimized_perturbation_data:
+        #     grad = torch.autograd.grad(loss, self.optimized_perturbation_data[pert], create_graph=False, retain_graph=True)[0]
             
-            with torch.no_grad():  # Fix: Avoid unnecessary detaching/reseting requires_grad
-                noise = torch.randn_like(self.optimized_perturbation_data[pert]) * self.noise_scale
-                self.optimized_perturbation_data[pert] -= (self.eta / 2) * grad + self.sqrt_eta * noise
+        #     with torch.no_grad():  # Fix: Avoid unnecessary detaching/reseting requires_grad
+        #         noise = torch.randn_like(self.optimized_perturbation_data[pert]) * self.noise_scale
+        #         self.optimized_perturbation_data[pert] -= (self.eta / 2) * grad + self.sqrt_eta * noise
         return loss
 
 
 class NeuralInverseModel(BaseConditionOptimizer):
     """"""
-    training_free: bool = False
 
     def __init__(
         self,
@@ -344,6 +337,8 @@ class NeuralInverseModel(BaseConditionOptimizer):
         prior: torch.nn.Module | None = None,
         prior_weight: float | None = None,
         hard: bool = True,
+        tau: float = 1.0,
+        eps: float = 1e-10,
         state_dim: int | None = None,
         perturbation_covariates_noise_models: Literal["gaussian", "neg_bin"] | dict[str, None | Literal["gaussian", "neg_bin"]] | None = None,
         perturbation_covariates_predictor_kwargs: dict[str, dict[str, Any]] | None = None,
@@ -363,6 +358,8 @@ class NeuralInverseModel(BaseConditionOptimizer):
             prior=prior,
             prior_weight=prior_weight,
             hard=hard,
+            tau=tau,
+            eps=eps,
             device_id=device_id,
         )
 

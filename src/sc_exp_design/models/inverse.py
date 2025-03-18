@@ -7,6 +7,7 @@ import torch
 
 from sc_exp_design.data.dataloaders import TrainData, SequentialDataLoader
 from sc_exp_design.models.flow_matching import FlowMatching
+from sc_exp_design.models.inverse_utils import LangevinOptimizer
 from sc_exp_design.networks.inverse import (
     BaseConditionOptimizer,
     MAPConditionOptimizer,
@@ -338,19 +339,35 @@ class InverseModel:
         self.inverse_model = self.inverse_model.to(self.device)
 
         # optimizer and scheduler 
-        if not self.inverse_model.training_free:
-            self.inverse_model_optimizer = optimizer_class(
-                self.inverse_model.parameters(),
-                **optimizer_kwargs,
-            )
-
-            self.inverse_model_lr_scheduler = None
-            self.inverse_model_lr_scheduler_step = None
-            if lr_scheduler_kwargs is None:
-                lr_scheduler_kwargs = {}
+        if self.inverse_method == "langevin":
+            if not optimizer_class is LangevinOptimizer:
+                msg = f""
+                logger.warning(msg)
+                optimizer_class = LangevinOptimizer
+            # preparing optimizer keyword arguments
+            optimizer_kwargs = {}
+            if "eta" in kwargs.keys():
+                optimizer_kwargs["eta"] = kwargs["eta"]
+            if "noise_scale" in kwargs.keys():
+                optimizer_kwargs["noise_scale"] = kwargs["noise_scale"]
+            # no scheduler when using langevin
             if lr_scheduler_class is not None:
-                self.inverse_model_lr_scheduler = lr_scheduler_class(self.inverse_model_optimizer, **lr_scheduler_kwargs)
-                self.inverse_model_lr_scheduler_step = lr_scheduler_step
+                msg = f""
+                logger.warning(msg)
+                lr_scheduler_class = None
+
+        self.inverse_model_optimizer = optimizer_class(
+            self.inverse_model.parameters(),
+            **optimizer_kwargs,
+        )
+
+        self.inverse_model_lr_scheduler = None
+        self.inverse_model_lr_scheduler_step = None
+        if lr_scheduler_kwargs is None:
+            lr_scheduler_kwargs = {}
+        if lr_scheduler_class is not None:
+            self.inverse_model_lr_scheduler = lr_scheduler_class(self.inverse_model_optimizer, **lr_scheduler_kwargs)
+            self.inverse_model_lr_scheduler_step = lr_scheduler_step
 
     def train_inverse_model(
         self,
@@ -368,9 +385,6 @@ class InverseModel:
         # sanity checks
         msg = f"You need to have instantitated the target predictor model by calling `prepare_inverse_model`"
         assert self.inverse_model is not None, msg
-
-        msg = f""
-        assert not self.inverse_model.training_free, msg
 
         if train_data is None:
             msg = f""
