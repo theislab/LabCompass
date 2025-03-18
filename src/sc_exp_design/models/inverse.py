@@ -163,16 +163,16 @@ class InverseModel:
         assert train_data.target_perturbation_repr is not None, msg
 
         # initializing data loader
-        self.train_data = train_data
-        self.train_dataloader = SequentialDataLoader(
-            self.train_data,
+        self.target_predictor_train_data = train_data
+        self.target_predictor_train_dataloader = SequentialDataLoader(
+            self.target_predictor_train_data,
             train_batch_size,
             state_transforms=state_transforms,
             device_id=self.device_id
         )
 
         # initialize trainer
-        self.trainer = TargetPredictionTrainer(
+        self.target_predictor_trainer = TargetPredictionTrainer(
             self.target_prediction_model,
             self.target_prediction_optimizer,
             lr_scheduler=self.target_prediction_lr_scheduler,
@@ -182,25 +182,59 @@ class InverseModel:
         )
 
         # optional validation data
-        self.validation_dataloader = None
+        self.target_predictor_validation_dataloader = None
+        self.target_predictor_validation_data = validation_data
         if validation_data is not None:
-            self.validation_dataloader = SequentialDataLoader(
-                validation_data,
+
+            self.target_predictor_validation_dataloader = SequentialDataLoader(
+                self.target_predictor_validation_data,
                 validation_batch_size,
                 state_transforms=state_transforms,
                 device_id=self.device_id,
             )
 
         # fitting the trainer
-        self.trainer.fit(
+        self.target_predictor_trainer.fit(
             num_training_steps,
-            self.train_dataloader,
-            self.validation_dataloader,
+            self.target_predictor_train_dataloader,
+            self.target_predictor_validation_dataloader,
             valid_freq,
         )
 
         self.target_prediction_model_trained = True
 
+    def attach_target_prediction_model(
+        self, 
+        other,
+    ) -> None:
+        """
+        Copies all attributes from another InverseModel instance.
+        """
+        if not isinstance(other, InverseModel):
+            msg = "Expected an instance of InverseModel"
+            raise TypeError(msg)
+
+        msg = f""
+        assert other.target_prediction_model_trained, msg
+
+        # Copy attributes set in prepare_target_prediction_model
+        self.target_covariates = other.target_covariates
+        self.target_covariates_dims = other.target_covariates_dims
+        self.target_covariates_noise_models = other.target_covariates_noise_models
+        self.target_covariates_predictor_kwargs = other.target_covariates_predictor_kwargs
+        self.target_prediction_model = other.target_prediction_model
+        self.target_prediction_optimizer = other.target_prediction_optimizer
+        self.target_prediction_lr_scheduler = other.target_prediction_lr_scheduler
+        self.target_prediction_lr_scheduler_step = other.target_prediction_lr_scheduler_step
+
+        # Copy attributes set in train_target_prediction_model
+        self.target_predictor_train_data = other.target_predictor_train_data
+        self.target_predictor_train_dataloader = other.target_predictor_train_dataloader
+        self.target_predictor_trainer = other.target_predictor_trainer
+        self.target_predictor_validation_dataloader = other.target_predictor_validation_dataloader
+        self.target_predictor_validation_data = other.target_predictor_validation_data
+        self.target_prediction_model_trained = other.target_prediction_model_trained
+    
     def prepare_inverse_model(
         self,
         optimal_condition: torch.Tensor | dict[str, torch.Tensor], 
