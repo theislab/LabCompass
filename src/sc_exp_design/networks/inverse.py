@@ -9,7 +9,7 @@ import torch.optim as optim
 import torch.nn.functional as F
 
 from sc_exp_design.networks.blocks import BaseModule
-from sc_exp_design.constants import DataFields, ParamsFields
+from sc_exp_design.constants import DataFields, PredictionFields, ParamsFields
 from sc_exp_design.networks.inference_networks import PerturbationApproximatePosterior
 
 __all__ = ["BaseConditionOptimizer", "MAPConditionOptimizer", "LangevinSampler", "NeuralInverseModel"]
@@ -203,7 +203,16 @@ class MAPConditionOptimizer(BaseConditionOptimizer):
 
         # compute loss 
         loss = self.compute_loss(class_pred, optimal_condition, self.optimized_perturbation_data)
-        return loss
+
+        # constructing step output dictionary
+        out_dict = {
+            DataFields.SOURCE_STATE: X_controls,
+            DataFields.PERTURBATION_DATA: expanded_perturbation_data,
+            PredictionFields.PREDICTION_DATA: X_pert_pred,
+            PredictionFields.TARGET_PREDICTION_DATA: class_pred,
+            PredictionFields.PREDICTED_PERTURBATION: self.optimized_perturbation_data,
+        }
+        return loss, out_dict
     
     
 class LangevinSampler(BaseConditionOptimizer):
@@ -319,7 +328,17 @@ class LangevinSampler(BaseConditionOptimizer):
         #     with torch.no_grad():  # Fix: Avoid unnecessary detaching/reseting requires_grad
         #         noise = torch.randn_like(self.optimized_perturbation_data[pert]) * self.noise_scale
         #         self.optimized_perturbation_data[pert] -= (self.eta / 2) * grad + self.sqrt_eta * noise
-        return loss
+
+        # constructing step output dictionary
+        out_dict = {
+            DataFields.SOURCE_STATE: X_controls,
+            DataFields.PERTURBATION_DATA: expanded_perturbation_data,
+            PredictionFields.PREDICTION_DATA: X_pert_pred,
+            PredictionFields.TARGET_PREDICTION_DATA: class_pred,
+            PredictionFields.PREDICTED_PERTURBATION: self.optimized_perturbation_data,
+        }
+
+        return loss, out_dict
 
 
 class NeuralInverseModel(BaseConditionOptimizer):
@@ -505,4 +524,11 @@ class NeuralInverseModel(BaseConditionOptimizer):
         class_pred = self.linear_classifier(x1_hat)
         loss = self.compute_loss(class_pred, target, pert_data)
 
-        return loss
+        # constructing step output dictionary
+        out_dict = {
+            DataFields.SOURCE_STATE: control_states,
+            DataFields.PERTURBATION_DATA: pert_data,
+            PredictionFields.PREDICTION_DATA: x1_hat,
+            PredictionFields.TARGET_PREDICTION_DATA: class_pred,
+        }
+        return loss, out_dict

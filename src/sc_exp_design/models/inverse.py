@@ -5,6 +5,7 @@ from typing import Any, Literal
 import numpy as np
 import torch
 
+from sc_exp_design.constants import DataFields
 from sc_exp_design.data.dataloaders import TrainData, SequentialDataLoader
 from sc_exp_design.models.flow_matching import FlowMatching
 from sc_exp_design.models.inverse_utils import LangevinOptimizer
@@ -375,7 +376,7 @@ class InverseModel:
         # optimizer and scheduler 
         if self.inverse_method == "langevin":
             if not optimizer_class is LangevinOptimizer:
-                msg = f""
+                msg = f"When {self.inverse_method=}, you need to pass `LangevinOptimizer` as the `optimizer_class` argument. Setting it for you."
                 logger.warning(msg)
                 optimizer_class = LangevinOptimizer
             # preparing optimizer keyword arguments
@@ -386,7 +387,7 @@ class InverseModel:
                 optimizer_kwargs["noise_scale"] = kwargs["noise_scale"]
             # no scheduler when using langevin
             if lr_scheduler_class is not None:
-                msg = f""
+                msg = f"With {self.inverse_method=} the use of learning rate schedulers is not supported."
                 logger.warning(msg)
                 lr_scheduler_class = None
 
@@ -476,6 +477,9 @@ class InverseModel:
 
     def predict(
         self,
+        control_states: torch.Tensor,
     ) -> torch.Tensor:
         """"""
+        _, out_dict = self.inverse_model(control_states)
+        return out_dict
         

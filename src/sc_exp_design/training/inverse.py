@@ -124,8 +124,8 @@ class InverseModelTrainer(BaseTrainer):
         # parsing batch dictonary
         source_states = batch[DataFields.STATE_DATA]
 
-        loss = self.inverse_model(source_states)    
-        return loss, {LossFields.LOSS: loss.item()}
+        loss, out_dict = self.inverse_model(source_states)    
+        return loss, {LossFields.LOSS: loss.item(), **out_dict}
         
     def _validation_step(
         self,

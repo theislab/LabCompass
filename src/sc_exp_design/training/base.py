@@ -135,13 +135,24 @@ class BaseTrainer(abc.ABC):
 
     def plot_training_logs(
         self,
-        figsize: Sequence[int] = (5, 3),
+        figsize: Sequence[int] = (3, 3),
+        keys_to_plot: str | Sequence[str] = LossFields.LOSS,
         show: bool = False,
     ) -> tuple[Figure, Axes]:
         """"""
-        fig, axes = plt.subplots(1, len(self.training_logs), figsize=figsize)
-        for idx, (loss_id, loss_history) in enumerate(self.training_logs.items()):
-            if len(self.training_logs) == 1:
+        # handling keys to plot
+        if isinstance(keys_to_plot, str):
+            keys_to_plot = (keys_to_plot, )
+        # sanity checks
+        for key in keys_to_plot:
+            msg = f""
+            assert key in self.training_logs.keys(), msg
+        # retrieving the logs we want to plot
+        logs_to_plot = {log_id: log_data for log_id, log_data in self.training_logs.items() if log_id in keys_to_plot}
+
+        fig, axes = plt.subplots(1, len(logs_to_plot), figsize=figsize)
+        for idx, (loss_id, loss_history) in enumerate(logs_to_plot.items()):
+            if len(logs_to_plot) == 1:
                 current_axes = axes
             else:
                 current_axes = axes[idx]

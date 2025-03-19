@@ -16,6 +16,13 @@ class DataFields:
 
 
 @dataclass(frozen=True)
+class PredictionFields:
+    PREDICTION_DATA: str = "predicted_states"
+    TARGET_PREDICTION_DATA: str = "target_prediction_data"
+    PREDICTED_PERTURBATION: str = "predicted_perturbation"
+
+
+@dataclass(frozen=True)
 class LossFields:
     LOSS: str = "loss"
     VF_LOSS: str = "vf_loss"

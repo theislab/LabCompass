@@ -1,4 +1,5 @@
 from collections.abc import Callable, Sequence
+from typing import Any
 
 import torch
 from torch.optim import Optimizer
@@ -30,11 +31,10 @@ class LangevinOptimizer(Optimizer):
 
     def __setstate__(
         self,
-        state: dict, # what type is this??
+        state: dict[str, Any],
     ) -> None:
         """"""
         super().__setstate__(state)
-
 
     def step(
         self,
@@ -54,13 +54,18 @@ class LangevinOptimizer(Optimizer):
             for p in group["params"]:
                 if p.grad is None:
                     continue
-                
+                # get gradients
                 d_p = p.grad.data
-                
-                # Add Gaussian noise scaled by sqrt(eta)
-                noise = -torch.randn_like(p.data) * sqrt_eta * noise_scale
-                
-                # Langevin update step
-                p.data.add_(-d_p, alpha=eta/2).add_(noise)
+                # scale gradients
+                grad = d_p*eta/2
 
+                # Add Gaussian noise scaled by sqrt(eta)
+                noise = torch.randn_like(p.data) * sqrt_eta * noise_scale
+                
+                # computing update term
+                update = grad + noise
+
+                # Langevin update step
+                p.data.add_(-update)
+        
         return loss
