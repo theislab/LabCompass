@@ -31,7 +31,6 @@ sym_conf = {
 train_adata, sym_dict = get_annotated_perturbation_data(
     **sym_conf
 )
-train_adata
 
 class TestInverseUtils:
     
