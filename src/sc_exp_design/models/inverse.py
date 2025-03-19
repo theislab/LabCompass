@@ -29,7 +29,7 @@ class InverseModel:
     """"""
     def __init__(
         self,
-        forward_model: FlowMatching | None = None,
+        forward_model: BaseForwardModel | None = None,
         state_dim: int | None = None,
         inverse_method: Literal["map", "langevin", "neural"] = "map",
         device_id: Literal["cuda", "cpu"] = "cuda",

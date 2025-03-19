@@ -215,7 +215,7 @@ class MAPConditionOptimizer(BaseConditionOptimizer):
             PredictionFields.PREDICTION_DATA: X_pert_pred.detach().cpu(),
             PredictionFields.TARGET_PREDICTION_DATA: class_pred.detach().cpu(),
             PredictionFields.PREDICTED_PERTURBATION: {
-                covariate: covariate_data.clone().detach().cpu() covariate, covariate_data in self.optimized_perturbation_data.items()
+                covariate: covariate_data.clone().detach().cpu() for covariate, covariate_data in self.optimized_perturbation_data.items()
             },
         }
         return loss, out_dict
@@ -337,7 +337,7 @@ class LangevinSampler(BaseConditionOptimizer):
             PredictionFields.PREDICTION_DATA: X_pert_pred.detach().cpu(),
             PredictionFields.TARGET_PREDICTION_DATA: class_pred.detach().cpu(),
             PredictionFields.PREDICTED_PERTURBATION: {
-                covariate: covariate_data.clone().detach().cpu() covariate, covariate_data in self.optimized_perturbation_data.items()
+                covariate: covariate_data.clone().detach().cpu() for covariate, covariate_data in self.optimized_perturbation_data.items()
             },
         }
 
