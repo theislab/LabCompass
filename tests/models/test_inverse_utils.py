@@ -207,7 +207,7 @@ class TestInverseUtils:
         print("starting optimization at: ", cond_init['repr_treatment_treatment_shift'])
 
         # attaching the optimizer to the first clone
-        optim = LangevinOptimizer(list(cond_init_clone0.values()), noise_scale=0.01)
+        optim = LangevinOptimizer(list(cond_init_clone0.values()), noise_scale=0.00)
 
         for step in range(n_iters):
 
