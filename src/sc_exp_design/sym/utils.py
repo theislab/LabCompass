@@ -6,9 +6,6 @@ import numpy as np
 import torch
 import itertools
 
-import numpy as np
-import torch
-
 from sc_exp_design.types import TensorLike
 from sc_exp_design.sym.gmm import (
     AnnotatedGaussianMixtureModel,
@@ -430,6 +427,15 @@ def get_annotated_perturbation_data(
             covariate_label: np.vectorize(perturbation_ids_to_label.get)(perturbation_ids[covariate_label])
             for covariate_label, perturbation_ids_to_label in perturbation_ids_to_labels.items()
         }
+        # one hot encoding of the treatments
+        perturbation_labels_one_hot = {
+            covariate_label: {
+                perturbation_label: np.zeros(U[covariate_label] + 1) for perturbation_label in perturbation_labels_to_ids[covariate_label].keys()#.keys()
+            } for covariate_label in perturbation_labels.keys()
+        }
+        for perturbation_label in perturbation_labels_one_hot.values():
+            for idx, perturbation_one_hot in enumerate((perturbation_label.values())):
+                np.put(perturbation_one_hot, [idx], [1])
     else:
         perturbation_ids_to_labels = {
             0: control_label,
@@ -439,6 +445,12 @@ def get_annotated_perturbation_data(
         }
         perturbation_labels_to_ids = {v:np.array([k]) for k, v in perturbation_ids_to_labels.items()}
         perturbation_labels = np.vectorize(perturbation_ids_to_labels.get)(perturbation_ids)
+        # one hot encoding of the treatments
+        perturbation_labels_one_hot = {
+            str(perturbation_label): np.zeros(U + 1) for perturbation_label in perturbation_labels#.keys()
+        }
+        for idx, perturbation_one_hot in enumerate(perturbation_labels_one_hot.values()):
+            np.put(perturbation_one_hot, [idx], [1])
 
     # annotating the category data
     category_ids_to_labels = {
@@ -451,17 +463,17 @@ def get_annotated_perturbation_data(
     if multi_attribute:
         perturbation_shift = {
             covariate_label: {
-                control_label: torch.zeros((d)),
+                control_label: torch.zeros((d)).numpy(),
                 **{
-                    perturbation_ids_to_label[(idx + 1)]: comp["mean"] for idx, comp in enumerate(gmm.parameters[covariate_label])
+                    perturbation_ids_to_label[(idx + 1)]: comp["mean"].numpy() for idx, comp in enumerate(gmm.parameters[covariate_label])
                 } 
             } for covariate_label, perturbation_ids_to_label in perturbation_ids_to_labels.items()
         }
     else:
         perturbation_shift = {
-            control_label: torch.zeros((d)),
+            control_label: torch.zeros((d)).numpy(),
             **{
-                perturbation_ids_to_labels[(idx + 1)]: comp["mean"] for idx, comp in enumerate(gmm.parameters)
+                perturbation_ids_to_labels[(idx + 1)]: comp["mean"].numpy() for idx, comp in enumerate(gmm.parameters)
             }
         }
 
@@ -504,6 +516,10 @@ def get_annotated_perturbation_data(
             **{
                 f"{covariate_label}_label": covariate_label_id
                 for covariate_label, covariate_label_id in perturbation_labels_to_ids.items()
+            },
+            **{
+                f"{covariate_label}_one_hot": covariate_one_hot
+                for covariate_label, covariate_one_hot in perturbation_labels_one_hot.items()
             }
         }
     else:
@@ -519,6 +535,7 @@ def get_annotated_perturbation_data(
         uns = {
             f"{treatment_label}_labels": perturbation_labels_to_ids,
             f"{treatment_label}_shift": perturbation_shift,
+            f"{treatment_label}_one_hot": perturbation_labels_one_hot,
             f"{category_label}_label": category_labels_to_ids,
         }
 
