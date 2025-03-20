@@ -255,9 +255,9 @@ class InverseModel:
         self,
         optimal_condition: torch.Tensor | dict[str, torch.Tensor], 
         loss_fn: dict[str, Callable[[torch.Tensor, torch.Tensor], torch.Tensor]] | Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
-        perturbation_covariates: Sequence[str],
+        perturbation_covariates: str | Sequence[str],
         perturbation_covariates_dims: int | dict[str, int],
-        is_discrete_dict: bool | dict[str, bool],
+        is_discrete_dict: bool | dict[str, bool] | None = None,
         forward_model: BaseForwardModel | None = None,
         target_prediction_model: BaseModule | None = None, 
         prior: torch.nn.Module | None = None,
@@ -311,7 +311,11 @@ class InverseModel:
             msg = f"When `is_discrete_dict` is of type `bool`, the respective perturbations should contain only one element, found {len(perturbation_covariates)}"
             assert len(perturbation_covariates) == 1, msg
             is_discrete_dict = {perturbation_covariates[0]: is_discrete_dict}
-        
+        if is_discrete_dict is None:
+            msg = f""
+            logger.warning(msg)
+            is_discrete_dict = {covariate: False for covariate in perturbation_covariates}
+
         if isinstance(perturbation_initializer, Callable):
             msg = f"When `perturbation_initializer` is of type `Callable`, the respective perturbations should contain only one element, found {len(perturbation_covariates)}"
             assert len(perturbation_covariates) == 1, msg
