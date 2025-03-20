@@ -3,7 +3,6 @@ from typing import Any, Literal
 
 import anndata
 import numpy as np
-import pandas as pd
 import torch
 import itertools
 
