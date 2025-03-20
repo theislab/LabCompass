@@ -213,7 +213,9 @@ class MAPConditionOptimizer(BaseConditionOptimizer):
                 covariate: covariate_data.detach().cpu() for covariate, covariate_data in expanded_perturbation_data.items()
             },
             PredictionFields.PREDICTION_DATA: X_pert_pred.detach().cpu(),
-            PredictionFields.TARGET_PREDICTION_DATA: class_pred.detach().cpu(),
+            PredictionFields.TARGET_PREDICTION_DATA: {
+                covariate: covariate_pred.detach().cpu() for covariate, covariate_pred in class_pred.items()
+            },
             PredictionFields.PREDICTED_PERTURBATION: {
                 covariate: covariate_data.clone().detach().cpu() for covariate, covariate_data in self.optimized_perturbation_data.items()
             },
@@ -335,7 +337,9 @@ class LangevinSampler(BaseConditionOptimizer):
                 covariate: covariate_data.detach().cpu() for covariate, covariate_data in expanded_perturbation_data.items()
             },
             PredictionFields.PREDICTION_DATA: X_pert_pred.detach().cpu(),
-            PredictionFields.TARGET_PREDICTION_DATA: class_pred.detach().cpu(),
+            PredictionFields.TARGET_PREDICTION_DATA: {
+                covariate: covariate_pred.detach().cpu() for covariate, covariate_pred in class_pred.items()
+            },
             PredictionFields.PREDICTED_PERTURBATION: {
                 covariate: covariate_data.clone().detach().cpu() for covariate, covariate_data in self.optimized_perturbation_data.items()
             },
@@ -531,12 +535,14 @@ class NeuralInverseModel(BaseConditionOptimizer):
 
         # constructing step output dictionary
         out_dict = {
-            DataFields.SOURCE_STATE: X_controls.detach().cpu(),
+            DataFields.SOURCE_STATE: control_states.detach().cpu(),
             DataFields.PERTURBATION_DATA: {
                 covariate: covariate_data.detach().cpu() for covariate, covariate_data in pert_data.items()
             },
-            PredictionFields.PREDICTION_DATA: X_pert_pred.detach().cpu(),
-            PredictionFields.TARGET_PREDICTION_DATA: class_pred.detach().cpu(),
+            PredictionFields.PREDICTION_DATA: x1_hat.detach().cpu(),
+            PredictionFields.TARGET_PREDICTION_DATA: {
+                covariate: covariate_pred.detach().cpu() for covariate, covariate_pred in class_pred.items()
+            },
             PredictionFields.PREDICTED_PERTURBATION: {
                 covariate: torch.mean(covariate_data, dim=0).detach().cpu() for covariate, covariate_data in pert_data.items()
             }
