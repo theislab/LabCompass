@@ -7,9 +7,18 @@ from anndata import AnnData
 from torch import Tensor
 
 from sc_exp_design.constants import DataFields
-from sc_exp_design.couplings import Coupling, IndependentCoupling
+from sc_exp_design.couplings import (
+    IndependentCoupling,
+    FixedCoupling,
+    OTCoupling,
+)
 from sc_exp_design.data import DataManager, TrainDataLoader, ValidationDataLoader
-from sc_exp_design.flows import BaseFlow, ConstantNoiseFlow
+from sc_exp_design.flows import (
+    ConstantNoiseFlow,
+    EncodingDecodingFlow,
+    RectifiedFlow,
+    VariancePreservingFlow,
+)
 from sc_exp_design.networks import NeuralVelocityField, NeuralVelocityFieldConfig
 from sc_exp_design.ode import ODESolver
 from sc_exp_design.training import CallBack, CFMTrainer
@@ -23,26 +32,26 @@ __all__ = ["FlowMatching"]
 class FlowMatching:
     """Initializes the :class:`FlowMatching` model.
 
-    :param flow_class: The flow used to define the target dynamics. Should be a reference to
+    :param flow_type: The flow used to define the target dynamics. Should be a reference to
         a class derived from :class:`sc_exp_design.flows.BaseFlow` and not an instance.
-        Such class has to provide the methods :method:`flow_class.compute_x_t`, :method:`flow_class.compute_u_t` and
-        (optionally), :method:`flow_class.compute_score_t`, when we also want to lean the score
+        Such class has to provide the methods :method:`flow_type.compute_x_t`, :method:`flow_type.compute_u_t` and
+        (optionally), :method:`flow_type.compute_score_t`, when we also want to lean the score
         (i.e.: :attr:`NeuralVelocityFieldConfig.learn_score_fiels` is `True`).
         Defaults to :class:`sc_exp_design.flows.ConstantNoiseFlow`.
-    :type flow_class: class:`BaseFlow | None`
+    :type flow_type: class:`BaseFlow | None`
 
-    :param flow_kwargs: Dictionary containing the keyword arguments to pass to :param:`flow_class` for its initialization.
+    :param flow_kwargs: Dictionary containing the keyword arguments to pass to :param:`flow_type` for its initialization.
         Refer to the :module:`sc_exp_design.flows` page for the available flows and their respective keyword arguments.
         Defaults to `None`.
     :type flow_kwargs: class:`dict[str, Any] | None`
 
-    :param coupling_class: The coupling used to sample source and terminal states from the dataset. Should be a
+    :param coupling_type: The coupling used to sample source and terminal states from the dataset. Should be a
         reference to a class derived from :class:`sc_exp_design.couplings.BaseCoupling` and not an instance.
-        Such class has to provide the :method:`coupling_class.match_groups` that will be used by the dataloader
+        Such class has to provide the :method:`coupling_type.match_groups` that will be used by the dataloader
         to define the pairings during sampling. Defaults to  :class:`sc_exp_design.couplings.IndependentCoupling`
-    :type coupling_class: class:`dict[str, Any] | Any`
+    :type coupling_type: class:`dict[str, Any] | Any`
 
-    :param coupling_kwargs: Dictionary containing the keyword arguments to pass to :param:`coupling_class` for its initialization.
+    :param coupling_kwargs: Dictionary containing the keyword arguments to pass to :param:`coupling_type` for its initialization.
         Refer to the :module:`sc_exp_design.couplings` page for the available couplings and their respective keyword arguments.
         Defaults to `None`.
     :type coupling_kwargs: class:`dict[str, Any] | None`
@@ -56,25 +65,43 @@ class FlowMatching:
 
     def __init__(
         self,
-        flow_class: BaseFlow | None = None,
+        flow_type: Literal["constant_noise", "encoding_decoding", "rectified", "variance_preserving"] = "rectified",
         flow_kwargs: dict[str, Any] | None = None,
-        coupling_class: Coupling | None = None,
+        coupling_type: Literal["fixed", "independent", "ot"] = "ot",
         coupling_kwargs: dict[str, Any] | None = None,
         time_sampler: Callable[[Sequence[int], Any], Tensor] = torch.rand,
         device_id: Literal["cuda", "cpu"] = "cuda",
     ) -> None:
         # initialize the Flow model 
-        if flow_class is None:
+        if flow_type == "constant_noise":
             flow_class = ConstantNoiseFlow
+        elif flow_type == "encoding_decoding":
+            flow_class = EncodingDecodingFlow
+        elif flow_type == "rectified":
+            flow_class = RectifiedFlow
+        elif flow_type == "variance_preserving":
+            flow_class = VariancePreservingFlow
+        else:
+            msg = f""
+            raise ValueError(msg)
+        # setting optional flow kwargs
         if flow_kwargs is None:
             flow_kwargs = {}
         self.flow = flow_class(**flow_kwargs)
 
         # initialize the coupling logic 
-        if coupling_class is None:
+        if coupling_type == "fixed":
+            coupling_class = FixedCoupling
+        elif coupling_type == "independent":
             coupling_class = IndependentCoupling
+        elif coupling_type == "ot":
+            coupling_class = OTCoupling
+        else:
+            msg = f""
+            raise ValueError(msg)
+        # setting optional coupling kwargs
         if coupling_kwargs is None:
-            coupling_kwargs = {}
+            coupling_kwargs = {"method": "exact"}
         self.coupling = coupling_class(**coupling_kwargs)
 
         self.time_sampler = time_sampler
