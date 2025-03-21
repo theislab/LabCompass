@@ -243,8 +243,7 @@ class PerturbationApproximatePosterior(BaseApproximatePosterior):
             # forward pass on nn and storing the results
             pert_posterior_params = cov_decoder(input_pert_posterior)
             pert_posterior_params_dict[cov_id] = pert_posterior_params
-        pert_output_dict[VFStepFields.PERTURBATION_PARAMS] = pert_posterior_params_dict
-        return pert_output_dict
+        return pert_posterior_params_dict
 
 
 class EndpointsApproximatePosterior(BaseApproximatePosterior):

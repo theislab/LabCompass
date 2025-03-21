@@ -155,6 +155,36 @@ class TrainData(BaseDataStruct):
             output_dict[DataFields.PERTURBATION_TARGET_REPR] = trtm_pert_repr
         return output_dict
 
+    def __getitem__(
+        self,
+        idx: int,
+    ) -> dict[str, Any]:
+        """"""
+        # retrieving adata and states
+        adata = self.adata[idx]
+        state_data = self.state_data[idx]
+        # retrieving optional data
+        perturbation_data = None
+        if self.perturbation_data is not None:
+            perturbation_data = {perturbation: perturbation_data[idx] for perturbation, perturbation_data in self.perturbation_data.items()}
+        target_perturbation_repr = None
+        if self.target_perturbation_repr is not None:
+            target_perturbation_repr = {target: target_data[idx] for target, target_data in self.target_perturbation_repr.items()}
+        return TrainData(
+            adata,
+            self.control_key,
+            state_data,
+            perturbation_data=perturbation_data,
+            target_perturbation_repr=target_perturbation_repr,
+            perturbations_with_rep=self.perturbations_with_rep,
+        )
+    
+    def __len__(
+        self,
+    ) -> int:
+        """"""
+        return self.adata.shape[0]
+
 
 @dataclass
 class PredictionData(BaseDataStruct):

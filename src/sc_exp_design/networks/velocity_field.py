@@ -214,7 +214,7 @@ class NeuralVelocityField(BaseModule):
             dict[str, Tensor]: Model output including velocity field and latent representations.
         """
         # encoding time
-        t = torch.unsqueeze(t, dim=1)
+        t = torch.unsqueeze(t, dim=-1)
         t_latent = t
         if self.config.encode_time:
             t_latent = self.time_encoder(t)
@@ -245,11 +245,11 @@ class NeuralVelocityField(BaseModule):
             # sanity check (condition should be not None)
             msg = f""
             assert cond is not None, msg
-            latent_concat = torch.cat([t_latent, xt_latent, condition_latent], dim=1)
-            original_concat = torch.cat([t, xt, condition_original], dim=1)
+            latent_concat = torch.cat([t_latent, xt_latent, condition_latent], dim=-1)
+            original_concat = torch.cat([t, xt, condition_original], dim=-1)
         else:
-            latent_concat = torch.cat([t_latent, xt_latent], dim=1)
-            original_concat = torch.cat([t, xt], dim=1)
+            latent_concat = torch.cat([t_latent, xt_latent], dim=-1)
+            original_concat = torch.cat([t, xt], dim=-1)
 
         # forward pass on neural velocity field
         vf = self.decoder(latent_concat)
@@ -295,16 +295,16 @@ class NeuralVelocityField(BaseModule):
             pert_output_dict = {}
             # with endpoints
             if (endpoints is not None) and (self.config.pert_approximate_posterior_input_type == "endpoints"):
-                pert_output_dict = self.pert_approximate_posterior(endpoints)
+                pert_output_dict[VFStepFields.PERTURBATION_PARAMS] = self.pert_approximate_posterior(endpoints)
             # with original representation
             if (original_concat is not None) and (self.config.pert_approximate_posterior_input_type == "original"):
-                pert_output_dict = self.pert_approximate_posterior(original_concat)
+                pert_output_dict[VFStepFields.PERTURBATION_PARAMS] = self.pert_approximate_posterior(original_concat)
             # with latent representation
             if (latent_concat is not None) and (self.config.pert_approximate_posterior_input_type == "latent"):
-                pert_output_dict = self.pert_approximate_posterior(latent_concat)
+                pert_output_dict[VFStepFields.PERTURBATION_PARAMS] = self.pert_approximate_posterior(latent_concat)
             # with one step prediction
             if (one_step_prediction is not None) and (self.config.pert_approximate_posterior_input_type == "one_step_prediction"):
-                pert_output_dict = self.pert_approximate_posterior(one_step_prediction)
+                pert_output_dict[VFStepFields.PERTURBATION_PARAMS] = self.pert_approximate_posterior(one_step_prediction)
             output_dict.update(pert_output_dict)
 
         return output_dict

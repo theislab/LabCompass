@@ -75,8 +75,9 @@ def binary_classification_loss(
 def reconstruction_loss_noise_model(
     params: dict[str, Tensor],
     samples: Tensor,
-    noise_model: Literal["gaussian", "neg_bin"],
+    noise_model: Literal["gaussian", "neg_bin"] | None,
     cov_estimation_mode: Literal["isotropic", "anisotropic"] | None = None,
+    allow_noise_model_to_be_none: bool = False
 ) -> Tensor:
     """"""
     # loss on the source posterior
@@ -86,8 +87,13 @@ def reconstruction_loss_noise_model(
         loss_fn = partial(gaussian_rec_loss, cov_estimation_mode=cov_estimation_mode)
     elif noise_model == "neg_bin":
         loss_fn = neg_bin_rec_loss
+    elif allow_noise_model_to_be_none and noise_model is None:
+        loss_fn = binary_classification_loss
     else:
-        msg = f"{noise_model=} not supported (possible values `['gaussian', 'neg_bin']`)."
+        msg = (
+            f"{noise_model=} not supported (possible values `['gaussian', 'neg_bin', None]`)." if allow_noise_model_to_be_none else
+            f"{noise_model=} not supported (possible values `['gaussian', 'neg_bin']`)."
+        )
         raise ValueError(msg)
     loss = loss_fn(
         params,

@@ -27,6 +27,34 @@ class BaseModule(abc.ABC, nn.Module):
         raise NotImplementedError
 
 
+class BaseForwardModel(BaseModule):
+
+    @abc.abstractmethod
+    def forward(
+        self,
+        source_states: torch.Tensor,
+        perturbations: dict[str, torch.Tensor],
+    ) -> torch.Tensor:
+        """"""
+        raise NotImplementedError
+    
+    def predict(
+        self,
+        batch: dict[str, torch.Tensor | dict[str, torch.Tensor]],
+        no_grad: bool = True,
+    ) -> torch.Tensor:
+        """"""
+        # parsing batch dictionary
+        source_states = batch[DataFields.SOURCE_STATE]
+        perturbations = batch[DataFields.PERTURBATION_DATA]
+        if no_grad:
+            with torch.no_grad():
+                out =  self.forward(source_states, perturbations)
+        else:
+            out =  self.forward(source_states, perturbations)
+        return out
+
+
 class MLPBlock(BaseModule):
     """Implements a Multi-Layered Perceptron with optional batch normalization and dropout
 

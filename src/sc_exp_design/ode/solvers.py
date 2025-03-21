@@ -65,7 +65,7 @@ class VF(nn.Module):
             Tensor: The drift (rate of change) at each time step and state, as computed 
                     by the drift function.
         """
-        t = t.repeat(xt.shape[0])
+        t = t.repeat(*xt.shape[:-1])
         return self.drift_fn(t, xt)
 
 

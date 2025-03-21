@@ -44,7 +44,6 @@ class CFMTrainer(BaseTrainer):
         time_sampler: Callable = torch.rand,
         callbacks: CallBack | None = None,
         grad_step_interval_log: int = 1000,
-        solver_class: ODESolver | None = None,
         num_time_steps: int = 100,
         gamma_fn: Callable[[Tensor, Tensor], Tensor] | None = None,
         solver_kwargs: dict[str, Any] = None,
@@ -61,7 +60,6 @@ class CFMTrainer(BaseTrainer):
         self.time_sampler = time_sampler
         self.callbacks = callbacks
         self.grad_step_interval_log = grad_step_interval_log
-        self.solver_class = solver_class
         self.num_time_steps = num_time_steps
         self.gamma_fn = gamma_fn
         self.solver_kwargs = solver_kwargs
@@ -200,7 +198,7 @@ class CFMTrainer(BaseTrainer):
         # defining velocity function
         vf = self.velocity_field.get_vf_fn(condition, gamma_fn=self.gamma_fn)
         # initializing the sampler clss
-        ode_sampler = self.solver_class(
+        ode_sampler = ODESolver(
             vf,
             num_time_steps=self.num_time_steps,
             gamma_fn=self.gamma_fn,
