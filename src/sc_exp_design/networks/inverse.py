@@ -64,12 +64,14 @@ class BaseConditionOptimizer(BaseModule):
         e_optimized: dict[str, nn.Parameter],
     ) -> torch.Tensor:
         """"""
-        loss = torch.zeros((), requires_grad=True, device=list(target.values())[0].device)
-        for covariate, loss_fn in self.loss_fn.items():
-            loss = loss + loss_fn(pred[covariate], target[covariate])
+        loss = torch.sum(
+            torch.stack(
+                [loss_fn(pred[covariate], target[covariate]) for covariate, loss_fn in self.loss_fn.items()]
+            )
+        )
         if self.prior:
-            for key in self.prior:
-                log_prior = self.prior[key].log_prob(e_optimized[key]).sum()
+            for covariate, prior in self.prior.items():
+                log_prior = prior.log_prob(e_optimized[covariate]).sum()
                 loss = loss - self.prior_weight * log_prior
         return loss
 
@@ -179,7 +181,7 @@ class MAPConditionOptimizer(BaseConditionOptimizer):
         
         expanded_perturbation_data = {}
         for pert_key in self.optimized_perturbation_data:
-            if not self.is_discrete_dict:
+            if not self.is_discrete_dict[pert_key]:
                 non_linearity = self.perturbation_non_linearities[pert_key]
                 expanded_perturbation_data[pert_key] = non_linearity(
                     self.optimized_perturbation_data[pert_key].expand(X_controls.shape[0], -1)
@@ -311,7 +313,7 @@ class LangevinSampler(BaseConditionOptimizer):
         }
         expanded_perturbation_data = {}
         for pert_key in self.optimized_perturbation_data:
-            if not self.is_discrete_dict:
+            if not self.is_discrete_dict[pert_key]:
                 non_linearity = self.perturbation_non_linearities[pert_key]
                 expanded_perturbation_data[pert_key] = non_linearity( 
                     self.optimized_perturbation_data[pert_key].unsqueeze(1).expand(-1, X_controls.shape[1], -1) 
