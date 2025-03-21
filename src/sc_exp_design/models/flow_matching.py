@@ -101,7 +101,7 @@ class FlowMatching:
             raise ValueError(msg)
         # setting optional coupling kwargs
         if coupling_kwargs is None:
-            coupling_kwargs = {}
+            coupling_kwargs = {"method": "exact"}
         self.coupling = coupling_class(**coupling_kwargs)
 
         self.time_sampler = time_sampler
