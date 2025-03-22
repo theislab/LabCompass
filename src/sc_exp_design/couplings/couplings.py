@@ -85,7 +85,7 @@ class OTCoupling(Coupling):
 
     def __init__(
         self,
-        method: Literal["exact", "sinkhorn", "unbalanced", "partial"] = "sinkhorn",
+        method: Literal["exact", "sinkhorn", "unbalanced", "partial"] = "exact",
         solver_kwargs: dict[str, Any] | None = None,
         cost_fn: Callable[[TensorLike, TensorLike], TensorLike] | None = None,
         reg: float = 5e-1,
