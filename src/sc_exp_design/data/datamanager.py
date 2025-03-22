@@ -33,6 +33,7 @@ class DataManager:
         perturbation_target_covariates: dict[str, Literal["one_hot", "label", "identity"] | None] | None = None,
         perturbation_target_covariates_in_obsm: dict[str, bool] | None = None,
         perturbation_target_covariates_kwargs: dict[str, Any] | None = None,
+        has_controls: bool = True
     ) -> None:
         """
         `self.perturbations`:
@@ -59,6 +60,7 @@ class DataManager:
         self.adata = adata
         self.sample_rep = sample_rep
         self.control_key = control_key
+        self.has_controls = has_controls
 
         # preparing the attributes
         if perturbations is not None:
@@ -321,4 +323,4 @@ class DataManager:
         target_perturbation_repr = None
         if self.use_perturbation_target_repr:
             target_perturbation_repr = self.__get_perturbation_target_rep_data(adata)
-        return TrainData(adata, self.control_key, state_data, perturbation_data, target_perturbation_repr, self.perturbations_with_rep)
+        return TrainData(adata, self.control_key, state_data, perturbation_data, target_perturbation_repr, self.perturbations_with_rep, self.has_controls)
