@@ -7,6 +7,7 @@ from anndata import AnnData
 from torch import Tensor
 
 from sc_exp_design.constants import DataFields
+from sc_exp_design.config.velocity_field import NeuralVelocityFieldConfig
 from sc_exp_design.couplings import (
     IndependentCoupling,
     FixedCoupling,
@@ -19,7 +20,7 @@ from sc_exp_design.flows import (
     RectifiedFlow,
     VariancePreservingFlow,
 )
-from sc_exp_design.networks import NeuralVelocityField, NeuralVelocityFieldConfig
+from sc_exp_design.networks import NeuralVelocityField
 from sc_exp_design.ode import ODESolver
 from sc_exp_design.training import CallBack, CFMTrainer
 from sc_exp_design.transforms import Transform

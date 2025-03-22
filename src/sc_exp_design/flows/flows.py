@@ -32,6 +32,7 @@ class BaseFlow(abc.ABC, nn.Module):
         :param random_seed: Random seed for reproducibility.
         :type random_seed: int
         """
+        super().__init__()
         self.random_seed = random_seed
 
     @abc.abstractmethod
