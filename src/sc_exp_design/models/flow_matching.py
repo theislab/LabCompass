@@ -259,6 +259,7 @@ class FlowMatching:
         posterior_on_perts_update_step: int | None = None,
         posterior_on_latent_perts_update_step: int | None = None,
         gamma_fn: Callable[[Tensor, Tensor], Tensor] | None = None,
+        generate_from_noise: bool = False
     ) -> None:
         """Trains the model.
 
@@ -302,6 +303,9 @@ class FlowMatching:
             a drift adjusted by the score. In case :attr:`self.velocity_field.config.lean_score_field` is `False` it will be ignores, falling back to ODE sampling by
             default as from the original fromulation, defaults to `None`.
         :type gamma_fn: class:`Callable[[Tensor, Tensor], Tensor] | None`
+        
+        :param generate_from_noise: Controls if the source samples are Gaussian (True) or control cells (False).
+        :type num_training_steps: class:`bool`
         """
         # sanity checks
         msg = "Data not initialized, run `prepare_data` before training the model"
@@ -333,6 +337,7 @@ class FlowMatching:
             train_batch_size,
             state_transforms,
             self.device_id,
+            generate_from_noise
         )
 
         self.validation_dataloader = None
@@ -343,6 +348,7 @@ class FlowMatching:
                 validation_batch_size,
                 state_transforms,
                 self.device_id,
+                generate_from_noise
             )
 
         self.trainer.fit(
