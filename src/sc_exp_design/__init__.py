@@ -1,7 +1,10 @@
 from importlib.metadata import version
 
-from . import constants, couplings, data, flows, models, networks, ode, sym, training, transforms, utils
+from .config import *
+from .models import *
+from .sym import *
+from .utils import *
 
-__all__ = ["constants", "couplings", "data", "flows", "models", "networks", "ode", "sym", "training", "transforms", "utils"]
+__all__ = ["config", "models", "utils"]
 
 __version__ = version("scExpDesign")

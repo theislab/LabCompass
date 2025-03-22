@@ -3,7 +3,7 @@ import torch
 
 from sc_exp_design.constants import DataFields
 from sc_exp_design.networks.blocks import BaseModule, BaseForwardModel
-from sc_exp_design.networks.config import NeuralVelocityFieldConfig
+from sc_exp_design.config.velocity_field import NeuralVelocityFieldConfig
 from sc_exp_design.models.inverse_utils import LangevinOptimizer
 from sc_exp_design.models.flow_matching import FlowMatching
 from sc_exp_design.models.inverse import InverseModel

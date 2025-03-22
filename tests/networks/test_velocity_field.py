@@ -76,7 +76,7 @@ class TestNeuralVelocityField:
             learn_posterior_on_latent_perts = False
 
         # initializing configurations
-        config = sc_exp_design.networks.NeuralVelocityFieldConfig(
+        config = sc_exp_design.config.NeuralVelocityFieldConfig(
             pert_target_covariates_output_dims=pert_target_covariates_output_dims,
             perturbation_latent_dim=perturbation_latent_dim,
             perturbation_layers_before_pooling=layers_before_pooling,

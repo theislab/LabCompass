@@ -7,7 +7,7 @@ from torch import Tensor, nn
 
 from sc_exp_design.constants import VFStepFields
 from sc_exp_design.networks.blocks import BaseModule, ConditionEncoder, MLPBlock
-from sc_exp_design.networks.config import NeuralVelocityFieldConfig
+from sc_exp_design.config.velocity_field import NeuralVelocityFieldConfig
 from sc_exp_design.networks.neural_noise_models import MLPGaussianNoiseModel, MLPNegBinNoiseModel
 from sc_exp_design.networks.inference_networks import PerturbationApproximatePosterior, EndpointsApproximatePosterior
 

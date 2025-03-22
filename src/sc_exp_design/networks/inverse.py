@@ -391,27 +391,6 @@ class NeuralInverseModel(BaseConditionOptimizer):
             device_id=device_id,
         )
 
-        # preparing input with some sanity checks
-        msg = f""
-        assert perturbation_covariates is not None, msg
-        if isinstance(perturbation_covariates, str):
-            perturbation_covariates = (perturbation_covariates, )
-
-        if perturbation_covariates_noise_models is None:
-            perturbation_covariates_noise_models = {covariate: None for covariate in perturbation_covariates}
-
-        # setting the optional keyword arguments to a dictionary when not passed
-        if perturbation_covariates_predictor_kwargs is None:
-            perturbation_covariates_predictor_kwargs = {
-                covariate: {} for covariate in perturbation_covariates
-            }
-        msg = f""
-        assert perturbation_covariates_noise_models is not None, msg
-        msg = f""
-        assert perturbation_covariates_predictor_kwargs is not None, msg
-        msg = f""
-        assert state_dim is not None, msg
-
         # setting additional attributes
         self.state_dim = state_dim
         self.perturbation_covariates_noise_models = perturbation_covariates_noise_models
@@ -546,7 +525,7 @@ class NeuralInverseModel(BaseConditionOptimizer):
                 covariate: covariate_pred.detach().cpu() for covariate, covariate_pred in class_pred.items()
             },
             PredictionFields.PREDICTED_PERTURBATION: {
-                covariate: torch.mean(covariate_data, dim=0).detach().cpu() for covariate, covariate_data in pert_data.items()
+                covariate: torch.mean(covariate_data, dim=0, keepdim=True).detach().cpu() for covariate, covariate_data in pert_data.items()
             }
         }
         return loss, out_dict
