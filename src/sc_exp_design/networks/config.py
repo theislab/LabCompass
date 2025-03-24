@@ -315,6 +315,7 @@ class NeuralVelocityFieldConfig:
     state_encoder_mlp_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
     encode_time: bool = False
     time_encoder_input_dim: int = 1
+    time_encoder_output_dim: int = None 
     time_encoder_mlp_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
     use_guidance: bool = True
     encode_conditions: bool = False
