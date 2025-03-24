@@ -170,15 +170,15 @@ class DataManager:
         :return: The primary state representation of cells.
         :rtype: TensorLike
 
-        :raises ValueError: If `sample_rep` is specified but not found in `adata.layers`.
+        :raises ValueError: If `sample_rep` is specified but not found in `adata.obsm`.
         """
         if self.sample_rep is None:
             state_data = adata.X
         else:
-            if self.sample_rep not in adata.layers.keys():
-                msg = f"{self.sample_rep=} not found in `adata.layers` (Keys found: {list(adata.layers.keys())})"
+            if self.sample_rep not in adata.obsm.keys():
+                msg = f"{self.sample_rep=} not found in `adata.obsm` (Keys found: {list(adata.obsm.keys())})"
                 raise ValueError(msg)
-            state_data = adata.layers[self.sample_rep]
+            state_data = adata.obsm[self.sample_rep]
         return state_data
 
     def __get_perturbation_data(
