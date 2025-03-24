@@ -4,6 +4,7 @@ from typing import Literal
 
 import numpy as np
 import random
+import numpy as np
 import torch
 
 from sc_exp_design.constants import DataFields
@@ -96,6 +97,7 @@ class TrainDataLoader(BaseDataLoader):
         batch_size: int,
         state_transforms: Transform | None = None,
         device_id: Literal["cuda", "cpu"] = "cuda",
+        noise_source: bool = False
     ) -> None:
         """
         Initializes the training data loader.
@@ -110,6 +112,7 @@ class TrainDataLoader(BaseDataLoader):
         :type state_transforms: class:`Transform`, optional
         :param device_id: Device to use for tensor operations (`cuda` or `cpu`), defaults to `cuda`.
         :type device_id: class:`Literal[\"cuda\", \"cpu\"]`, optional
+        :param noise_source: Controls if the source samples are Gaussian (True) or control cells (False).
         """
         self.data = data
         self.coupling = coupling
@@ -117,6 +120,7 @@ class TrainDataLoader(BaseDataLoader):
         self.device_id = device_id
         self.state_transforms = state_transforms
         self.device = torch.device(self.device_id)
+        self.noise_source = noise_source
 
     def __sample_perturbation_id(
         self,
@@ -142,10 +146,6 @@ class TrainDataLoader(BaseDataLoader):
                  and optional perturbation representations.
         :rtype: dict[str, TensorLike]
         """
-        # control states
-        ctrl_data = self.data.get_controls(self.batch_size)
-        ctrl_states = ctrl_data[DataFields.STATE_DATA]
-
         # sampling treatments for current batch needed for OT couplings when we sample only one condition per batch
         treatments = None
         if isinstance(self.coupling, OTCoupling):
@@ -154,6 +154,13 @@ class TrainDataLoader(BaseDataLoader):
         # treatment states
         trtm_data = self.data.get_treatments(self.batch_size, treatments)
         trtm_states = trtm_data[DataFields.STATE_DATA]
+        
+        # control states
+        if not self.noise_source:
+            ctrl_data = self.data.get_controls(self.batch_size)
+            ctrl_states = ctrl_data[DataFields.STATE_DATA]
+        else:
+            ctrl_states = np.random.randn(*trtm_states.shape).astype(trtm_states.dtype)
 
         # matching the two groups
         source_idx, target_idx = self.coupling.match_groups(ctrl_states, trtm_states)
@@ -176,6 +183,7 @@ class TrainDataLoader(BaseDataLoader):
             condition = {cond: torch.from_numpy(cond_data[target_idx]).to(self.device).float()
                          for cond, cond_data in trtm_perts.items()}
             out_dict[DataFields.PERTURBATION_DATA] = condition
+            
         if self.data.target_perturbation_repr is not None:
             trtm_perts_target_rep = trtm_data[DataFields.PERTURBATION_TARGET_REPR]
             trtm_perts_target_rep = {key: torch.from_numpy(val[target_idx]).to(self.device).float()
@@ -197,6 +205,7 @@ class ValidationDataLoader(BaseDataLoader):
         batch_size: int,
         state_transforms: Transform | None = None,
         device_id: Literal["cuda", "cpu"] = "cuda",
+        noise_source: bool = False
     ) -> None:
         """
         Initializes the validation data loader.
@@ -211,6 +220,7 @@ class ValidationDataLoader(BaseDataLoader):
         :type state_transforms: class:`Transform`, optional
         :param device_id: Device to use for tensor operations (`cuda` or `cpu`), defaults to `cuda`.
         :type device_id: class:`Literal[\"cuda\", \"cpu\"]`, optional
+        :param noise_source: Controls if the source samples are Gaussian (True) or control cells (False).
         """
         self.data = data
         self.coupling = coupling
@@ -218,6 +228,7 @@ class ValidationDataLoader(BaseDataLoader):
         self.device_id = device_id
         self.state_transforms = state_transforms
         self.device = torch.device(self.device_id)
+        self.noise_source = noise_source
 
     def sample(self) -> dict[str, TensorLike]:
         """
@@ -227,11 +238,14 @@ class ValidationDataLoader(BaseDataLoader):
                  and optional perturbation representations.
         :rtype: dict[str, TensorLike]
         """
-        ctrl_data = self.data.get_controls(self.batch_size)
-        ctrl_states = ctrl_data[DataFields.STATE_DATA]
-
         trtm_data = self.data.get_treatments(self.batch_size)
         trtm_states = trtm_data[DataFields.STATE_DATA]
+        
+        if not self.noise_source:
+            ctrl_data = self.data.get_controls(self.batch_size)
+            ctrl_states = ctrl_data[DataFields.STATE_DATA]
+        else: 
+            ctrl_states = np.random.randn(*trtm_states.shape).astype(trtm_states.dtype)
 
         if self.data.perturbation_data is not None:
             trtm_perts = trtm_data[DataFields.PERTURBATION_DATA]
