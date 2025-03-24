@@ -324,6 +324,6 @@ class DataManager:
             perturbation_data = self.__get_perturbation_data(adata)
         # condition target representation
         target_perturbation_repr = None
-        if self.use_perturbation_target_repr:
-            target_perturbation_repr = self.__get_perturbation_target_rep_data(adata)
-        return TrainData(adata, self.control_key, state_data, perturbation_data, target_perturbation_repr, self.perturbations_with_rep, self.has_controls)
+        if self.load_target_covariates:
+            target_data = self.__get_target_data(adata)
+        return TrainData(adata, self.control_key, state_data, perturbation_data, target_data, self.perturbations_with_rep, self.has_controls)

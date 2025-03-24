@@ -126,6 +126,7 @@ class FlowMatching:
         perturbations: str | Sequence[str] | None = None,
         perturbation_covariates: dict[str, str | Sequence[str]] | None = None,
         perturbation_reps: dict[str, str | Sequence[str]] | None = None,
+        load_target_covariates: bool = False,
         target_covariates: dict[str, Literal["one_hot", "label", "identity"]] | None = None,
         target_covariates_in_obsm: dict[str, bool] | None = None,
         target_covariates_kwargs: dict[str, Any] | None = None,
@@ -184,7 +185,7 @@ class FlowMatching:
             target_covariates=target_covariates,
             target_covariates_in_obsm=target_covariates_in_obsm,
             target_covariates_kwargs=target_covariates_kwargs,
-
+            has_controls= has_controls,
         )
         train_data = data_manager.get_train_data(train_adata)
 
