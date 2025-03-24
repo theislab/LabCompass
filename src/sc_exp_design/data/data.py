@@ -39,11 +39,12 @@ class TrainData(BaseDataStruct):
     """
     
     adata: anndata.AnnData
-    control_key: str
+    control_key: str | None
     state_data: TensorLike
     perturbation_data: dict[str, TensorLike] | None
     target_perturbation_repr: dict[str, TensorLike] | None = None
     perturbations_with_rep: dict[str, Sequence[str]] | None = None
+    has_controls: bool = True
 
     @property
     def seen_combinatorial_perturbations(
@@ -76,6 +77,10 @@ class TrainData(BaseDataStruct):
         :return: Dictionary containing control state and perturbation data (if available).
         :rtype: Dict[str, TensorLike]
         """
+        msg = "Controls are not available in this dataset (has_controls=False)."
+        if not self.has_controls:
+            raise ValueError(msg)
+        
         # collect control ids and features
         ctrl_obs_idx = np.argwhere(self.adata.obs[self.control_key] == True)[:, 0]
         ctrl_state_data = self.state_data[ctrl_obs_idx]
@@ -124,7 +129,10 @@ class TrainData(BaseDataStruct):
         :rtype: Dict[str, TensorLike]
         """
         # collect treatment ids and features
-        trtm_obs_idx = np.argwhere(self.adata.obs[self.control_key] == False)[:, 0]
+        if self.has_controls:
+            trtm_obs_idx = np.argwhere(self.adata.obs[self.control_key] == False)[:, 0]
+        else:
+            trtm_obs_idx = np.arange(len(self.adata))
         # optionally selecting only the current treatment (used in case of OT couplings) 
         if treatments is not None:
             trtm_obs_idx = np.argwhere(self.adata.obs[[pert for pert in self.perturbations_with_rep.keys()]] == treatments)[:, 0]
@@ -197,6 +205,7 @@ class PredictionData(BaseDataStruct):
     state_data: TensorLike
     perturbation_data: dict[str, TensorLike] | None
     target_perturbation_repr: dict[str, TensorLike] | None = None
+    has_controls: bool = None 
 
     def get_controls(
         self,
@@ -210,6 +219,10 @@ class PredictionData(BaseDataStruct):
         :return: Dictionary containing control state and perturbation data (if available).
         :rtype: Dict[str, TensorLike]
         """
+        msg = "Controls are not available in this dataset (has_controls=False)."
+        if not self.has_controls:
+            raise ValueError(msg)
+    
         # collect control ids and features
         ctrl_obs_idx = np.argwhere(self.adata.obs[self.control_key] == True)[:, 0]
         ctrl_state_data = self.state_data[ctrl_obs_idx]
@@ -253,7 +266,11 @@ class PredictionData(BaseDataStruct):
         :rtype: Dict[str, TensorLike]
         """
         # collect treatment ids and features
-        trtm_obs_idx = np.argwhere(self.adata.obs[self.control_key] == False)[:, 0]
+        if self.has_controls:
+            trtm_obs_idx = np.argwhere(self.adata.obs[self.control_key] == False)[:, 0]
+        else:
+            trtm_obs_idx = np.arange(len(self.adata))
+            
         trtm_state_data = self.state_data[trtm_obs_idx]
 
         # collect treatment annotations from perturbation data 
