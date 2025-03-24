@@ -450,7 +450,7 @@ class NeuralInverseModel(BaseConditionOptimizer):
 
             # when discrete
             if is_discrete_covariate:
-                self.differentiable_categorical(covariate_params)
+                self.differentiable_categorical(covariate_data)
             
             # gaussian noise model
             elif covariate_noise_model == "gaussian":

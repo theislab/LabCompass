@@ -131,8 +131,7 @@ class FlowMatching:
         target_covariates_in_obsm: dict[str, bool] | None = None,
         target_covariates_kwargs: dict[str, Any] | None = None,
     ) -> None:
-        """Prepares the data for training and initializes the :attr:`FlowMatching.data_manager` and :attr:`FlowMatching.train_data` attributes of the model.
-
+        """
         :param train_adata: An instance of :class:`anndata.AnnData` containing the training data.
         :type train_adata: class:`anndata.AnnData`
 
@@ -185,7 +184,7 @@ class FlowMatching:
             target_covariates=target_covariates,
             target_covariates_in_obsm=target_covariates_in_obsm,
             target_covariates_kwargs=target_covariates_kwargs,
-            has_controls= has_controls,
+            has_controls=has_controls,
         )
         train_data = data_manager.get_train_data(train_adata)
 
