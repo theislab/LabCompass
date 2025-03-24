@@ -4,7 +4,6 @@ from typing import Any, Literal
 import torch
 from torch import Tensor, linspace, nn
 from torchdiffeq import odeint
-from torchsde import sdeint
 
 __all__ = ["ODESolver"]
 
@@ -67,80 +66,6 @@ class VF(nn.Module):
         """
         t = t.repeat(*xt.shape[:-1])
         return self.drift_fn(t, xt)
-
-
-class SDE(nn.Module):
-    """
-    A class representing a Stochastic Differential Equation (SDE). This class computes the drift and diffusion 
-    components of the SDE, which are used in simulations of stochastic processes. It can handle both Ito and 
-    Stratonovich formulations of the SDE, as well as different noise types.
-    """
-
-    def __init__(
-        self,
-        drift_fn: Callable[[Tensor, Tensor], Tensor],
-        diffusion_fn: Callable[
-            [
-                Tensor,
-            ],
-            Tensor,
-        ],
-        sde_type: Literal["ito", "stratonovich"] = "ito",
-        noise_type: Literal["scalar", "additive", "diagonal", "general"] = "diagonal",
-        device_id: Literal["cuda", "cpu"] = "cuda",
-    ) -> None:
-        """
-        Initializes the Stochastic Differential Equation (SDE) with the given drift and diffusion functions, 
-        noise type, and device configuration.
-
-        Args:
-            drift_fn (Callable[[Tensor, Tensor], Tensor]): A function that computes the drift term of the SDE 
-                                                           at a given time `t` and state `xt`.
-            diffusion_fn (Callable[[Tensor], Tensor]): A function that computes the diffusion term (noise) at 
-                                                       a given time `t` and state `xt`.
-            sde_type (str, optional): Specifies the SDE formulation, either 'ito' or 'stratonovich'. Defaults to 'ito'.
-            noise_type (str, optional): Specifies the type of noise, options include 'scalar', 'additive', 
-                                         'diagonal', and 'general'. Defaults to 'diagonal'.
-            device_id (str, optional): The device type, either 'cuda' or 'cpu'. Defaults to 'cuda'.
-        """
-        super().__init__()
-        self.drift_fn = drift_fn
-        self.diffusion_fn = diffusion_fn
-        self.sde_type = sde_type
-        self.noise_type = noise_type
-        self.device_id = device_id
-
-        self.device = torch.device(self.device_id)
-
-    def f(
-        self,
-        t: Tensor,
-        xt: Tensor,
-    ) -> Tensor:
-        """
-        Computes the drift term (rate of change) of the SDE at a given time `t` and state `xt`.
-
-        Args:
-            t (Tensor): The time variable.
-            xt (Tensor): The state of the system at time `t`.
-
-        Returns:
-            Tensor: The drift term at the given time and state, computed by the drift function.
-        """
-        return self.drift_fn(t, xt)
-
-    def g(self, t: Tensor, xt: Tensor) -> Tensor:
-        """
-        Computes the diffusion (noise) term of the SDE at a given time `t` and state `xt`.
-
-        Args:
-            t (Tensor): The time variable.
-            xt (Tensor): The state of the system at time `t`.
-
-        Returns:
-            Tensor: The diffusion term (noise) at the given time and state, computed by the diffusion function.
-        """
-        return self.diffusion_fn(t, xt)
 
 
 class ODESolver:
@@ -211,17 +136,7 @@ class ODESolver:
             Tensor: The final state at the last time step, or the full trajectory if `return_trajectory=True`.
         """
         vf = VF(self.drift_fn)
-        if self.gamma_fn is not None:
-            sde = SDE(
-                vf,
-                self.gamma_fn,
-                sde_type=self.sde_type,
-                noise_type=self.noise_type,
-                device_id=self.device_id,
-            )
-            trajectory = sdeint(sde, source, self.time)
-        else:
-            trajectory = odeint(vf, source, self.time, **self.solver_kwargs)
+        trajectory = odeint(vf, source, self.time, **self.solver_kwargs)
         if return_trajectory:
             return trajectory
         else:
