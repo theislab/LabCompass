@@ -62,6 +62,9 @@ class FlowMatching:
 
     :param device_id: The identifier for the device where to do the computations, defaults to `"cuda"`.
     :type device_id: class:`Literal["cuda", "cpu"]`
+    
+    :param generate_from_noise: Controls if the source samples are Gaussian (True) or control cells (False).
+    :type num_training_steps: class:`bool`
     """
 
     def __init__(
@@ -72,6 +75,7 @@ class FlowMatching:
         coupling_kwargs: dict[str, Any] | None = None,
         time_sampler: Callable[[Sequence[int], Any], Tensor] = torch.rand,
         device_id: Literal["cuda", "cpu"] = "cuda",
+        generate_from_noise: bool = False
     ) -> None:
         # initialize the Flow model 
         if flow_type == "constant_noise":
@@ -112,6 +116,7 @@ class FlowMatching:
         self.data_manager = None
         self.train_data = None
         self.validation_data = None
+        self.generate_from_noise = generate_from_noise
 
     def prepare_train_data(
         self,
@@ -125,8 +130,6 @@ class FlowMatching:
         target_covariates: dict[str, Literal["one_hot", "label", "identity"]] | None = None,
         target_covariates_in_obsm: dict[str, bool] | None = None,
         target_covariates_kwargs: dict[str, Any] | None = None,
-    ) -> None:
-        """Prepares the data for training and initializes the :attr:`FlowMatching.data_manager` and :attr:`FlowMatching.train_data` attributes of the model.
 
         :param train_adata: An instance of :class:`anndata.AnnData` containing the training data.
         :type train_adata: class:`anndata.AnnData`
@@ -168,6 +171,7 @@ class FlowMatching:
         :param target_covariates_kwargs:
         :type target_covariates_kwargs: class `dict[str, Any] | None`
         """
+        has_controls = (not self.generate_from_noise)
         data_manager = DataManager(
             train_adata,
             sample_rep=sample_rep,
@@ -179,6 +183,7 @@ class FlowMatching:
             target_covariates=target_covariates,
             target_covariates_in_obsm=target_covariates_in_obsm,
             target_covariates_kwargs=target_covariates_kwargs,
+            has_controls= has_controls
         )
         train_data = data_manager.get_train_data(train_adata)
 
@@ -280,7 +285,7 @@ class FlowMatching:
         posterior_on_cond_vars_update_step: int | None = None,
         posterior_on_perts_update_step: int | None = None,
         posterior_on_latent_perts_update_step: int | None = None,
-        gamma_fn: Callable[[Tensor, Tensor], Tensor] | None = None,
+        gamma_fn: Callable[[Tensor, Tensor], Tensor] | None = None
     ) -> None:
         """Trains the model.
 
@@ -354,6 +359,7 @@ class FlowMatching:
             train_batch_size,
             state_transforms,
             self.device_id,
+            self.generate_from_noise
         )
 
         self.validation_dataloader = None
@@ -364,6 +370,7 @@ class FlowMatching:
                 validation_batch_size,
                 state_transforms,
                 self.device_id,
+                self.generate_from_noise
             )
 
         self.trainer.fit(

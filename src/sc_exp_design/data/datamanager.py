@@ -33,6 +33,7 @@ class DataManager:
         target_covariates: dict[str, Literal["one_hot", "label", "identity"] | None] | None = None,
         target_covariates_in_obsm: dict[str, bool] | None = None,
         target_covariates_kwargs: dict[str, Any] | None = None,
+        has_controls: bool = True
     ) -> None:
         """
         `self.perturbations`:
@@ -59,6 +60,7 @@ class DataManager:
         self.adata = adata
         self.sample_rep = sample_rep
         self.control_key = control_key
+        self.has_controls = has_controls
 
         # preparing the attributes
         if perturbations is not None:
@@ -168,15 +170,15 @@ class DataManager:
         :return: The primary state representation of cells.
         :rtype: TensorLike
 
-        :raises ValueError: If `sample_rep` is specified but not found in `adata.layers`.
+        :raises ValueError: If `sample_rep` is specified but not found in `adata.obsm`.
         """
         if self.sample_rep is None:
             state_data = adata.X
         else:
-            if self.sample_rep not in adata.layers.keys():
-                msg = f"{self.sample_rep=} not found in `adata.layers` (Keys found: {list(adata.layers.keys())})"
+            if self.sample_rep not in adata.obsm.keys():
+                msg = f"{self.sample_rep=} not found in `adata.obsm` (Keys found: {list(adata.obsm.keys())})"
                 raise ValueError(msg)
-            state_data = adata.layers[self.sample_rep]
+            state_data = adata.obsm[self.sample_rep]
         return state_data
 
     def __get_perturbation_data(
@@ -323,4 +325,3 @@ class DataManager:
         target_perturbation_repr = None
         if self.load_target_covariates:
             target_perturbation_repr = self.__get_target_data(adata)
-        return TrainData(adata, self.control_key, state_data, perturbation_data, target_perturbation_repr, self.perturbations_with_rep)
