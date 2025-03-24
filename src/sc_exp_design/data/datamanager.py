@@ -237,7 +237,7 @@ class DataManager:
                     perturbation_data[covariate_cov_key] = covariate_data
         return perturbation_data
 
-    def __get_perturbation_target_rep_data(
+    def __get_target_data(
         self,
         adata: anndata.AnnData,
     ) -> dict[str, TensorLike]:
@@ -322,5 +322,5 @@ class DataManager:
         # condition target representation
         target_perturbation_repr = None
         if self.load_target_covariates:
-            target_perturbation_repr = self.__get_perturbation_target_rep_data(adata)
+            target_perturbation_repr = self.__get_target_data(adata)
         return TrainData(adata, self.control_key, state_data, perturbation_data, target_perturbation_repr, self.perturbations_with_rep)
