@@ -29,10 +29,10 @@ class DataManager:
         perturbations: str | Sequence[str] | None = None,
         perturbation_covariates: dict[str, str | Sequence[str]] | None = None,
         perturbation_reps: dict[str, str | Sequence[str]] | None = None,
-        use_perturbation_target_repr: bool = False,
-        perturbation_target_covariates: dict[str, Literal["one_hot", "label", "identity"] | None] | None = None,
-        perturbation_target_covariates_in_obsm: dict[str, bool] | None = None,
-        perturbation_target_covariates_kwargs: dict[str, Any] | None = None,
+        load_target_covariates: bool = False,
+        target_covariates: dict[str, Literal["one_hot", "label", "identity"] | None] | None = None,
+        target_covariates_in_obsm: dict[str, bool] | None = None,
+        target_covariates_kwargs: dict[str, Any] | None = None,
         has_controls: bool = True
     ) -> None:
         """
@@ -99,23 +99,23 @@ class DataManager:
         self.perturbations = perturbations
         self.perturbation_covariates = perturbation_covariates
         self.perturbation_reps = perturbation_reps
-        self.use_perturbation_target_repr = use_perturbation_target_repr
+        self.load_target_covariates = load_target_covariates
 
         # when we need some target representation for the conditions
-        if self.use_perturbation_target_repr:
-            msg = f"With {self.use_perturbation_target_repr=} you need to specify the target covariate reprs in `perturbation_target_reprs`, `None` found"
-            assert perturbation_target_covariates is not None, msg
-            if perturbation_target_covariates_kwargs is None:
-                perturbation_target_covariates_kwargs = {}
-                for target_covariate, target_covariate_rep in perturbation_target_covariates.items():
-                    perturbation_target_covariates_kwargs[target_covariate] = {}
+        if self.load_target_covariates:
+            msg = f"With {self.load_target_covariates=} you need to specify the target covariate reprs in `target_covariates`, `None` found"
+            assert target_covariates is not None, msg
+            if target_covariates_kwargs is None:
+                target_covariates_kwargs = {}
+                for target_covariate, target_covariate_rep in target_covariates.items():
+                    target_covariates_kwargs[target_covariate] = {}
 
-            if perturbation_target_covariates_in_obsm is None:
-                perturbation_target_covariates_in_obsm = ()
+            if target_covariates_in_obsm is None:
+                target_covariates_in_obsm = ()
 
-        self.perturbation_target_covariates = perturbation_target_covariates
-        self.perturbation_target_covariates_in_obsm = perturbation_target_covariates_in_obsm
-        self.perturbation_target_covariates_kwargs = perturbation_target_covariates_kwargs
+        self.target_covariates = target_covariates
+        self.target_covariates_in_obsm = target_covariates_in_obsm
+        self.target_covariates_kwargs = target_covariates_kwargs
 
     @property
     def perturbations_with_rep(
@@ -239,7 +239,7 @@ class DataManager:
                     perturbation_data[covariate_cov_key] = covariate_data
         return perturbation_data
 
-    def __get_perturbation_target_rep_data(
+    def __get_target_data(
         self,
         adata: anndata.AnnData,
     ) -> dict[str, TensorLike]:
@@ -256,22 +256,22 @@ class DataManager:
         # dictionary storing representations for perturbation target covariates
         out_dict = {}
         
-        for condition_target_covariate, condition_target_covariate_rep in self.perturbation_target_covariates.items():
+        for condition_target_covariate, condition_target_covariate_rep in self.target_covariates.items():
             # if covariate is stored in adata.obsm we retrieve its representation directly
-            if condition_target_covariate in self.perturbation_target_covariates_in_obsm:
+            if condition_target_covariate in self.target_covariates_in_obsm:
                 # sanity check
                 msg = f"{condition_target_covariate} not found in `adata.obsm.keys()`"
                 assert condition_target_covariate in adata.obsm.keys(), msg
                 condition_target_covariate_data = adata.obsm[condition_target_covariate]
                 out_dict[condition_target_covariate] = condition_target_covariate_data
             else:
-                condition_target_covariate_kwargs = self.perturbation_target_covariates_kwargs[condition_target_covariate]
+                condition_target_covariate_kwargs = self.target_covariates_kwargs[condition_target_covariate]
                 # sanity check
                 msg = f"{condition_target_covariate} not found in `adata.obs.columns`"
                 assert condition_target_covariate in adata.obs.columns, msg
 
-                covariate_target_rep = self.perturbation_target_covariates[condition_target_covariate]
-                covariate_target_rep_kwargs = self.perturbation_target_covariates_kwargs[condition_target_covariate]
+                covariate_target_rep = self.target_covariates[condition_target_covariate]
+                covariate_target_rep_kwargs = self.target_covariates_kwargs[condition_target_covariate]
 
                 # Collect the condition target covariate from the adata.obs 
                 covariate_data = adata.obs[[condition_target_covariate]].values
@@ -323,6 +323,5 @@ class DataManager:
             perturbation_data = self.__get_perturbation_data(adata)
         # condition target representation
         target_perturbation_repr = None
-        if self.use_perturbation_target_repr:
-            target_perturbation_repr = self.__get_perturbation_target_rep_data(adata)
-        return TrainData(adata, self.control_key, state_data, perturbation_data, target_perturbation_repr, self.perturbations_with_rep, self.has_controls)
+        if self.load_target_covariates:
+            target_perturbation_repr = self.__get_target_data(adata)

@@ -126,12 +126,10 @@ class FlowMatching:
         perturbations: str | Sequence[str] | None = None,
         perturbation_covariates: dict[str, str | Sequence[str]] | None = None,
         perturbation_reps: dict[str, str | Sequence[str]] | None = None,
-        use_perturbation_target_repr: bool = False,
-        perturbation_target_covariates: dict[str, Literal["one_hot", "label", "identity"]] | None = None,
-        perturbation_target_covariates_in_obsm: dict[str, bool] | None = None,
-        perturbation_target_covariates_kwargs: dict[str, Any] | None = None
-    ) -> None:
-        """Prepares the data for training and initializes the :attr:`FlowMatching.data_manager` and :attr:`FlowMatching.train_data` attributes of the model.
+        load_target_covariates: bool = False,
+        target_covariates: dict[str, Literal["one_hot", "label", "identity"]] | None = None,
+        target_covariates_in_obsm: dict[str, bool] | None = None,
+        target_covariates_kwargs: dict[str, Any] | None = None,
 
         :param train_adata: An instance of :class:`anndata.AnnData` containing the training data.
         :type train_adata: class:`anndata.AnnData`
@@ -161,17 +159,17 @@ class FlowMatching:
             the perturbations), defaults to `None`.
         :type perturbation_reps: class:`dict[str, str | Sequence[str]] | None`
 
-        :param use_perturbation_target_repr: Whether to use some target representation for the perturbations which to perform inference on, defaults t o `False`
-        :type use_perturbation_target_repr: class:`bool`
+        :param load_target_covariates: Whether to use some target representation for the perturbations which to perform inference on, defaults t o `False`
+        :type load_target_covariates: class:`bool`
 
-        :param perturbation_target_covariates:
-        :type perturbation_target_covariates_in_obsm: class:`dict[str, bool] | None`
+        :param target_covariates:
+        :type target_covariates_in_obsm: class:`dict[str, bool] | None`
 
-        :param perturbation_target_covariates_in_obsm:
-        :type perturbation_target_covariates_in_obsm: class:`dict[str, bool] | None`
+        :param target_covariates_in_obsm:
+        :type target_covariates_in_obsm: class:`dict[str, bool] | None`
 
-        :param perturbation_target_covariates_kwargs:
-        :type perturbation_target_covariates_kwargs: class `dict[str, Any] | None`
+        :param target_covariates_kwargs:
+        :type target_covariates_kwargs: class `dict[str, Any] | None`
         """
         has_controls = (not self.generate_from_noise)
         data_manager = DataManager(
@@ -181,10 +179,10 @@ class FlowMatching:
             perturbations=perturbations,
             perturbation_covariates=perturbation_covariates,
             perturbation_reps=perturbation_reps,
-            use_perturbation_target_repr=use_perturbation_target_repr,
-            perturbation_target_covariates=perturbation_target_covariates,
-            perturbation_target_covariates_in_obsm=perturbation_target_covariates_in_obsm,
-            perturbation_target_covariates_kwargs=perturbation_target_covariates_kwargs,
+            load_target_covariates=load_target_covariates,
+            target_covariates=target_covariates,
+            target_covariates_in_obsm=target_covariates_in_obsm,
+            target_covariates_kwargs=target_covariates_kwargs,
             has_controls= has_controls
         )
         train_data = data_manager.get_train_data(train_adata)

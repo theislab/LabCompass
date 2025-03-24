@@ -105,8 +105,8 @@ class TestInverseUtils:
             control_key="control",
             perturbations=("treatment", "cell_type", ),
             perturbation_reps={"treatment": "treatment_shift"},
-            use_perturbation_target_repr=True,
-            perturbation_target_covariates={"cell_type": "label"},
+            load_target_covariates=True,
+            target_covariates={"cell_type": "label"},
         )
 
         # configure velocity field
