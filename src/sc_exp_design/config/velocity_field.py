@@ -174,139 +174,6 @@ class NeuralVelocityFieldConfig:
         Sets the attribe :attr:`MLPBlock.final_activation_class` of :attr:`NeuralVelocityField.decoder`, defaults to `torch.nn.Identity`.
     :type decoder_final_activation_class: class:`torch.nn.Module`
 
-    ## Score Field Settings
-
-    :param learn_score_field: Whether to lean an approximation to the score while learning the velocity field. The score
-        can then be used to turn the ODE in an SDE by equating the Continuity Equation (ODE) to the corresponding
-        Forward Fokker-Plank Equation, for the same initial conditions. While the trajectory will differ,
-        the probability paths will remain unchanged, thus theoretically obtaining the same distributional
-        properties for the generated data. In case initialized, it will share the same latent representation
-        as the one used for the velocity field (i.e.: it will take as an input the latent states, concatenated with the current time step
-        and possibly the (encoded) conditions), defaults to `"False"`.
-    :type learn_score_field: class:`bool`
-
-    :param score_field_freeze_grads: Whether to backpropagate the gradients to the upstream modules, thus optimizing also the latent reprsentation
-        for the task of approximating the score field along with the velocity field, deafults to `True`.
-    :type score_field_freeze_grads: class:`bool`
-
-    :param score_hidden_dims: The hidden dimensions for the (optional) score encoder.
-        Sets the attribute :attr:`MLPBlock.hidden_dims` of `NeuralVelocityField.score_decoder`, defaults to `(128, 64, 32)`.
-    :type score_hidden_dims: class:`Sequence[int]`
-
-    :param score_use_batchnorm: Whether to use batch normalization when decoding the joint latent representation to the approximate score field.
-        Sets the attribe :attr:`MLPBlock.use_batchnorm` of :attr:`NeuralVelocityField.score_decoder`, defaults to `False`.
-    :type score_use_batchnorm: class:`bool`
-
-    :param score_use_dropout: Whether to use dropout when decoding the joint latent representation to the approximate score field.
-        Sets the attribe :attr:`MLPBlock.use_dropout` of :attr:`NeuralVelocityField.score_decoder`, defaults to `False`.
-    :type score_use_dropout: class:`bool`
-
-    :param score_dropout_rate: The dropout rate using when :attr:`NeuralVelocityFieldConfig.score_use_dropout` is `True`.
-        Sets the attribe :attr:`MLPBlock.dropout_rate` of :attr:`NeuralVelocityField.score_decoder`, defaults to `0.0`.
-    :type score_dropout_rate: class:`float`
-
-    :param score_activation_class: A reference to a :class:`torch.nn.Module` used as activation for the hidden layers
-        of the (optional) score field decoder. Note that you should pass a class and not an instance.
-        Sets the attribe :attr:`MLPBlock.activation_class` of :attr:`NeuralVelocityField.score_decoder`, defaults to `torch.nn.ELU`.
-    :type score_activation_class: class:`torch.nn.Module`
-
-    :param score_final_activation_class: A reference to a :class:`torch.nn.Module` used as activation for the output (final) layer
-        of the (optional) score field decoder. Note that you should pass a class and not an instance.
-        Sets the attribe :attr:`MLPBlock.final_activation_class` of :attr:`NeuralVelocityField.score_decoder`, defaults to `torch.nn.Identity`.
-    :type score_final_activation_class: class:`torch.nn.Module`
-
-    ## Endpoints Inference Settings
-
-    :param lean_posterior_on_cond_vars: Whether to learn an approximate posterior distribution over the conditioning variables (i.e.: endpoints)
-        of the flow, defaults to `False`.
-    :type lean_posterior_on_cond_vars: class:`bool`
-
-    :param endpoints_approximate_posterior_freeze_grads: Whether to backpropagate the gradients to the upstream modules, thus optimizing also the latent reprsentation
-        for the task of approximating a posterior on the conditioning variables (endpoints). It will only have and effect when using the latent representation,
-        (i.e.: :attr:`NeuralVelocityFieldConfig.endpoints_approximate_posterior_use_latent_repr` is `True`), deafults to `True`.
-    :type endpoints_approximate_posterior_freeze_grads: class:`bool`
-
-    :param endpoints_approximate_posterior_use_latent_repr: Whether to use the latent representation or the orignal one when doing inference
-        on the conditioning variables (endpoints), defaults to `True`.
-    :type endpoints_approximate_posterior_use_latent_repr: class:`bool`
-
-    :param src_noise_model: The noise model used to probabilistically decode the source state, defaults to `"gaussian"`.
-    :type src_noise_model: class:`Literal["gaussian", "neg_bin"]`
-
-    :param src_approximate_posterior_kwargs: Dictionary with key-value pairs given by the optional keyword arguments for the neural noise model used to decode the source state.
-        Only supports Gaussian Noise Models for now. The :attr:`<NoiseModel>.latent_dim` will be inferred internally
-        by the :class:`NeuralVelocityField` from either :attr:`NeuralVelocityField.joint_original_dim`, when :attr:`NeuralVelocityFieldConfig.src_approximate_posterior_kwargs`
-        is `False`, or from :attr:`NeuralVelocityField.joint_latent_dim` otherwise, while :attr:`<NoiseModel>.output_dim` will be simply given by
-        :attr:`NeuralVelocityField.flow_dim` (that is, we assume for now that source and target lie in the same space as the flow, which may not always be the case, for example
-        when using GENOT the source may lie in a different space).
-    :type src_approximate_posterior_kwargs: class:`dict[str, Any] | None`
-
-    :param tgt_noise_model: The noise model used to probabilistically decode the source state, defaults to `"gaussian"`.
-    :type tgt_noise_model: class:`Literal["gaussian", "neg_bin"]`
-
-    :param tgt_approximate_posterior_kwargs: Dictionary with key-value pairs given by the optional keyword arguments for the neural noise model used to decode the source state.
-        Only supports Gaussian Noise Models for now. The :attr:`<NoiseModel>.latent_dim` will be inferred internally
-        by the :class:`NeuralVelocityField` from either :attr:`NeuralVelocityField.joint_original_dim`, when :attr:`NeuralVelocityFieldConfig.src_approximate_posterior_kwargs`
-        is `False`, or from :attr:`NeuralVelocityField.joint_latent_dim` otherwise, while :attr:`<NoiseModel>.output_dim` will be simply given by
-        :attr:`NeuralVelocityField.flow_dim`.
-    :type tgt_approximate_posterior_kwargs: class:`dict[str, Any]`
-
-    ## Perturbation Inference Settings
-
-    :param lean_posterior_on_perts: Whether to lean an approximate posterior distribution on some target representation of the perturbations.é
-    :type lean_posterior_on_perts: class:`bool`
-
-    :param pert_approximate_posterior_freeze_grads: Whether to backpropagate the gradients to the upstream modules, thus optimizing also the latent reprsentation
-        for the task of approximating a posterior on the target perturbation covariate, defaults to `True`.
-    :type pert_approximate_posterior_freeze_grads: class:`bool`
-
-    :param pert_approximate_posterior_input_type: The input used to predict the posterior distribution on the applied perturbations, defaults to `"endpoints"`.
-    :type pert_approximate_posterior_input_type: class:`Literal["latent", "original", "endpoints", "one_step_prediction"]`
-
-    :param pert_target_covariates_output_dims: Dictionary specifying the output dimensionality for each of the perturbation target covariates.
-
-        Should have the same keys as :attr:`NeuralVelocityFieldConfig.pert_noise_model`, :attr:`NeuralVelocityFieldConfig.pert_approximate_posterior_kwargs`
-        and :attr:`NeuralVelocityFieldConfig.pert_cov_estimation_modes`, throws an :class:`AssertionError` otherwise, defaults to `None`.
-    :type pert_target_covariates_output_dims: class:`dict[str, int] | None`
-
-    :param pert_noise_model: Dictionary specifying the noise model used to decode each target perturbation covariate.
-
-        Should have the same keys as :attr:`NeuralVelocityFieldConfig.pert_target_covariates_output_dims`, :attr:`NeuralVelocityFieldConfig.pert_approximate_posterior_kwargs`
-        and :attr:`NeuralVelocityFieldConfig.pert_cov_estimation_modes`, throws an :class:`AssertionError` otherwise, defaults to `None`.
-    :type pert_noise_model: class:`dict[str, Literal["gaussian", "neg_bin"]] | None`
-
-    :param pert_approximate_posterior_kwargs: Dictionary with keys given by a :class:`str` with the identifier of the
-        target perturbation covariate to decode and values given by dictionary specifying the optional keyword arguments for the neural noise model used to decode
-        target perturbation covariate. Only supports Gaussian Noise Models for now. The :attr:`<NoiseModel>.latent_dim` will be inferred internally
-        by the :class:`NeuralVelocityField` from either :attr:`NeuralVelocityField.joint_original_dim`, when :attr:`NeuralVelocityFieldConfig.src_approximate_posterior_kwargs`
-        is `False`, or from :attr:`NeuralVelocityField.joint_latent_dim` otherwise, while :attr:`<NoiseModel>.output_dim` will be simply given by
-        the corresponding value in :attr:`NeuralVelocityFieldConfig.pert_target_covariates_output_dims`.
-
-        Should have the same keys as :attr:`NeuralVelocityFieldConfig.pert_target_covariates_output_dims`, :attr:`NeuralVelocityFieldConfig.pert_noise_model`
-        and :attr:`NeuralVelocityFieldConfig.pert_cov_estimation_modes`, throws an :class:`AssertionError` otherwise, defaults to `None`.
-    :type pert_approximate_posterior_kwargs: class:`dict[str, dict[str, Any]] | None`
-
-    :param pert_cov_estimation_modes: Specifies the covariance estimation mode when decoding the target perturbation covariates using a Gaussian noise model.
-
-        Should have the same keys as :attr:`NeuralVelocityFieldConfig.pert_target_covariates_output_dims`, :attr:`NeuralVelocityFieldConfig.pert_noise_model`
-        and :attr:`NeuralVelocityFieldConfig.pert_approximate_posterior_kwargs`, throws an :class:`AssertionError` otherwise, defaults to `None`.
-    :type pert_cov_estimation_modes: class:`dict[str, Literal["isotropic", "anisotropic"] | None] | None`
-
-    ## Latent Perturbation Inference Settings
-
-    :param learn_posterior_on_latent_perts: Whether to lean an approximate posterior on the latent perturbations by using the endpoints (conditioning variables).
-        Only effective when :attr:`NeuralVelocityFieldConfig.encode_conditions` is `True`.
-        For now, it only supports the use of :class:`MLPGaussianNoiseModel`, defaults to `False`.
-    :type learn_posterior_on_latent_perts: class:`bool`
-
-    :param latent_perts_posterior_freeze_grads: Whether to backpropagate the gradients to the upstream modules, thus optimizing also the latent reprsentation
-        for the task of approximating a posterior on the latent representation for the conditions, defaults to `True`.
-    :type latent_perts_posterior_freeze_grads: class:`bool`
-
-    :param latent_perts_approximate_posterior_kwargs: The :attr:`<NoiseModel>.latent_dim` will be inferred internally
-        by the :class:`NeuralVelocityField` from :attr:`NeuralVelocityField.flow_dim` (namely `2*velocity_field.flow_dim`),
-        while :attr:`<NoiseModel>.output_dim` will be simply given by :attr:`ConditionEncoder.latent_dim` of :attr:`NeuralVelocityField.condition_encoder`, defaults to `None`.
-    :type latent_perts_approximate_posterior_kwargs: class`dict[str, Any]`
     """
 
     flow_dim: int
@@ -315,6 +182,7 @@ class NeuralVelocityFieldConfig:
     state_encoder_mlp_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
     encode_time: bool = False
     time_encoder_input_dim: int = 1
+    time_encoder_output_dim: int = 10
     time_encoder_mlp_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
     use_guidance: bool = True
     encode_conditions: bool = False
@@ -325,61 +193,12 @@ class NeuralVelocityFieldConfig:
     perturbation_pooling_kwargs: dict[str, Any] | None = None
     perturbation_layers_after_pooling: LayersDict | None = None
     decoder_mlp_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
-    learn_score_field: bool = False
-    score_field_freeze_grads: bool = True
-    score_mlp_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
-    learn_posterior_on_cond_vars: bool = False
-    endpoints_approximate_posterior_freeze_grads: bool = True
-    endpoints_approximate_posterior_use_latent_repr: bool = True
-    src_noise_model: Literal["gaussian", "neg_bin"] = "gaussian"
-    src_approximate_posterior_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
-    tgt_noise_model: Literal["gaussian", "neg_bin"] = "gaussian"
-    tgt_approximate_posterior_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
-    learn_posterior_on_perts: bool = False
-    pert_approximate_posterior_freeze_grads: bool = True
-    pert_approximate_posterior_input_type: Literal["latent", "original", "endpoints", "one_step_prediction"] = "endpoints"
-    pert_target_covariates_output_dims: dict[str, int] | None = None
-    pert_noise_model: dict[str, Literal["gaussian", "neg_bin"]] | None = None
-    pert_approximate_posterior_kwargs: dict[str, dict[str, Any]] | None = None
-    pert_cov_estimation_modes: dict[str, Literal["isotropic", "anisotropic"] | None] = None
-    learn_posterior_on_latent_perts: bool = False
-    latent_perts_posterior_freeze_grads: bool = True
-    latent_perts_approximate_posterior_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
-
+    
     def __post_init__(self) -> None:
         """
         Compatibility checks and edits for a valid configuration 
         """
-        # sanity checks posterior latent perturbations
-        if self.learn_posterior_on_latent_perts and (not self.encode_conditions):
-            msg = f"With {self.learn_posterior_on_latent_perts=}, `self.encode_condition` should be set to `True`, found {self.encode_conditions}. Setting `learn_posterior_on_latent_perts` to `False`."
-            logger.warning(msg)
-            self.learn_posterior_on_latent_perts = False
-            
-        # sanity check posterior on perturbations
-        if self.learn_posterior_on_perts:
-            msg = f"With {self.learn_posterior_on_perts=}, you need to pass the target output dims in `self.pert_target_covariates_output_dims`, found `None`."
-            assert self.pert_target_covariates_output_dims is not None, msg
-            if self.pert_noise_model is None:
-                msg = "`self.pert_noise_model` is `None`. Setting it to a dictionary with the same keys as `self.pert_target_covariates_output_dims` and values `None` (i.e.: simply using `MLPBlock`)"
-                logger.warning(msg)
-                self.pert_noise_model = {key: None for key in self.pert_target_covariates_output_dims.keys()}
-            if self.pert_approximate_posterior_kwargs is None:
-                msg = "`self.pert_approximate_posterior_kwargs` is `None`. Setting it to a dictionary with the same keys as `self.pert_target_covariates_output_dims` and emty dictionaries as values (i.e.: ising default class configurations)"
-                logger.warning(msg)
-                self.pert_approximate_posterior_kwargs = {
-                    key: {} for key in self.pert_target_covariates_output_dims.keys()
-                }
-            if self.pert_cov_estimation_modes is None:
-                msg = "`self.pert_approximate_posterior_kwargs` is `None`. Setting it to a dictionary with the same keys as `self.pert_target_covariates_output_dims` and emty dictionaries as values (i.e.: ising default class configurations)"
-                logger.warning(msg)
-                self.pert_cov_estimation_modes = {key: None for key in self.pert_target_covariates_output_dims.keys()}
-            msg = f"Dictionaries `self.pert_approximate_posterior_kwargs`, `self.pert_target_covariates_output_dims` and `self.pert_noise_model` are expected to have the same keys (found {self.pert_approximate_posterior_kwargs.keys()=}, {self.pert_target_covariates_output_dims.keys()=}, {self.pert_noise_model.keys()=})"
-            assert set(self.pert_approximate_posterior_kwargs.keys()) == set(
-                self.pert_target_covariates_output_dims.keys()
-            ), msg
-            assert set(self.pert_approximate_posterior_kwargs.keys()) == set(self.pert_noise_model.keys()), msg
-            
+  
         # sanity check on condition encoder
         if self.use_guidance:
             msg = f"With {self.use_guidance=} you need to pass a dictionary in the proper format as the `self.perturbation_layers_before_pooling` attribute, found `None`"

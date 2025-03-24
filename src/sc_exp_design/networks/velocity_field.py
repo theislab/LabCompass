@@ -55,8 +55,6 @@ class NeuralVelocityField(BaseModule):
             nn.Module: The model moved to the specified device.
         """
         self = super().to(device)
-        if self.config.learn_posterior_on_perts:
-            self.pert_approximate_posterior = self.pert_approximate_posterior.to(device)
         if self.condition_encoder is not None:
             self.condition_encoder = self.condition_encoder.to(device)
         return self
@@ -71,8 +69,6 @@ class NeuralVelocityField(BaseModule):
             Iterator[nn.Parameter]: Model parameters.
         """
         parameters = [super().parameters()]
-        if self.config.learn_posterior_on_perts:
-            parameters.append(self.pert_approximate_posterior.parameters())
         if self.condition_encoder is not None:
             parameters.append(self.condition_encoder.parameters())
         parameters = itertools.chain(*parameters)
@@ -92,8 +88,6 @@ class NeuralVelocityField(BaseModule):
             nn.Module: The model in training mode.
         """
         self = super().train(mode)
-        if self.config.learn_posterior_on_perts:
-            self.pert_approximate_posterior = self.pert_approximate_posterior.train(mode)
         if self.condition_encoder is not None:
             self.condition_encoder = self.condition_encoder.train(mode)
         return self
@@ -153,44 +147,6 @@ class NeuralVelocityField(BaseModule):
             self.config.flow_dim,
             **self.config.decoder_mlp_kwargs
         )
-        # score
-        self.score_decoder = None
-        if self.config.learn_score_field:
-            self.score_decoder = MLPBlock(
-                self.config.joint_latent_dim,
-                self.config.flow_dim,
-                **self.config.score_mlp_kwargs,
-            )
-        # inference on conditioning vars 
-        self.endpoints_approximate_posterior = None
-        if self.config.learn_posterior_on_cond_vars:
-            self.endpoints_approximate_posterior = EndpointsApproximatePosterior(
-                self.config.cond_vars_input_dim,
-                self.config.flow_dim,
-                freeze_grads=self.config.endpoints_approximate_posterior_freeze_grads,
-                src_noise_model=self.config.src_noise_model,
-                src_approximate_posterior_kwargs=self.config.src_approximate_posterior_kwargs,
-                tgt_noise_model=self.config.tgt_noise_model,
-                tgt_approximate_posterior_kwargs=self.config.tgt_approximate_posterior_kwargs,
-            )
-        # inference on perturbations
-        self.pert_approximate_posterior = None
-        if self.config.learn_posterior_on_perts:
-            self.pert_approximate_posterior = PerturbationApproximatePosterior(
-                self.config.pert_input_dim,
-                freeze_grads=self.config.pert_approximate_posterior_freeze_grads,
-                target_output_dims=self.config.pert_target_covariates_output_dims,
-                noise_models=self.config.pert_noise_model,
-                covariate_kwargs=self.config.pert_approximate_posterior_kwargs,
-            )
-        # inference on latent perturbations
-        self.latent_pert_approximate_posterior = None
-        if self.config.learn_posterior_on_latent_perts:
-            self.latent_pert_approximate_posterior = MLPGaussianNoiseModel(
-                2 * self.config.flow_dim,
-                self.condition_encoder.latent_dim,
-                **self.config.latent_perts_approximate_posterior_kwargs,
-            )
 
     def forward(
         self,
@@ -256,57 +212,6 @@ class NeuralVelocityField(BaseModule):
         # creating output dictionary
         output_dict = {VFStepFields.VF: vf, VFStepFields.LATENT_REPR: latent_concat, VFStepFields.LATENT_STATE: xt_latent}
 
-        # preparing the endpoints for inference on perturbation
-        endpoints = None
-        if self.config.learn_posterior_on_perts and (self.config.pert_approximate_posterior_input_type == "endpoints"):
-            if (source is not None) and (target is not None):
-                endpoints = torch.concatenate((source, target), dim=1)
-
-        # one step prediction for inference on perturbation
-        one_step_prediction = None
-        if self.config.learn_posterior_on_perts and (self.config.pert_approximate_posterior_input_type == "one_step_prediction"):
-            if source is not None:
-                one_step_prediction = xt + (1 - t)*vf 
-                one_step_prediction = torch.concatenate((source, one_step_prediction), dim=1)
-
-        # forward pass on neural score field
-        if self.config.learn_score_field:
-            score_decoder_input = latent_concat.clone()
-            if self.config.score_field_freeze_grads:
-                score_decoder_input = score_decoder_input.detach()
-            score = self.score_decoder(latent_concat)
-            output_dict[VFStepFields.SCORE] = score
-        if self.config.encode_time:
-            output_dict[VFStepFields.LATENT_TIME] = t_latent
-        if self.config.use_guidance and self.config.encode_conditions:
-            output_dict[VFStepFields.LATENT_PERTURBATION] = condition_latent
-
-        # optional inference on conditioning variables
-        if self.config.learn_posterior_on_cond_vars:
-            if self.config.endpoints_approximate_posterior_use_latent_repr:
-                input_condition_var_posterior = latent_concat
-            else:
-                input_condition_var_posterior = original_concat
-            cond_vars_output_dict = self.endpoints_approximate_posterior(input_condition_var_posterior)
-            output_dict.update(cond_vars_output_dict)
-
-        # optional inference on perturbations
-        if self.config.learn_posterior_on_perts:
-            pert_output_dict = {}
-            # with endpoints
-            if (endpoints is not None) and (self.config.pert_approximate_posterior_input_type == "endpoints"):
-                pert_output_dict[VFStepFields.PERTURBATION_PARAMS] = self.pert_approximate_posterior(endpoints)
-            # with original representation
-            if (original_concat is not None) and (self.config.pert_approximate_posterior_input_type == "original"):
-                pert_output_dict[VFStepFields.PERTURBATION_PARAMS] = self.pert_approximate_posterior(original_concat)
-            # with latent representation
-            if (latent_concat is not None) and (self.config.pert_approximate_posterior_input_type == "latent"):
-                pert_output_dict[VFStepFields.PERTURBATION_PARAMS] = self.pert_approximate_posterior(latent_concat)
-            # with one step prediction
-            if (one_step_prediction is not None) and (self.config.pert_approximate_posterior_input_type == "one_step_prediction"):
-                pert_output_dict[VFStepFields.PERTURBATION_PARAMS] = self.pert_approximate_posterior(one_step_prediction)
-            output_dict.update(pert_output_dict)
-
         return output_dict
 
     def vf(
@@ -328,27 +233,6 @@ class NeuralVelocityField(BaseModule):
         """
         return self.forward(t, xt, cond=cond)[VFStepFields.VF]
 
-    def score(
-        self,
-        t: Tensor,
-        xt: Tensor,
-        cond: dict[str, Tensor] | None = None,
-    ) -> Tensor:
-        """
-        Computes the score given time and state.
-        
-        Args:
-            t (Tensor): Time input.
-            xt (Tensor): State input.
-            cond (dict[str, Tensor] | None, optional): Conditioning variables. Defaults to None.
-        
-        Returns:
-            Tensor: Score output.
-        """
-        msg = f"{self.config.learn_score_field=}, hence no score field was initialized"
-        assert self.config.learn_score_field, msg
-        return self.forward(t, xt, cond=cond)[VFStepFields.SCORE]
-
     def get_vf_fn(
         self,
         cond: dict[str, Tensor] | None = None,
@@ -364,25 +248,12 @@ class NeuralVelocityField(BaseModule):
         Returns:
             Callable[[Tensor, Tensor], Tensor]: Velocity field function.
         """
-        # sanity checks
-        if gamma_fn is not None and (not self.config.learn_score_field):
-            msg = f"You passed `gamma_fn` for computing the diffusion coefficient with {self.config.learn_score_field=}. Deterministic sampling is set, hence it will be ignored."
-            logger.warning(msg)
-        if self.config.learn_score_field and gamma_fn is None:
-            msg = f"With {self.config.learn_score_field=} you should pass a `gamma_fn` to compute the diffusion coefficient, found `None`. Falling back to deterministic sampling by default."
-            logger.warning(msg)
-
         def vf_fn(
             t: Tensor,
             xt: Tensor,
         ) -> Tensor:
             """"""
-            vf = self.vf(t, xt, cond=cond)
-            if self.config.learn_score_field and gamma_fn is None:
-                score = self.score(t, xt, cond=cond)
-                gamma = gamma_fn(t, xt)
-                return vf + 0.5 * (gamma**2) * score
-            return vf
+            return self.vf(t, xt, cond=cond)
 
         return vf_fn
 
