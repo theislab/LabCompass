@@ -236,7 +236,6 @@ class NeuralVelocityField(BaseModule):
     def get_vf_fn(
         self,
         cond: dict[str, Tensor] | None = None,
-        gamma_fn: Callable[[Tensor, Tensor], Tensor] | None = None,
     ) -> Callable[[Tensor, Tensor], Tensor]:
         """
         Returns a velocity field function.

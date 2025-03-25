@@ -385,7 +385,6 @@ class FlowMatching:
         self,
         batch: dict[str, Tensor | dict[str, Tensor]],
         return_trajectory: bool = False,
-        gamma_fn: Callable[[Tensor, Tensor], Tensor] | None = None,
         no_grad: bool = True,
     ) -> dict[str, Tensor]:
         """Generates the predictions by integrating the dynamics with the learnt velocity field for a given initial condition
@@ -411,11 +410,10 @@ class FlowMatching:
             condition = batch[DataFields.PERTURBATION_DATA]
 
         # defining velocity function
-        vf = self.velocity_field.get_vf_fn(condition, gamma_fn=gamma_fn)
+        vf = self.velocity_field.get_vf_fn(condition)
         # initializing the sampler clss
         ode_solver = ODESolver(
             vf,
-            gamma_fn=gamma_fn,
             num_time_steps=self.num_time_steps,
             solver_kwargs=self.solver_kwargs,
             device_id=self.device_id,
