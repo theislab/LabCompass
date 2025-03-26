@@ -94,6 +94,9 @@ class PerturbationApproximatePosterior(BaseApproximatePosterior):
         target_output_dims: dict[str, int] | None = None,
         noise_models: dict[str, Literal["gaussian", "neg_bin"]] | None = None,
         covariate_kwargs: dict[str, dict[str, Any]] | None = None,
+        use_shared_representation: bool = False,
+        latent_dim: int = 1024,
+        encoder_mlp_kwargs: dict[str, Any] | None = None,
     ) -> None:
         """
         Initializes the PerturbationApproximatePosterior object.
@@ -112,8 +115,25 @@ class PerturbationApproximatePosterior(BaseApproximatePosterior):
         self.target_output_dims = target_output_dims
         self.noise_models = noise_models
         self.covariate_kwargs = covariate_kwargs
+        self.use_shared_representation = use_shared_representation
+        self.latent_dim = latent_dim
+        self.encoder_mlp_kwargs = encoder_mlp_kwargs  
 
         self._init_modules()
+
+    @property
+    def decoder_input_dim(
+        self,
+    ) -> None:
+        """
+        Returns the dimensionality of the decoder input based on whether shared representation is used.
+
+        :return: Dimensionality of the decoder input.
+        :rtype: int
+        """
+        if self.use_shared_representation:
+            return self.latent_dim
+        return self.input_dim
 
     def _init_modules(
         self,
@@ -129,6 +149,12 @@ class PerturbationApproximatePosterior(BaseApproximatePosterior):
         Raises:
             KeyError: If a covariate ID in `target_output_dims` does not have a corresponding noise model or configuration.
         """
+        if self.use_shared_representation:
+            self.encoder = MLPBlock(
+                self.input_dim,
+                self.latent_dim,
+                **self.encoder_mlp_kwargs,
+            )
         pert_approximate_posterior = {}
         for covariate_id, output_dim in self.target_output_dims.items():
             # retrieving configuration for target covariates
@@ -139,7 +165,7 @@ class PerturbationApproximatePosterior(BaseApproximatePosterior):
             # initializing the module
             pert_approximate_posterior_class = self._get_noise_model(pert_covariate_noise_model)
             cov_pert_approximate_posterior = pert_approximate_posterior_class(
-                self.input_dim,
+                self.decoder_input_dim,
                 output_dim,
                 **pert_covariate_approximate_posterior_kwargs,
             )
@@ -232,14 +258,20 @@ class PerturbationApproximatePosterior(BaseApproximatePosterior):
         Returns:
             dict[str, dict[str, Tensor]]: A dictionary containing the perturbation parameters for each covariate.
         """
+        # cloning to preserve the gradients
+        input_pert_posterior = input_pert_posterior.clone()
+        # freezing the grads
+        if self.freeze_grads:
+            input_pert_posterior = input_pert_posterior.detach()
+        
+        # optional encoder
+        if self.use_shared_representation:
+            input_pert_posterior = self.encoder(input_pert_posterior)
+
+        # decoder for each target covariate
         pert_output_dict = {}
         pert_posterior_params_dict = {}
         for cov_id, cov_decoder in self.pert_approximate_posterior.items():
-            # cloning to preserve the gradients
-            input_pert_posterior = input_pert_posterior.clone()
-            # freezing the grads
-            if self.freeze_grads:
-                input_pert_posterior = input_pert_posterior.detach()
             # forward pass on nn and storing the results
             pert_posterior_params = cov_decoder(input_pert_posterior)
             pert_posterior_params_dict[cov_id] = pert_posterior_params

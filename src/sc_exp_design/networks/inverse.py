@@ -370,6 +370,9 @@ class NeuralInverseModel(BaseConditionOptimizer):
         state_dim: int | None = None,
         perturbation_covariates_noise_models: Literal["gaussian", "neg_bin"] | dict[str, None | Literal["gaussian", "neg_bin"]] | None = None,
         perturbation_covariates_predictor_kwargs: dict[str, dict[str, Any]] | None = None,
+        perturbation_covariates_use_shared_representation: bool = False,
+        perturbation_covariates_latent_dim: int = 1024,
+        perturbation_encoder_mlp_kwargs: dict[str, Any] | None = None,
         device_id: Literal["cpu", "cuda"] = "cuda",
         **kwargs,
     ) -> None:
@@ -395,6 +398,9 @@ class NeuralInverseModel(BaseConditionOptimizer):
         self.state_dim = state_dim
         self.perturbation_covariates_noise_models = perturbation_covariates_noise_models
         self.perturbation_covariates_predictor_kwargs = perturbation_covariates_predictor_kwargs
+        self.perturbation_covariates_use_shared_representation = perturbation_covariates_use_shared_representation
+        self.perturbation_covariates_latent_dim = perturbation_covariates_latent_dim
+        self.perturbation_encoder_mlp_kwargs = perturbation_encoder_mlp_kwargs
 
         # initializing modules
         self._init_modules()
@@ -420,6 +426,9 @@ class NeuralInverseModel(BaseConditionOptimizer):
             target_output_dims=self.perturbation_covariates_dims,
             noise_models=self.perturbation_covariates_noise_models,
             covariate_kwargs=self.perturbation_covariates_predictor_kwargs,
+            use_shared_representation=self.perturbation_covariates_use_shared_representation
+            latent_dim=self.perturbation_covariates_latent_dim
+            encoder_mlp_kwargs=self.perturbation_encoder_mlp_kwargs
         )
 
     def parameters(
