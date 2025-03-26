@@ -160,17 +160,17 @@ class FlowMatching:
             the perturbations), defaults to `None`.
         :type perturbation_reps: class:`dict[str, str | Sequence[str]] | None`
 
-        :param use_perturbation_target_repr: Whether to use some target representation for the perturbations which to perform inference on, defaults t o `False`
-        :type use_perturbation_target_repr: class:`bool`
+        :param load_target_covariates: Whether to use some target representation for the perturbations which to perform inference on, defaults t o `False`
+        :type load_target_covariates: class:`bool`
 
-        :param perturbation_target_covariates:
-        :type perturbation_target_covariates_in_obsm: class:`dict[str, bool] | None`
+        :param target_covariates:
+        :type target_covariates_in_obsm: class:`dict[str, bool] | None`
 
-        :param perturbation_target_covariates_in_obsm:
-        :type perturbation_target_covariates_in_obsm: class:`dict[str, bool] | None`
+        :param target_covariates_in_obsm:
+        :type target_covariates_in_obsm: class:`dict[str, bool] | None`
 
-        :param perturbation_target_covariates_kwargs:
-        :type perturbation_target_covariates_kwargs: class `dict[str, Any] | None`
+        :param target_covariates_kwargs:
+        :type target_covariates_kwargs: class `dict[str, Any] | None`
         """
         has_controls = (not self.generate_from_noise)
         data_manager = DataManager(
@@ -184,7 +184,7 @@ class FlowMatching:
             target_covariates=target_covariates,
             target_covariates_in_obsm=target_covariates_in_obsm,
             target_covariates_kwargs=target_covariates_kwargs,
-            has_controls= has_controls
+            has_controls=has_controls,
         )
         train_data = data_manager.get_train_data(train_adata)
 
@@ -385,7 +385,6 @@ class FlowMatching:
         self,
         batch: dict[str, Tensor | dict[str, Tensor]],
         return_trajectory: bool = False,
-        gamma_fn: Callable[[Tensor, Tensor], Tensor] | None = None,
         no_grad: bool = True,
     ) -> dict[str, Tensor]:
         """Generates the predictions by integrating the dynamics with the learnt velocity field for a given initial condition
@@ -411,11 +410,10 @@ class FlowMatching:
             condition = batch[DataFields.PERTURBATION_DATA]
 
         # defining velocity function
-        vf = self.velocity_field.get_vf_fn(condition, gamma_fn=gamma_fn)
+        vf = self.velocity_field.get_vf_fn(condition)
         # initializing the sampler clss
         ode_solver = ODESolver(
             vf,
-            gamma_fn=gamma_fn,
             num_time_steps=self.num_time_steps,
             solver_kwargs=self.solver_kwargs,
             device_id=self.device_id,

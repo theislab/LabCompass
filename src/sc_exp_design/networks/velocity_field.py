@@ -10,6 +10,7 @@ from sc_exp_design.networks.blocks import BaseModule, ConditionEncoder, MLPBlock
 from sc_exp_design.config.velocity_field import NeuralVelocityFieldConfig
 from sc_exp_design.networks.neural_noise_models import MLPGaussianNoiseModel, MLPNegBinNoiseModel
 from sc_exp_design.networks.inference_networks import PerturbationApproximatePosterior, EndpointsApproximatePosterior
+from sc_exp_design.utils import sinusoidal_time_features
 
 logger = logging.getLogger(__name__)
 
@@ -172,6 +173,11 @@ class NeuralVelocityField(BaseModule):
         # encoding time
         t = torch.unsqueeze(t, dim=-1)
         t_latent = t
+        if self.config.use_sinusoidal_time_features:
+            t_latent = sinusoidal_time_features(
+                t,
+                num_freqs=self.config.time_features_num_freqs,
+            )
         if self.config.encode_time:
             t_latent = self.time_encoder(t)
             
@@ -236,7 +242,6 @@ class NeuralVelocityField(BaseModule):
     def get_vf_fn(
         self,
         cond: dict[str, Tensor] | None = None,
-        gamma_fn: Callable[[Tensor, Tensor], Tensor] | None = None,
     ) -> Callable[[Tensor, Tensor], Tensor]:
         """
         Returns a velocity field function.

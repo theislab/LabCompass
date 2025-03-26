@@ -34,6 +34,7 @@ class DataManager:
         target_covariates_in_obsm: dict[str, bool] | None = None,
         target_covariates_kwargs: dict[str, Any] | None = None,
         has_controls: bool = True
+
     ) -> None:
         """
         `self.perturbations`:
@@ -324,5 +325,6 @@ class DataManager:
         # condition target representation
         target_perturbation_repr = None
         if self.load_target_covariates:
-            target_perturbation_repr = self.__get_target_data(adata)
-        return TrainData(adata, self.control_key, state_data, perturbation_data, target_perturbation_repr, self.perturbations_with_rep, self.has_controls)
+
+            target_data = self.__get_target_data(adata)
+        return TrainData(adata, self.control_key, state_data, perturbation_data, target_data, self.perturbations_with_rep, self.has_controls)

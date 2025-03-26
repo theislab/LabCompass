@@ -80,9 +80,6 @@ class ODESolver:
         drift_fn: Callable[[Tensor, Tensor], Tensor],
         num_time_steps: int = 500,
         solver_kwargs: dict[str, Any] | None = None,
-        gamma_fn: Callable[[Tensor, Tensor], Tensor] | None = None,
-        sde_type: Literal["ito", "stratonovich"] = "ito",
-        noise_type: Literal["scalar", "additive", "diagonal", "general"] = "diagonal",
         device_id: Literal["cuda", "cpu"] = "cuda",
     ) -> None:
         """
@@ -110,9 +107,6 @@ class ODESolver:
         self.drift_fn = drift_fn
         self.num_time_steps = num_time_steps
         self.solver_kwargs = solver_kwargs
-        self.gamma_fn = gamma_fn
-        self.sde_type = sde_type
-        self.noise_type = noise_type
         self.device_id = device_id
 
         self.device = torch.device(self.device_id)
