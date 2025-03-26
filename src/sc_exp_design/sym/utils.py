@@ -539,7 +539,9 @@ def get_annotated_perturbation_data(
 
         # handling uns attribute of annotated data        
         uns = {
-            f"{category_label}_label": category_labels_to_ids,
+            **{
+                f"{cat_id}_label": cat_labels for cat_id, cat_labels in category_labels_to_ids.items()
+            },
             **{
                 f"{covariate_label}_shift": covariate_perturbation_shift
                 for covariate_label, covariate_perturbation_shift in perturbation_shift.items()
