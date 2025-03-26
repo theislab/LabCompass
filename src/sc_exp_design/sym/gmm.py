@@ -162,8 +162,8 @@ class AnnotatedGaussianMixtureModel(GaussianMixtureModel):
     def __init__(
         self,
         params: Sequence[dict[str, TensorLike]],
-        n_cat: int,
-        cat_logit_lm: TensorLike,
+        n_cat: dict[str, int],
+        cat_logit_lm: dict[str, TensorLike],
         weights: Sequence[float] | None = None,
         non_linearity: Callable[[TensorLike], TensorLike] | None = None
     ) -> None:
@@ -185,7 +185,7 @@ class AnnotatedGaussianMixtureModel(GaussianMixtureModel):
         self.cat_logit_lm = cat_logit_lm  # (n_features x n_categories) matrix representing the logits 
 
         if non_linearity is None:
-            non_linearity = lambda x: x
+            non_linearity = {cat_id: lambda x: x for cat_id in self.n_cat.keys()}
         self.non_linearity = non_linearity
         
     @property
@@ -213,11 +213,13 @@ class AnnotatedGaussianMixtureModel(GaussianMixtureModel):
         Returns:
             TensorLike: The sampled categorical labels.
         """
-        # apply non linearity to the samples
-        features = self.non_linearity(features)
-        # Collect class logits for the samples
-        logits = torch.matmul(features, self.cat_logit_lm)
-        sampled_categories = Categorical(logits=logits).sample()
+        sampled_categories = {}
+        for cat_id, cat_logit_lm in self.cat_logit_lm.items():
+            # apply non linearity to the samples
+            features = self.non_linearity[cat_id](features)
+            # Collect class logits for the samples
+            logits = torch.matmul(features, cat_logit_lm)
+            sampled_categories[cat_id] = Categorical(logits=logits).sample()
         return sampled_categories
 
     def sample(
