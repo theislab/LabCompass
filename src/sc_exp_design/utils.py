@@ -81,7 +81,7 @@ def set_reproducibility(random_seed: int) -> None:
 
 def sinusoidal_time_features(
     t: torch.Tensor,
-    n_freqs: int = 128,
+    num_freqs: int = 128,
 ) -> torch.Tensor:
     """"""
     times = 2*np.pi*torch.arange(1, n_freqs + 1)*t
