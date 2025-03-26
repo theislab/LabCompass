@@ -141,6 +141,13 @@ class NeuralVelocityField(BaseModule):
                 pooling_kwargs=self.config.perturbation_pooling_kwargs,
                 layers_after_pooling=self.config.perturbation_layers_after_pooling,
             )
+        # optional source encoder
+        if self.config.initialize_source_encoder:
+            self.source_encoder = MLPBlock(
+                self.config.flow_dim,
+                self.config.source_latent_dim,
+                **self.config.source_mlp_kwargs,
+            )
         # decoder
         self.decoder = MLPBlock(
             self.config.joint_latent_dim,
@@ -154,7 +161,6 @@ class NeuralVelocityField(BaseModule):
         xt: Tensor,
         cond: dict[str, Tensor] | None = None,
         source: Tensor | None = None,
-        target: Tensor | None = None,
     ) -> dict[str, Tensor]:
         """
         Forward pass through the neural velocity field model.
@@ -207,6 +213,17 @@ class NeuralVelocityField(BaseModule):
             latent_concat = torch.cat([t_latent, xt_latent], dim=-1)
             original_concat = torch.cat([t, xt], dim=-1)
 
+        # encoding source
+        if self.config.use_source_as_condition:
+            msg = f""
+            assert source is not None, msg
+            source_latent = source
+            if self.config.encode_source:
+                source_latent = self.source_encoder(source)
+            # concatenating to the input for the decoder
+            original_concat = torch.cat([original_concat, source], dim=-1)
+            latent_concat = torch.cat([latent_concat, source_latent], dim=-1)
+
         # forward pass on neural velocity field
         vf = self.decoder(latent_concat)
         # creating output dictionary
@@ -219,6 +236,7 @@ class NeuralVelocityField(BaseModule):
         t: Tensor,
         xt: Tensor,
         cond: dict[str, Tensor] | None = None,
+        source: Tensor | None = None,
     ) -> Tensor:
         """
         Computes the velocity field given time and state.
@@ -231,11 +249,12 @@ class NeuralVelocityField(BaseModule):
         Returns:
             Tensor: Velocity field output.
         """
-        return self.forward(t, xt, cond=cond)[VFStepFields.VF]
+        return self.forward(t, xt, cond=cond, source=source)[VFStepFields.VF]
 
     def get_vf_fn(
         self,
         cond: dict[str, Tensor] | None = None,
+        source: Tensor | None = None,
     ) -> Callable[[Tensor, Tensor], Tensor]:
         """
         Returns a velocity field function.
@@ -247,12 +266,17 @@ class NeuralVelocityField(BaseModule):
         Returns:
             Callable[[Tensor, Tensor], Tensor]: Velocity field function.
         """
+        # sanity checks
+        if self.config.use_source_as_condition:
+            msg = f""
+            assert source is not None, msg
+
         def vf_fn(
             t: Tensor,
             xt: Tensor,
         ) -> Tensor:
             """"""
-            return self.vf(t, xt, cond=cond)
+            return self.vf(t, xt, cond=cond, source=source)
 
         return vf_fn
 
@@ -277,43 +301,3 @@ class NeuralVelocityField(BaseModule):
         # forward pass on condition encoder
         condition_latent = self.condition_encoder(cond)
         return condition_latent
-
-    def get_latent_condition_inf_params(
-        self,
-        source: Tensor,
-        target: Tensor,
-    ) -> Tensor:
-        """
-        Computes latent condition inference parameters.
-        
-        Args:
-            source (Tensor): Source tensor.
-            target (Tensor): Target tensor.
-        
-        Returns:
-            Tensor: Inference parameters.
-        """
-        input_perts_recognition_model = torch.concatenate((source, target), dim=1)
-        params = self.latent_pert_approximate_posterior(input_perts_recognition_model)
-        return params
-
-    def get_perts_inf_params(
-        self,
-        source: Tensor,
-        target: Tensor,
-    ) -> Tensor:
-        """
-        Computes perturbation inference parameters.
-        
-        Args:
-            source (Tensor): Source tensor.
-            target (Tensor): Target tensor.
-        
-        Returns:
-            Tensor: Perturbation inference parameters.
-        """
-        msg = f"This method is only available when `self.config.pert_approximate_posterior_input_type` is either `'enpoints'` or `'one_step_prediction'`, found {self.config.pert_approximate_posterior_input_type=}"
-        assert self.config.pert_approximate_posterior_input_type in ["endpoints", "one_step_prediction"], msg
-        endpoints = torch.concatenate((source, target), dim=1)
-        pert_output_dict = self.pert_approximate_posterior(endpoints)
-        return pert_output_dict

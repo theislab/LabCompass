@@ -75,7 +75,7 @@ class FlowMatching:
         coupling_kwargs: dict[str, Any] | None = None,
         time_sampler: Callable[[Sequence[int], Any], Tensor] = torch.rand,
         device_id: Literal["cuda", "cpu"] = "cuda",
-        generate_from_noise: bool = False
+        generate_from_noise: bool = False,
     ) -> None:
         # initialize the Flow model 
         if flow_type == "constant_noise":
@@ -110,13 +110,13 @@ class FlowMatching:
         self.coupling = coupling_class(**coupling_kwargs)
 
         self.time_sampler = time_sampler
+        self.generate_from_noise = generate_from_noise
         self.device_id = device_id
         self.device = torch.device(self.device_id)
 
         self.data_manager = None
         self.train_data = None
         self.validation_data = None
-        self.generate_from_noise = generate_from_noise
 
     def prepare_train_data(
         self,
@@ -172,7 +172,7 @@ class FlowMatching:
         :param target_covariates_kwargs:
         :type target_covariates_kwargs: class `dict[str, Any] | None`
         """
-        has_controls = (not self.generate_from_noise)
+        has_controls = (control_key is not None)
         data_manager = DataManager(
             train_adata,
             sample_rep=sample_rep,
@@ -190,6 +190,7 @@ class FlowMatching:
 
         self.data_manager = data_manager
         self.train_data = train_data
+        self.has_controls = has_controls
 
     def prepare_validation_data(
         self,
@@ -248,6 +249,14 @@ class FlowMatching:
         :param solver_kwargs: Dictionary containining the keyword arguments used to initialize the :param:`solver_class`, defaults to `None`.
         :type solver_kwargs: class:`dict[str, Any] | None`
         """
+        if not self.has_controls:
+            msg = f""
+            assert not cvf_config.use_source_as_condition, msg
+        else:
+            if self.generate_from_noise:
+                msg = f""
+                assert cvf_config.use_source_as_condition, msg
+
         self.cvf_config = cvf_config
         
         # given a dimensionality and a configuration of hparams, initialize a flow model 
@@ -352,6 +361,8 @@ class FlowMatching:
             posterior_on_cond_vars_update_step=posterior_on_cond_vars_update_step,
             posterior_on_perts_update_step=posterior_on_perts_update_step,
             posterior_on_latent_perts_update_step=posterior_on_latent_perts_update_step,
+            has_controls=self.has_controls,
+            generate_from_noise=self.generate_from_noise,
         )
 
         self.train_dataloader = TrainDataLoader(
@@ -360,7 +371,7 @@ class FlowMatching:
             train_batch_size,
             state_transforms,
             self.device_id,
-            self.generate_from_noise
+            self.has_controls,
         )
 
         self.validation_dataloader = None
@@ -371,7 +382,7 @@ class FlowMatching:
                 validation_batch_size,
                 state_transforms,
                 self.device_id,
-                self.generate_from_noise
+                self.has_control,
             )
 
         self.trainer.fit(
@@ -386,6 +397,8 @@ class FlowMatching:
         batch: dict[str, Tensor | dict[str, Tensor]],
         return_trajectory: bool = False,
         no_grad: bool = True,
+        num_samples: int | None = None,
+        batch_size: int | None = None,
     ) -> dict[str, Tensor]:
         """Generates the predictions by integrating the dynamics with the learnt velocity field for a given initial condition
 
@@ -403,14 +416,49 @@ class FlowMatching:
         :return: Tensor of shape `(batch_size, self.flow_dim)` if :param:`return_trajectory` is `False`, otherwise Tensor of shape `(batch_size, self.num_time_steps, self.flow_dim)`
         :rtype: class:`torch.Tensor`
         """
-        source = batch[DataFields.SOURCE_STATE]
-        
+        # handling source
+        source = None
+        if self.has_controls:
+            source = batch[DataFields.SOURCE_STATE]
+
+        # handling conditions
         condition = None
         if DataFields.PERTURBATION_DATA in batch.keys():
             condition = batch[DataFields.PERTURBATION_DATA]
 
+        # handling batch size
+        if source is not None:
+            batch_size = source.shape[: -1]
+        if batch_size is None:
+            batch_size = (1, )
+
+        # handling number of samples
+        if num_samples is not None:
+            if not self.generate_from_noise:
+                msg = f""
+                logger.warning(msg)
+                num_samples = 1
+        else:
+            num_samples = 1
+        msg = f""
+        assert isinstance(num_samples, int), msg
+        if condition is not None:
+            condition = {
+                condition_covariate: condition_data.repeat(num_samples, *(1 for _ in condition_data.shape)).squeeze()
+                for condition_covariate, condition_data in condition.items()
+            }
+        if source is not None:
+            source = source.repeat(num_samples, *(1 for _ in source.shape)).squeeze()
+
+        # handling latent state
+        initial_state = source
+        if self.generate_from_noise:
+            initial_state = torch.randn((num_samples, *batch_size, self.cvf_config.flow_dim)).squeeze().to(self.device)
+        msg = f""
+        assert initial_state is not None, msg
+
         # defining velocity function
-        vf = self.velocity_field.get_vf_fn(condition)
+        vf = self.velocity_field.get_vf_fn(condition, source=source)
         # initializing the sampler clss
         ode_solver = ODESolver(
             vf,
@@ -420,7 +468,7 @@ class FlowMatching:
         )
         if no_grad:
             with torch.no_grad():
-                predictions = ode_solver.integrate(source, return_trajectory=return_trajectory)
+                predictions = ode_solver.integrate(initial_state, return_trajectory=return_trajectory)
         else:
-            predictions = ode_solver.integrate(source, return_trajectory=return_trajectory)
+            predictions = ode_solver.integrate(initial_state, return_trajectory=return_trajectory)
         return predictions
