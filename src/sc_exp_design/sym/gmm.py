@@ -279,14 +279,26 @@ class MultiAttributeAnnotatedGaussianMixtureModel(AnnotatedGaussianMixtureModel)
         )
 
     def sample_categories(
-        self,
-        features: TensorLike,
-    ) -> dict[str, TensorLike]:
-        """"""
-        # computing the logits
-        cov_logits = torch.matmul(features, self.cat_logit_lm)
-        # sampling categories according to the logits
-        return Categorical(logits=cov_logits).sample()
+            self,
+            features: TensorLike
+        ) -> TensorLike:
+        """
+        Samples categorical labels based on the given features.
+
+        Args:
+            features (TensorLike): The feature vectors for which to sample categories.
+
+        Returns:
+            TensorLike: The sampled categorical labels.
+        """
+        sampled_categories = {}
+        for cat_id, cat_logit_lm in self.cat_logit_lm.items():
+            # apply non linearity to the samples
+            features = self.non_linearity[cat_id](features)
+            # Collect class logits for the samples
+            logits = torch.matmul(features, cat_logit_lm)
+            sampled_categories[cat_id] = Categorical(logits=logits).sample()
+        return sampled_categories
 
     def get_params(
         self,
