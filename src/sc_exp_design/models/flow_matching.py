@@ -111,8 +111,13 @@ class FlowMatching:
         self.coupling = coupling_class(**coupling_kwargs)
 
         self.time_sampler = time_sampler
+
+        if generate_from_noise:
+            msg = f""
+            assert flow_type == "rectified", msg
         self.generate_from_noise = generate_from_noise
         self.noise_distribution = noise_distribution
+
         self.device_id = device_id
         self.device = torch.device(self.device_id)
 
