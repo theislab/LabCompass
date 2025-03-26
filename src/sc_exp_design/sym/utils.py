@@ -78,6 +78,7 @@ def __generate_perturbation_data(
     uniform_range: float = 5.0,
     seed: int | None = None,
     return_perturbation_representation: bool = False,
+    non_linearity: Callable[[TensorLike], TensorLike] | None = None,
     homoskedastic: bool = True,
     covariance_type: Literal["isotropic", "anisotropic", "full_covariance"] = "isotropic",
     cov_prior: Callable[[Any], TensorLike] = np.random.rand,
@@ -177,18 +178,21 @@ def __generate_perturbation_data(
             dosage_prior=dosage_prior,
             interpolation_fn=interpolation_fn,
             multi_attribute=multi_attribute,
+            non_linearity=non_linearity,
         )
     elif multi_attribute:
         gmm = MultiAttributeAnnotatedGaussianMixtureModel(
             params=trtm_params,
             n_cat=n_cat,
             cat_logit_lm=cat_logit_lm,
+            non_linearity=non_linearity,
         )
     else:
         gmm = AnnotatedGaussianMixtureModel(
             params=trtm_params,
             n_cat=n_cat,
             cat_logit_lm=cat_logit_lm,
+            non_linearity=non_linearity,
         )
 
     # handling perturbation identifiers
@@ -361,6 +365,7 @@ def get_annotated_perturbation_data(
     uniform_range: float = 5.0,
     seed: int | None = None,
     return_perturbation_representation: bool = False,
+    non_linearity: Callable[[TensorLike], TensorLike] | None = None,
     homoskedastic: bool = True,
     covariance_type: Literal["isotropic", "anisotropic", "full_covariance"] = "isotropic",
     cov_prior: Callable[[Any], TensorLike] = np.random.rand,
@@ -388,6 +393,7 @@ def get_annotated_perturbation_data(
         uniform_range=uniform_range,
         seed=seed,
         return_perturbation_representation=return_perturbation_representation,
+        non_linearity=non_linearity,
         homoskedastic=homoskedastic,
         covariance_type=covariance_type,
         cov_prior=cov_prior,
