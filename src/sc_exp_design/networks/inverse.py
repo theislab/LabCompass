@@ -426,9 +426,9 @@ class NeuralInverseModel(BaseConditionOptimizer):
             target_output_dims=self.perturbation_covariates_dims,
             noise_models=self.perturbation_covariates_noise_models,
             covariate_kwargs=self.perturbation_covariates_predictor_kwargs,
-            use_shared_representation=self.perturbation_covariates_use_shared_representation
-            latent_dim=self.perturbation_covariates_latent_dim
-            encoder_mlp_kwargs=self.perturbation_encoder_mlp_kwargs
+            use_shared_representation=self.perturbation_covariates_use_shared_representation,
+            latent_dim=self.perturbation_covariates_latent_dim,
+            encoder_mlp_kwargs=self.perturbation_encoder_mlp_kwargs,
         )
 
     def parameters(
