@@ -7,6 +7,7 @@ from torch import Tensor
 __all__ = [
     "match_shapes",
     "set_reproducibility",
+    "sinusoidal_time_features"
 ]
 
 
@@ -76,3 +77,15 @@ def set_reproducibility(random_seed: int) -> None:
     torch.manual_seed(random_seed)
     random.seed(random_seed)
     np.random.seed(random_seed)
+
+
+def sinusoidal_time_features(
+    t: torch.Tensor,
+    n_freqs: int = 128,
+) -> torch.Tensor:
+    """"""
+    times = t*torch.arange(1, n_freqs + 1)*np.pi
+    cos = torch.cos(times)
+    sin = torch.sin(times)
+    features = torch.concatenate((cos, sin), dim=-1)
+    return features
