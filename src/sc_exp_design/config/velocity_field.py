@@ -233,7 +233,7 @@ class NeuralVelocityFieldConfig:
     ) -> int:
         """"""
         if self.use_sinusoidal_time_features:
-            return self.time_features_num_freqs
+            return self.time_features_num_freqs*2
         return 1
 
     @property
