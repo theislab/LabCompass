@@ -70,7 +70,7 @@ def __generate_perturbation_data(
     sigma: float,
     d: int,
     U: int | dict[str, int],
-    n_cat: int,
+    n_cat: int | dict[str, int],
     N0: int,
     Nu: int,
     mean_range: float = 5.0,
@@ -78,6 +78,7 @@ def __generate_perturbation_data(
     uniform_range: float = 5.0,
     seed: int | None = None,
     return_perturbation_representation: bool = False,
+    non_linearity: Callable[[TensorLike], TensorLike] | None = None,
     homoskedastic: bool = True,
     covariance_type: Literal["isotropic", "anisotropic", "full_covariance"] = "isotropic",
     cov_prior: Callable[[Any], TensorLike] = np.random.rand,
@@ -101,6 +102,14 @@ def __generate_perturbation_data(
     else:
         msg = f""
         assert isinstance(U, int), msg
+
+    if isinstance(uniform_range, int | float):
+        uniform_range = {cat_id: uniform_range for cat_id in n_cat.keys()}
+    msg = f""
+    assert isinstance(uniform_range, dict), msg
+
+    if isinstance(non_linearity, Callable):
+        non_linearity = {cat_id: non_linearity for cat_id in n_cat.keys()}
 
     # total number of samples
     N = N0 + d*Nu
@@ -166,7 +175,7 @@ def __generate_perturbation_data(
         ]
 
     # sampling the logits
-    cat_logit_lm = torch.rand(d, n_cat) * uniform_range  # logits defining class of interest
+    cat_logit_lm = {cat_id: torch.rand(d, cat_dim) * uniform_range[cat_id] for cat_id, cat_dim in n_cat.items()}  # logits defining class of interest
 
     # initializing GMM
     if dose_resolved:
@@ -177,18 +186,21 @@ def __generate_perturbation_data(
             dosage_prior=dosage_prior,
             interpolation_fn=interpolation_fn,
             multi_attribute=multi_attribute,
+            non_linearity=non_linearity,
         )
     elif multi_attribute:
         gmm = MultiAttributeAnnotatedGaussianMixtureModel(
             params=trtm_params,
             n_cat=n_cat,
             cat_logit_lm=cat_logit_lm,
+            non_linearity=non_linearity,
         )
     else:
         gmm = AnnotatedGaussianMixtureModel(
             params=trtm_params,
             n_cat=n_cat,
             cat_logit_lm=cat_logit_lm,
+            non_linearity=non_linearity,
         )
 
     # handling perturbation identifiers
@@ -258,14 +270,15 @@ def __generate_perturbation_data(
     )
 
     # handling the categories
-    categories = torch.concatenate(
-        (
-            source_categories,
-            target_categories,
-        ),
-        dim=0,
-    )
-
+    categories = {
+        cat_id: torch.concatenate(
+            (
+                source_categories[cat_id],
+                target_categories[cat_id],
+            ),
+            dim=0,
+        ) for cat_id in source_categories.keys()
+    }
     # (optional) handling the perturbation representation
     if return_perturbation_representation:
         if multi_attribute:
@@ -312,7 +325,7 @@ def __generate_perturbation_data(
     # shuffling the data
     random_perm_idx = torch.randperm(states.shape[0])
     states = states[random_perm_idx].numpy()
-    categories = categories[random_perm_idx].numpy()
+    categories = {cat_id: category[random_perm_idx].numpy() for cat_id, category in categories.items()}
     if multi_attribute:
         perturbation_ids = {
             covariate_label: perturbation_id[random_perm_idx].numpy()
@@ -353,7 +366,7 @@ def get_annotated_perturbation_data(
     sigma: float,
     d: int,
     U: int | dict[str, int],
-    n_cat: int,
+    n_cat: int | dict[str, int],
     N0: int,
     Nu: int,
     mean_range: float = 5.0,
@@ -361,6 +374,7 @@ def get_annotated_perturbation_data(
     uniform_range: float = 5.0,
     seed: int | None = None,
     return_perturbation_representation: bool = False,
+    non_linearity: Callable[[TensorLike], TensorLike] | None = None,
     homoskedastic: bool = True,
     covariance_type: Literal["isotropic", "anisotropic", "full_covariance"] = "isotropic",
     cov_prior: Callable[[Any], TensorLike] = np.random.rand,
@@ -375,6 +389,12 @@ def get_annotated_perturbation_data(
     category_label: str = "cell_type",
 ) -> tuple[anndata.AnnData, dict[str, Any]]:
     """"""
+
+    if isinstance(n_cat, int):
+        n_cat = {"cell_type": n_cat}
+    msg = f""
+    assert isinstance(n_cat, dict), msg
+
     # generating data
     sym_dictionary = __generate_perturbation_data(
         sigma,
@@ -388,6 +408,7 @@ def get_annotated_perturbation_data(
         uniform_range=uniform_range,
         seed=seed,
         return_perturbation_representation=return_perturbation_representation,
+        non_linearity=non_linearity,
         homoskedastic=homoskedastic,
         covariance_type=covariance_type,
         cov_prior=cov_prior,
@@ -454,10 +475,18 @@ def get_annotated_perturbation_data(
 
     # annotating the category data
     category_ids_to_labels = {
-        idx: f"{category_label}_{idx}" for idx in range(n_cat)
+        cat_id: {
+            idx: f"{cat_id}_{idx}" for idx in range(n_cat[cat_id])
+        } for cat_id in categories.keys()
     }
-    category_labels_to_ids = {v:np.array([k]) for k, v in category_ids_to_labels.items()}
-    category_labels = np.vectorize(category_ids_to_labels.get)(categories)
+    category_labels_to_ids = {
+        cat_id: {
+            v:np.array([k]) for k, v in category_ids_to_labels[cat_id].items()
+        } for cat_id in categories.keys()
+    }
+    category_labels = {
+        cat_id: np.vectorize(category_ids_to_labels[cat_id].get)(categories[cat_id]) for cat_id in categories.keys()
+    }
 
     # retrieving perturbation shift
     if multi_attribute:
@@ -492,8 +521,10 @@ def get_annotated_perturbation_data(
     if multi_attribute:
         # handling obs attribute of annotated data
         obs = {
-            category_label: category_labels,
             control_label: is_control,
+            **{
+                cat_id: cat_labels for cat_id, cat_labels in category_labels.items()
+            },
             **{
                 covariate_label: covariate_perturbation_label
                 for covariate_label, covariate_perturbation_label in perturbation_labels.items()
@@ -525,8 +556,11 @@ def get_annotated_perturbation_data(
     else:
         obs = {
             treatment_label: perturbation_labels,
-            category_label: category_labels,
             control_label: is_control,
+            **{
+                cat_id: cat_labels for cat_id, cat_labels in category_labels.items()
+            },
+
         }
         if dose_resolved:
             obs["dose"] = dosages
@@ -536,7 +570,9 @@ def get_annotated_perturbation_data(
             f"{treatment_label}_labels": perturbation_labels_to_ids,
             f"{treatment_label}_shift": perturbation_shift,
             f"{treatment_label}_one_hot": perturbation_labels_one_hot,
-            f"{category_label}_label": category_labels_to_ids,
+            **{
+                f"{cat_id}_label": cat_labels for cat_id, cat_labels in category_labels_to_ids.items()
+            },
         }
 
     # initializing annotated data
