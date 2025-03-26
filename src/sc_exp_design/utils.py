@@ -84,7 +84,7 @@ def sinusoidal_time_features(
     n_freqs: int = 128,
 ) -> torch.Tensor:
     """"""
-    times = t*torch.arange(1, n_freqs + 1)*np.pi
+    times = 2*np.pi*torch.arange(1, n_freqs + 1)*t
     cos = torch.cos(times)
     sin = torch.sin(times)
     features = torch.concatenate((cos, sin), dim=-1)
