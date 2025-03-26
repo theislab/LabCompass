@@ -52,6 +52,7 @@ class CFMTrainer(BaseTrainer):
         posterior_on_latent_perts_update_step: int | None = None,
         has_controls: bool = True,
         generate_from_noise: bool = False,
+        noise_distribution: Callable[[Sequence[int]], Tensor] = torch.randn,
     ) -> None:
         """"""
         self.velocity_field = velocity_field
@@ -70,6 +71,7 @@ class CFMTrainer(BaseTrainer):
         self.posterior_on_latent_perts_update_step = posterior_on_latent_perts_update_step
         self.has_controls = has_controls
         self.generate_from_noise = generate_from_noise
+        self.noise_distribution = noise_distribution
 
     @property
     def model(
@@ -95,7 +97,7 @@ class CFMTrainer(BaseTrainer):
             source = None
             msg = f""
             assert self.generate_from_noise, msg
-            latent = torch.randn_like(target)
+            latent = self.noise_distribution(target.shape).to(target.device)
         # optional condition key
         condition = None
         if DataFields.PERTURBATION_DATA in batch.keys():

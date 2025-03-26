@@ -76,6 +76,7 @@ class FlowMatching:
         time_sampler: Callable[[Sequence[int], Any], Tensor] = torch.rand,
         device_id: Literal["cuda", "cpu"] = "cuda",
         generate_from_noise: bool = False,
+        noise_distribution: Callable[[Sequence[int]], Tensor] = torch.randn,
     ) -> None:
         # initialize the Flow model 
         if flow_type == "constant_noise":
@@ -111,6 +112,7 @@ class FlowMatching:
 
         self.time_sampler = time_sampler
         self.generate_from_noise = generate_from_noise
+        self.noise_distribution = noise_distribution
         self.device_id = device_id
         self.device = torch.device(self.device_id)
 
@@ -363,6 +365,7 @@ class FlowMatching:
             posterior_on_latent_perts_update_step=posterior_on_latent_perts_update_step,
             has_controls=self.has_controls,
             generate_from_noise=self.generate_from_noise,
+            noise_distribution=self.noise_distribution,
         )
 
         self.train_dataloader = TrainDataLoader(
@@ -453,7 +456,7 @@ class FlowMatching:
         # handling latent state
         initial_state = source
         if self.generate_from_noise:
-            initial_state = torch.randn((num_samples, *batch_size, self.cvf_config.flow_dim)).squeeze().to(self.device)
+            initial_state = self.noise_distribution((num_samples, *batch_size, self.cvf_config.flow_dim)).squeeze().to(self.device)
         msg = f""
         assert initial_state is not None, msg
 
