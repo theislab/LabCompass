@@ -213,10 +213,10 @@ class NeuralVelocityFieldConfig:
                     msg = f"`layers_dict` is expected to be an instance of `LayersDict`, found {type(layers_dict)}"
                     assert isinstance(layers_dict, LayersDict), msg
                     self.perturbation_layers_before_pooling[condition] = layers_dict
+                    
                 msg = f"With {self.encode_conditions=} you need to pass a dictionary in the proper format as the `self.perturbation_layers_after_pooling` attribute, found `None`"
                 assert self.perturbation_layers_after_pooling is not None, msg
                 if isinstance(self.perturbation_layers_after_pooling, dict):
-                    self.perturbation_layers_after_pooling["input_dim"] = self.perturbation_layers_after_pooling_input_dim
                     self.perturbation_layers_after_pooling["output_dim"] = self.perturbation_latent_dim
                     LayersDict.verify_keys(self.perturbation_layers_after_pooling)
                     self.perturbation_layers_after_pooling = LayersDict(**self.perturbation_layers_after_pooling)
@@ -246,25 +246,7 @@ class NeuralVelocityFieldConfig:
                 input_dim = layers_dict["input_dim"]
             dim = dim + input_dim
         return dim
-
-    @property
-    def perturbation_layers_after_pooling_input_dim(
-        self,
-    ) -> int | None:
-        """
-        Collect the condition input dimensions after pooling.
-        """
-        dim = 0
-        for condition, layers_dict in self.perturbation_layers_before_pooling.items():
-            if isinstance(layers_dict, LayersDict):
-                layers_dict = vars(layers_dict)
-            if layers_dict["layer_type"] == "mlp":
-                output_dim = layers_dict["output_dim"]
-            elif layers_dict["layer_type"] == "self_attention":
-                output_dim = layers_dict["embed_dim"][-1]
-            dim = dim + output_dim
-        return dim
-
+    
     @property
     def joint_latent_dim(
         self,
@@ -334,4 +316,3 @@ class NeuralVelocityFieldConfig:
         else:
             msg = f"{self.pert_approximate_posterior_input_type=} is not supported, possible values are `['latent', 'endpoints', 'one_step_prediction', 'original']`"
             raise ValueError(msg)
-
