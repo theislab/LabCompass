@@ -181,7 +181,8 @@ class NeuralVelocityFieldConfig:
     state_encoder_output_dim: int = 10
     state_encoder_mlp_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
     encode_time: bool = False
-    time_encoder_input_dim: int = 1
+    use_sinusoidal_time_features: bool = False
+    time_features_num_freqs: int = 128
     time_encoder_output_dim: int = 10
     time_encoder_mlp_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
     use_guidance: bool = True
@@ -225,6 +226,15 @@ class NeuralVelocityFieldConfig:
         else:
             msg = f"With {self.use_guidance=} an unguided flow model will be initialized, thus the settings for the condition encoder will be ignored."
             logger.warning(msg)
+
+    @property
+    def time_encoder_input_dim(
+        self,
+    ) -> int:
+        """"""
+        if self.use_sinusoidal_time_features:
+            return self.time_features_num_freqs*2
+        return 1
 
     @property
     def condition_input_dim(
