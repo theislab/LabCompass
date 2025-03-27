@@ -103,8 +103,8 @@ class CFMTrainer(BaseTrainer):
         if DataFields.PERTURBATION_DATA in batch.keys():
             condition = batch[DataFields.PERTURBATION_DATA]
         # retrieving batch size and ode time
-        batch_size = source.shape[0]
-        t = self.time_sampler((batch_size,), device=source.device)
+        batch_size = target.shape[0]
+        t = self.time_sampler((batch_size,), device=target.device)
         # computing flow and target velocity field
         xt = self.flow.compute_x_t(t, latent, target)
         ut = self.flow.compute_u_t(t, latent, target, xt)
