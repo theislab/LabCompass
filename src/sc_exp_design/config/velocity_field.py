@@ -254,8 +254,8 @@ class NeuralVelocityFieldConfig:
             if self.encode_conditions:
                 if layers_dict["layer_type"] == "mlp":
                     input_dim = layers_dict["input_dim"]
-                elif layers_dict["layer_type"] == "self_attention":
-                    input_dim = layers_dict["num_embeddings"]
+                else:
+                    raise NotImplementedError
             else:
                 input_dim = layers_dict["input_dim"]
             dim = dim + input_dim
@@ -268,14 +268,35 @@ class NeuralVelocityFieldConfig:
         """
         Collect the condition input dimensions after pooling.
         """
+        # Initialize the dim as the output of the pooling layer 
         dim = 0
-        for condition, layers_dict in self.perturbation_layers_before_pooling.items():
-            if isinstance(layers_dict, LayersDict):
-                layers_dict = vars(layers_dict)
-            if layers_dict["layer_type"] == "mlp":
-                output_dim = layers_dict["output_dim"]
-            elif layers_dict["layer_type"] == "self_attention":
-                output_dim = layers_dict["embed_dim"][-1]
+        
+        if self.perturbation_covariates_not_pooled is not None:
+            perturbation_covariate_pooled = [perturbation
+                                            for perturbation in self.perturbation_layers_before_pooling
+                                            if perturbation not in self.perturbation_covariates_not_pooled
+                                            ]
+        else:
+            perturbation_covariate_pooled = list(self.perturbation_layers_before_pooling.keys())
+            
+        # Pooled layers 
+        if len(perturbation_covariate_pooled) > 0:
+            for perturbation_to_pool in perturbation_covariate_pooled:
+                covariate_pool_dict = self.perturbation_layers_before_pooling[perturbation_to_pool]
+                if isinstance(covariate_pool_dict, LayersDict):
+                    covariate_pool_dict = vars(covariate_pool_dict)
+                if dim == 0:
+                    dim = dim + covariate_pool_dict["output_dim"]
+                msg = f"The output layers of the pooled variables must all have the same dimensionality."
+                assert covariate_pool_dict["output_dim"] == dim, msg
+        
+        # Not pooled layers 
+        if self.perturbation_covariates_not_pooled is not None:
+            for condition in self.perturbation_covariates_not_pooled:
+                layers_dict = self.perturbation_layers_before_pooling[condition]
+                if isinstance(layers_dict, LayersDict):
+                    layers_dict = vars(layers_dict)
+            output_dim = layers_dict["output_dim"]
             dim = dim + output_dim
         return dim
 
