@@ -6,9 +6,7 @@ from sc_exp_design.data.data import (
 from sc_exp_design.data.dataloaders import (
     BaseDataLoader,
     SequentialDataLoader,
-    PredictionDataLoader,
     TrainDataLoader,
-    ValidationDataLoader,
 )
 from sc_exp_design.data.datamanager import DataManager
 
