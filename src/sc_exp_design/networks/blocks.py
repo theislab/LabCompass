@@ -611,6 +611,8 @@ class ConditionEncoder(BaseModule):
         # pooling modules
         if self.pooling == "mean":
             self.pooling_layer = lambda x: torch.mean(x, dim=1)
+        elif self.pooling == "sum":
+            self.pooling_layer = lambda x: torch.sum(x, dim=1)
         elif self.pooling == "self_attention":
             self.pooling_layer = AttentionPooling(**self.pooling_kwargs)
         else:
@@ -622,11 +624,12 @@ class ConditionEncoder(BaseModule):
 
     def __get_mask(
         self,
+        batch_size: int,
         sequence_length: int,
         device: torch.device,
     ) -> Tensor:
         """Retrieves the mask for attention blocks (still to be correctly implemented)"""
-        mask = torch.ones((sequence_length, sequence_length), device=device)
+        mask = torch.ones((batch_size, sequence_length, sequence_length), device=device)
         return mask
 
     def _get_layers(
@@ -683,11 +686,7 @@ class ConditionEncoder(BaseModule):
             if covariate not in self.layers_before_pooling:
                 continue
             before_pooling = self.before_pooling[covariate]
-            if isinstance(before_pooling, SelfAttentionBlock):
-                mask = self.__get_mask(covariate_data.shape[1], covariate_data.device)
-                encoded_covariate = before_pooling(covariate_data, mask)
-            else:
-                encoded_covariate = before_pooling(covariate_data)
+            encoded_covariate = before_pooling(covariate_data)
             encoded_covariates[covariate] = encoded_covariate
 
         # concatenating in two separete arrays the covariates
@@ -695,25 +694,29 @@ class ConditionEncoder(BaseModule):
         if self.covariates_not_pooled is not None:
             encoded_covariates_not_pooled = torch.concatenate(
                 [encoded_covariates[covariate] for covariate in self.covariates_not_pooled], dim=-1
-            )
+            )  # B x N_conditions x (D * N_cov_not_pooled)
             encoded_covariates_pooled = None
             if len(self.covariates_to_pool) > 0:
-                encoded_covariates_pooled = torch.concatenate(
+                encoded_covariates_pooled = torch.stack(
                     [
                         encoded_covariate
                         for covariate, encoded_covariate in encoded_covariates.items()
                         if covariate in self.covariates_to_pool
                     ],
                     dim=-1,
-                )
+                )  # B x N_conditions x D 
         else:
             encoded_covariates_pooled = torch.stack(
                 [encoded_covariate for covariate, encoded_covariate in encoded_covariates.items()], dim=1
-            )
+            )  # B x N_conditions x D 
 
         if encoded_covariates_pooled is not None:
             # pooling the covariates
-            z = self.pooling_layer(encoded_covariates_pooled)
+            if self.pooling == "attention":
+                mask = self.__get_mask(encoded_covariates_pooled.shape[0], encoded_covariates_pooled.shape[1], encoded_covariates_pooled.device)
+                z = self.pooling_layer(encoded_covariates_pooled, mask)
+            else:
+                z = self.pooling_layer(encoded_covariates_pooled)
             # concatenating with the covariates not pooled
             if self.covariates_not_pooled is not None:
                 z = torch.concatenate((z, encoded_covariates_not_pooled), dim=-1)
@@ -721,9 +724,5 @@ class ConditionEncoder(BaseModule):
             z = encoded_covariates_not_pooled
         
         # layers after pooling
-        if isinstance(self.after_pooling, SelfAttentionBlock):
-            mask = self.__get_mask(z.shape[1], z.device)
-            z = self.after_pooling(z, mask)
-        else:
-            z = self.after_pooling(z)
+        z = self.after_pooling(z)
         return z
