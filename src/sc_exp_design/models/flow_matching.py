@@ -384,14 +384,7 @@ class FlowMatching:
 
         self.validation_dataloader = None
         if self.validation_data is not None:
-            self.validation_dataloader = ValidationDataLoader(
-                self.validation_data,
-                self.coupling,
-                validation_batch_size,
-                state_transforms,
-                self.device_id,
-                self.has_control,
-            )
+            raise NotImplementedError
 
         self.trainer.fit(
             num_training_steps,
@@ -439,7 +432,10 @@ class FlowMatching:
             batch_size = source.shape[: -1]
         if batch_size is None:
             batch_size = (1, )
-
+        
+        if isinstance(batch_size, int):
+            batch_size = (batch_size,)
+        
         # handling number of samples
         if num_samples is not None:
             if not self.generate_from_noise:
