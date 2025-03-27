@@ -323,7 +323,7 @@ class DataManager:
         if self.perturbations is not None:
             perturbation_data = self.__get_perturbation_data(adata)
         # condition target representation
-        target_perturbation_repr = None
+        target_data = None
         if self.load_target_covariates:
 
             target_data = self.__get_target_data(adata)
