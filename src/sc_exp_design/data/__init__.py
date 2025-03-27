@@ -15,7 +15,5 @@ __all__ = [
     "TrainData",
     "PredictionData",
     "TrainDataLoader",
-    "ValidationDataLoader",
-    "PredictionDataLoader",
     "DataManager",
 ]
