@@ -77,8 +77,12 @@ class TrainData(BaseDataStruct):
         :return: Dictionary containing control state and perturbation data (if available).
         :rtype: Dict[str, TensorLike]
         """
-        msg = "Controls are not available in this dataset (has_controls=False)."
-        if not self.has_controls:
+        # sanity check
+        if self.has_controls:
+            msg = f""
+            assert self.control_key is not None, msg
+        else:
+            msg = "Controls are not available in this dataset (has_controls=False)."
             raise ValueError(msg)
         
         # collect control ids and features

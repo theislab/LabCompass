@@ -97,7 +97,7 @@ class TrainDataLoader(BaseDataLoader):
         batch_size: int,
         state_transforms: Transform | None = None,
         device_id: Literal["cuda", "cpu"] = "cuda",
-        noise_source: bool = False
+        has_controls: bool = True
     ) -> None:
         """
         Initializes the training data loader.
@@ -120,7 +120,7 @@ class TrainDataLoader(BaseDataLoader):
         self.device_id = device_id
         self.state_transforms = state_transforms
         self.device = torch.device(self.device_id)
-        self.noise_source = noise_source
+        self.has_controls = has_controls
 
     def __sample_perturbation_id(
         self,
@@ -156,26 +156,28 @@ class TrainDataLoader(BaseDataLoader):
         trtm_states = trtm_data[DataFields.STATE_DATA]
         
         # control states
-        if not self.noise_source:
+        if self.has_controls:
             ctrl_data = self.data.get_controls(self.batch_size)
             ctrl_states = ctrl_data[DataFields.STATE_DATA]
-        else:
-            ctrl_states = np.random.randn(*trtm_states.shape).astype(trtm_states.dtype)
 
         # matching the two groups
         source_idx, target_idx = self.coupling.match_groups(ctrl_states, trtm_states)
 
         # moving states to torch tensors
-        source = torch.from_numpy(ctrl_states[source_idx]).to(self.device).float()
+        if self.has_controls:
+            source = torch.from_numpy(ctrl_states[source_idx]).to(self.device).float()
         target = torch.from_numpy(trtm_states[target_idx]).to(self.device).float()
 
         # handling transformations
         if self.state_transforms is not None:
-            source = self.state_transforms.transform(source)
+            if self.has_controls:
+                source = self.state_transforms.transform(source)
             target = self.state_transforms.transform(target)
 
         # constructing output dictionary
-        out_dict = {DataFields.SOURCE_STATE: source, DataFields.TARGET_STATE: target}
+        out_dict = {DataFields.TARGET_STATE: target}
+        if self.has_controls:
+            out_dict[DataFields.SOURCE_STATE] = source 
 
         # handling perturbation data
         if self.data.perturbation_data is not None:

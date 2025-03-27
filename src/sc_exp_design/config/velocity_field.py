@@ -194,6 +194,10 @@ class NeuralVelocityFieldConfig:
     perturbation_pooling_kwargs: dict[str, Any] | None = None
     perturbation_layers_after_pooling: LayersDict | None = None
     decoder_mlp_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
+    use_source_as_condition: bool = False
+    encode_source: bool = False
+    source_latent_dim: int = 10
+    souce_encoder_mlp_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
     
     def __post_init__(self) -> None:
         """
@@ -282,17 +286,27 @@ class NeuralVelocityFieldConfig:
         """
         Collect the dimension of the joint latent space (concatenating time, latent feature dimensions and perturbation)
         """
+        # perturbations
         perturbation_latent_dim = 0
         if self.use_guidance and self.encode_conditions:
             perturbation_latent_dim = self.perturbation_latent_dim
         elif self.use_guidance and (not self.encode_conditions):
             perturbation_latent_dim = self.condition_input_dim
+        # time
         time_latent_dim = self.time_encoder_input_dim
         if self.encode_time:
             time_latent_dim = self.time_encoder_output_dim
+        # states
+        state_latent_dim = self.flow_dim
         if self.encode_state:
-            return self.state_encoder_output_dim + time_latent_dim + perturbation_latent_dim
-        return self.flow_dim + time_latent_dim + perturbation_latent_dim
+            state_latent_dim = self.state_encoder_output_dim 
+        # source
+        source_latent_dim = 0
+        if self.use_source_as_condition:
+            source_latent_dim = self.flow_dim
+            if self.encode_source:
+                source_latent_dim = self.source_latent_dim
+        return state_latent_dim + time_latent_dim + perturbation_latent_dim + source_latent_dim
 
     @property
     def joint_original_dim(
@@ -304,44 +318,17 @@ class NeuralVelocityFieldConfig:
         perturbation_dim = 0
         if self.use_guidance:
             perturbation_dim = self.condition_input_dim
-        return self.flow_dim + self.time_encoder_input_dim + perturbation_dim
+        source_dim = 0
+        if self.use_source_as_condition:
+            source_dim = self.flow_dim
+        return self.flow_dim + self.time_encoder_input_dim + perturbation_dim + source_dim
 
     @property
-    def cond_vars_input_dim(
+    def initialize_source_encoder(
         self,
-    ) -> int:
-        """
-        Computes the input dimension for the inference network on conditioning variables.
-        
-        Returns:
-            int: Input dimension for conditioning variable inference.
-        """
-        # retrieving the input dimension for the inference network on the conditioning variables
-        if self.endpoints_approximate_posterior_use_latent_repr:
-            return self.joint_latent_dim
-        return self.joint_original_dim
-        
-    @property
-    def pert_input_dim(
-        self,
-    ) -> int:
-        """
-        Computes the input dimension for the inference network on perturbations.
-        
-        Returns:
-            int: Input dimension for perturbation inference.
-        
-        Raises:
-            ValueError: If an unsupported perturbation input type is provided.
-        """
-        # retrieving the input dimension for the inference network on the conditioning variables
-        if self.pert_approximate_posterior_input_type == "latent":
-            return self.joint_latent_dim
-        elif self.pert_approximate_posterior_input_type in ["endpoints", "one_step_prediction"]:
-            return self.flow_dim * 2
-        elif self.pert_approximate_posterior_input_type == "original":
-            return self.joint_original_dim
-        else:
-            msg = f"{self.pert_approximate_posterior_input_type=} is not supported, possible values are `['latent', 'endpoints', 'one_step_prediction', 'original']`"
-            raise ValueError(msg)
-
+    ) -> bool:
+        """"""
+        if self.use_source_as_condition:
+            if self.encode_source:
+                return True
+        return False

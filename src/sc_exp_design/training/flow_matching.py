@@ -50,6 +50,9 @@ class CFMTrainer(BaseTrainer):
         posterior_on_cond_vars_update_step: int | None = None,
         posterior_on_perts_update_step: int | None = None,
         posterior_on_latent_perts_update_step: int | None = None,
+        has_controls: bool = True,
+        generate_from_noise: bool = False,
+        noise_distribution: Callable[[Sequence[int]], Tensor] = torch.randn,
     ) -> None:
         """"""
         self.velocity_field = velocity_field
@@ -66,6 +69,9 @@ class CFMTrainer(BaseTrainer):
         self.posterior_on_cond_vars_update_step = posterior_on_cond_vars_update_step
         self.posterior_on_perts_update_step = posterior_on_perts_update_step
         self.posterior_on_latent_perts_update_step = posterior_on_latent_perts_update_step
+        self.has_controls = has_controls
+        self.generate_from_noise = generate_from_noise
+        self.noise_distribution = noise_distribution
 
     @property
     def model(
@@ -81,8 +87,17 @@ class CFMTrainer(BaseTrainer):
     ) -> tuple[Tensor, dict[str, Tensor]]:
         """"""
         # parsing batch dictionary
-        source = batch[DataFields.SOURCE_STATE]
         target = batch[DataFields.TARGET_STATE]
+        if self.has_controls:
+            source = batch[DataFields.SOURCE_STATE]
+            latent = source
+            if self.generate_from_noise:
+                latent = torch.randn_like(source)
+        else:
+            source = None
+            msg = f""
+            assert self.generate_from_noise, msg
+            latent = self.noise_distribution(target.shape).to(target.device)
         # optional condition key
         condition = None
         if DataFields.PERTURBATION_DATA in batch.keys():
@@ -91,10 +106,10 @@ class CFMTrainer(BaseTrainer):
         batch_size = source.shape[0]
         t = self.time_sampler((batch_size,), device=source.device)
         # computing flow and target velocity field
-        xt = self.flow.compute_x_t(t, source, target)
-        ut = self.flow.compute_u_t(t, source, target, xt)
+        xt = self.flow.compute_x_t(t, latent, target)
+        ut = self.flow.compute_u_t(t, latent, target, xt)
         # forward pass on the neural vf
-        vt_step = self.velocity_field(t, xt, condition, source=source, target=target)
+        vt_step = self.velocity_field(t, xt, condition, source=source)
         vt = vt_step[VFStepFields.VF]
         # computing losses
         loss = torch.nn.functional.mse_loss(vt, ut)
