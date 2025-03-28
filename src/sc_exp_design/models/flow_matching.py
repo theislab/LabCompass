@@ -3,7 +3,6 @@ import os
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any, Literal
 
-import cloudpickle
 import torch
 from anndata import AnnData
 from torch import Tensor
