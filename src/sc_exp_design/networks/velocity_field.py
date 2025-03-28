@@ -185,7 +185,7 @@ class NeuralVelocityField(BaseModule):
                 num_freqs=self.config.time_features_num_freqs,
             )
         if self.config.encode_time:
-            t_latent = self.time_encoder(t)
+            t_latent = self.time_encoder(t_latent)
             
         # encoding conditions
         condition_latent = cond
