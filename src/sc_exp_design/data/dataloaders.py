@@ -9,7 +9,7 @@ import torch
 
 from sc_exp_design.constants import DataFields
 from sc_exp_design.couplings import Coupling, OTCoupling
-from sc_exp_design.data.data import PredictionData, AnnotatedPerturbationData
+from sc_exp_design.data.data import AnnotatedPerturbationData
 from sc_exp_design.transforms import Transform
 from sc_exp_design.types import TensorLike
 
