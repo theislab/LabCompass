@@ -1,6 +1,7 @@
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, Literal
 
+import omegaconf
 import wandb
 
 from sc_exp_design.metrics import Metrics
@@ -16,6 +17,7 @@ __all__ = [
 
 class BaseCallBack:
     """"""
+    callback_type: Literal["computational", "logging"]
 
     def run_on_train_begin(
         self,
@@ -23,7 +25,7 @@ class BaseCallBack:
         **kwargs,
     ) -> None:
         """"""
-        raise NotImplementedError
+        pass
 
     def run_on_valid_step(
         self,
@@ -31,7 +33,7 @@ class BaseCallBack:
         **kwargs,
     ) -> None:
         """"""
-        raise NotImplementedError
+        pass
 
     def run_on_train_end(
         self,
@@ -39,10 +41,35 @@ class BaseCallBack:
         **kwargs,
     ) -> None:
         """"""
+        pass
+
+
+class ComputationalCallBack(BaseCallBack):
+    """"""
+    callback_type: Literal["computational", "logging"] = "computational"
+
+    def run_on_valid_step(
+        self,
+        preds: TensorLike,
+        target: TensorLike,
+    ) -> dict[str, Any]:
+        """"""
         raise NotImplementedError
 
 
-class MetricsCallBack(BaseCallBack):
+class LoggingCallBack(BaseCallBack):
+    """"""
+    callback_type: Literal["computational", "logging"] = "logging"
+
+    def run_on_valid_step(
+        self,
+        log_dict: dict[str, Any],
+    ) -> None:
+        """"""
+        raise NotImplementedError
+
+
+class MetricsCallBack(ComputationalCallBack):
     """"""
 
     def __init__(
@@ -65,12 +92,12 @@ class MetricsCallBack(BaseCallBack):
             preds = self.state_transforms(preds)
             target = self.state_transforms(target)
         for metric_id in self.metric_ids:
-            metric = dict(Metrics)[metric_id]
+            metric = vars(Metrics())[metric_id]
             metrics[metric_id] = metric(preds, target)
         return metrics
 
 
-class WandBLogger(BaseCallBack):
+class WandBLogger(LoggingCallBack):
     """"""
 
     def __init__(
@@ -84,6 +111,7 @@ class WandBLogger(BaseCallBack):
         self.project_name = project_name
         self.log_dir = log_dir
         self.config = config
+        self.kwargs = kwargs
 
     def run_on_train_begin(
         self,
@@ -91,14 +119,36 @@ class WandBLogger(BaseCallBack):
         **kwargs,
     ) -> None:
         """"""
-        raise NotImplementedError
+        # moving configuration to omegaconf
+        config = self.config
+        if isinstance(config, dict):
+            config = omegaconf.OmegaConf.create(config)
+
+        # initializing settings
+        settings = wandb.Settings(**self.kwargs)
+
+        # login to wandb and initialize run
+        wandb.login()
+        wandb.init(
+            project=self.project_name,
+            config=config,
+            dir=self.log_dir,
+            settings=settings,
+        )
+
 
     def run_on_valid_step(
         self,
-        preds: TensorLike,
-        target: TensorLike,
-    ) -> dict[str, Any]:
+        log_dict: dict[str, Any],
+    ) -> None:
         """"""
+        wandb.log(log_dict)
+
+    def run_on_train_end(
+        self,
+    ) -> None:
+        """"""
+        wandb.finish()
 
 
 class TrainingCallBacks(BaseCallBack):
@@ -111,6 +161,20 @@ class TrainingCallBacks(BaseCallBack):
         """"""
         self.callbacks = callbacks
     
+    @property
+    def computational_callbacks(
+        self,
+    ) -> Sequence[BaseCallBack]:
+        """"""
+        return [callback for callback in self.callbacks if callback.callback_type == "computational"]
+
+    @property
+    def logging_callbacks(
+        self,
+    ) -> Sequence[BaseCallBack]:
+        """"""
+        return [callback for callback in self.callbacks if callback.callback_type == "logging"]
+
     def run_on_train_begin(
         self,
     ) -> None:
@@ -124,8 +188,15 @@ class TrainingCallBacks(BaseCallBack):
         target: TensorLike,
     ) -> dict[str, Any]:
         """"""
-        for callback in self.callbacks:
-            callback.run_on_valid_step(preds, target)
+        # run computational callbacks first
+        callback_out = {}
+        for callback in self.computational_callbacks:
+            callback_metrics = callback.run_on_valid_step(preds, target)
+            callback_out.update(callback_metrics)
+        # then log the results
+        for callback in self.logging_callbacks:
+            callback_metrics = callback.run_on_valid_step(callback_out)
+        return callback_out
 
     def run_on_train_end(
         self,

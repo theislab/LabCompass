@@ -11,6 +11,12 @@ __all__ = [
 
 def compute_r_squared(pred: Tensor, target: Tensor):
     """"""
+    # moving to numpy in case inputs are tensors
+    if isinstance(pred, Tensor):
+        pred = pred.numpy()
+    if isinstance(target, Tensor):
+        target = target.numpy()
+    # computing r2 score
     return r2_score(np.mean(pred, axis=0), np.mean(target, axis=0))
 
 
