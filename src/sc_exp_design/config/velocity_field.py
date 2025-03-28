@@ -197,7 +197,7 @@ class NeuralVelocityFieldConfig:
     use_source_as_condition: bool = False
     encode_source: bool = False
     source_latent_dim: int = 10
-    souce_encoder_mlp_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
+    source_encoder_mlp_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
     
     def __post_init__(self) -> None:
         """

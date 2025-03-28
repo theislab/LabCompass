@@ -147,7 +147,7 @@ class NeuralVelocityField(BaseModule):
             self.source_encoder = MLPBlock(
                 self.config.flow_dim,
                 self.config.source_latent_dim,
-                **self.config.source_mlp_kwargs,
+                **self.config.source_encoder_mlp_kwargs,
             )
         # decoder
         self.decoder = MLPBlock(
