@@ -231,7 +231,7 @@ class ValidationDataLoader(BaseDataLoader):
         """
         # no perturbation data is passed to the AnnotatedPerturbationData object
         if self.data.seen_combinatorial_perturbations is None:
-            return None
+            return (None, )
         # retrieving the maximum number of treatements to load if specified
         if self.num_treatments_to_load is not None:
             return random.choices(self.data.seen_combinatorial_perturbations, k=self.num_treatments_to_load)
