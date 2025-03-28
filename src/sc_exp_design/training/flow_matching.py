@@ -166,7 +166,7 @@ class CFMTrainer(BaseTrainer):
         targets = torch.concatenate(targets, dim=0)
 
         # updating results dictionary with predictions concatenated over all conditions
-        predictions_dict[("all_conditions")] = {
+        predictions_dict["all_conditions"] = {
             PredictionFields.PREDICTION_DATA: predictions.cpu().numpy(),
             DataFields.TARGET_STATE: targets.cpu().numpy()
         }
