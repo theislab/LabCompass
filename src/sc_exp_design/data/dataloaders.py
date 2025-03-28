@@ -9,7 +9,7 @@ import torch
 
 from sc_exp_design.constants import DataFields
 from sc_exp_design.couplings import Coupling, OTCoupling
-from sc_exp_design.data.data import PredictionData, TrainData
+from sc_exp_design.data.data import PredictionData, AnnotatedPerturbationData
 from sc_exp_design.transforms import Transform
 from sc_exp_design.types import TensorLike
 
@@ -37,7 +37,7 @@ class SequentialDataLoader(BaseDataLoader):
     """"""
     def __init__(
         self,
-        data: TrainData,
+        data: AnnotatedPerturbationData,
         batch_size: int,
         state_transforms: Transform | None = None,
         device_id: Literal["cuda", "cpu"] = "cuda"
@@ -92,7 +92,7 @@ class TrainDataLoader(BaseDataLoader):
 
     def __init__(
         self,
-        data: TrainData,
+        data: AnnotatedPerturbationData,
         coupling: Coupling,
         batch_size: int,
         state_transforms: Transform | None = None,
@@ -103,7 +103,7 @@ class TrainDataLoader(BaseDataLoader):
         Initializes the training data loader.
 
         :param data: Training dataset containing control and perturbed cell states.
-        :type data: class:`TrainData`
+        :type data: class:`AnnotatedPerturbationData`
         :param coupling: Coupling strategy used to match control and perturbed states.
         :type coupling: class:`Coupling`
         :param batch_size: Number of samples per batch.
@@ -132,7 +132,7 @@ class TrainDataLoader(BaseDataLoader):
         :return: Integer containing the index for the perturbation used in the current batch of data.
         :rtype: int
         """
-        # no perturbation data is passed to the TrainData object
+        # no perturbation data is passed to the AnnotatedPerturbationData object
         if self.data.seen_combinatorial_perturbations is None:
             return None
         # need to sample one perturbation from the set of unique perturbations

@@ -12,7 +12,7 @@ from sc_exp_design.types import TensorLike
 
 __all__ = [
     "BaseDataStruct",
-    "TrainData",
+    "AnnotatedPerturbationData",
     "PredictionData",
 ]
 
@@ -33,7 +33,7 @@ class BaseDataStruct(abc.ABC):
 
 
 @dataclass
-class TrainData(BaseDataStruct):
+class AnnotatedPerturbationData(BaseDataStruct):
     """
     Data structure for training data containing control and perturbation information.
     """
@@ -51,7 +51,7 @@ class TrainData(BaseDataStruct):
         self,
     ) -> list[list[str]] | None:
         """"""
-        # no perturbation data is passed to the TrainData object or no perturbation with associated representation
+        # no perturbation data is passed to the AnnotatedPerturbationData object or no perturbation with associated representation
         if (self.perturbation_data is None) or (self.perturbations_with_rep is None):
             return None
         return self.adata.obs[[pert for pert in self.perturbations_with_rep.keys()]].drop_duplicates().values.tolist()
@@ -182,7 +182,7 @@ class TrainData(BaseDataStruct):
         target_perturbation_repr = None
         if self.target_perturbation_repr is not None:
             target_perturbation_repr = {target: target_data[idx] for target, target_data in self.target_perturbation_repr.items()}
-        return TrainData(
+        return AnnotatedPerturbationData(
             adata,
             self.control_key,
             state_data,

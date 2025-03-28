@@ -1,7 +1,7 @@
 from sc_exp_design.data.data import (
     BaseDataStruct,
     PredictionData,
-    TrainData,
+    AnnotatedPerturbationData,
 )
 from sc_exp_design.data.dataloaders import (
     BaseDataLoader,
@@ -14,7 +14,7 @@ from sc_exp_design.data.datamanager import DataManager
 
 __all__ = [
     "BaseDataStruct",
-    "TrainData",
+    "AnnotatedPerturbationData",
     "PredictionData",
     "TrainDataLoader",
     "ValidationDataLoader",

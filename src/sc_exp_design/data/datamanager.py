@@ -7,7 +7,7 @@ import numpy as np
 from sklearn.preprocessing import OneHotEncoder, LabelEncoder
 
 from sc_exp_design.constants import DataFields
-from sc_exp_design.data.data import TrainData
+from sc_exp_design.data.data import AnnotatedPerturbationData
 from sc_exp_design.types import TensorLike
 
 logger = logging.getLogger(__name__)
@@ -301,13 +301,13 @@ class DataManager:
     def get_train_data(
         self,
         adata: anndata.AnnData | None = None,
-    ) -> TrainData:
+    ) -> AnnotatedPerturbationData:
         """
         :param adata: AnnData object containing single-cell data. If `None`, uses `self.adata`.
         :type adata: anndata.AnnData | None
 
         :return: A structured object containing all necessary training inputs.
-        :rtype: TrainData
+        :rtype: AnnotatedPerturbationData
 
         :raises ValueError: If both `adata` and `self.adata` are `None`.
         """
@@ -327,4 +327,4 @@ class DataManager:
         if self.load_target_covariates:
 
             target_data = self.__get_target_data(adata)
-        return TrainData(adata, self.control_key, state_data, perturbation_data, target_data, self.perturbations_with_rep, self.has_controls)
+        return AnnotatedPerturbationData(adata, self.control_key, state_data, perturbation_data, target_data, self.perturbations_with_rep, self.has_controls)
