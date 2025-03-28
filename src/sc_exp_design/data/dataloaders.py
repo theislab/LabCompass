@@ -195,6 +195,7 @@ class TrainDataLoader(BaseDataLoader):
         
         return out_dict
 
+
 class ValidationDataLoader(BaseDataLoader):
     """"""
 
@@ -317,8 +318,11 @@ class ValidationDataLoader(BaseDataLoader):
                                         for key, val in trtm_perts_target_rep.items()}
                 out_dict[DataFields.PERTURBATION_TARGET_REPR] = trtm_perts_target_rep
             
+            # constructing perturbation identifier to store the results
+            perturbation_id = "_".join(perturbation)
+
             # storing output dictionary for current perturbation
-            matched_data[tuple(perturbation)] = out_dict
+            matched_data[perturbation_id] = out_dict
         return matched_data
 
      

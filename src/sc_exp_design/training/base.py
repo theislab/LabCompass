@@ -66,9 +66,10 @@ class BaseTrainer(abc.ABC):
         if self.lr_scheduler_step == "valid_step" and self.lr_scheduler is not None:
             self.lr_scheduler.step()
         # running callbacks
+        metrics = {}
         if self.callbacks is not None:
-            self.callbacks.run_on_valid_step(prediction_dict)
-        return val_preds, val_gt
+            metrics = self.callbacks.run_on_valid_step(prediction_dict)
+        return metrics
 
     def __update_logs(
         self,

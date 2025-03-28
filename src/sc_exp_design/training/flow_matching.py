@@ -171,4 +171,4 @@ class CFMTrainer(BaseTrainer):
             DataFields.TARGET_STATE: targets.cpu().numpy()
         }
 
-        return prediction_dict
+        return predictions_dict
