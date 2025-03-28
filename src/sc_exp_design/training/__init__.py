@@ -1,4 +1,9 @@
-from sc_exp_design.training.callbacks import CallBack, MetricsCallBack
+from sc_exp_design.training.callbacks import (
+    BaseCallBack,
+    MetricsCallBack,
+    WandBLogger,
+    TrainingCallBacks
+)
 from sc_exp_design.training.inverse import TargetPredictionTrainer, InverseModelTrainer
 from sc_exp_design.training.flow_matching import CFMTrainer
 from sc_exp_design.training.utils import (
@@ -13,6 +18,6 @@ from sc_exp_design.training.utils import (
 
 __all__ = [
     "CFMTrainer",
-    "CallBack",
+    "BaseCallBack",
     "MetricsCallBack",
 ]

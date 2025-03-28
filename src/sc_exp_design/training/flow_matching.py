@@ -16,7 +16,7 @@ from sc_exp_design.data import (
 from sc_exp_design.flows import BaseFlow
 from sc_exp_design.networks import NeuralVelocityField
 from sc_exp_design.ode import ODESolver
-from sc_exp_design.training.callbacks import CallBack
+from sc_exp_design.training.callbacks import BaseCallBack
 from sc_exp_design.training.utils import (
     compute_cond_vars_inference_loss,
     compute_latent_perturbation_inference_loss,
@@ -32,7 +32,6 @@ __all__ = [
 
 class CFMTrainer(BaseTrainer):
     """"""
-    _require_solver_for_validation: bool = True
 
     def __init__(
         self,
@@ -42,7 +41,7 @@ class CFMTrainer(BaseTrainer):
         lr_scheduler: torch.optim.lr_scheduler.LRScheduler | None = None,
         lr_scheduler_step: Literal["grad_step", "valid_step"] = "grad_step",
         time_sampler: Callable = torch.rand,
-        callbacks: CallBack | None = None,
+        callbacks: BaseCallBack | None = None,
         grad_step_interval_log: int = 1000,
         num_time_steps: int = 100,
         gamma_fn: Callable[[Tensor, Tensor], Tensor] | None = None,
@@ -53,6 +52,7 @@ class CFMTrainer(BaseTrainer):
         has_controls: bool = True,
         generate_from_noise: bool = False,
         noise_distribution: Callable[[Sequence[int]], Tensor] = torch.randn,
+        grad_steps_log_interval: bool | None = None
     ) -> None:
         """"""
         self.velocity_field = velocity_field
@@ -72,6 +72,7 @@ class CFMTrainer(BaseTrainer):
         self.has_controls = has_controls
         self.generate_from_noise = generate_from_noise
         self.noise_distribution = noise_distribution
+        self.grad_steps_log_interval = grad_steps_log_interval
 
     @property
     def model(

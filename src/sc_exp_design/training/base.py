@@ -16,7 +16,6 @@ from sc_exp_design.types import TensorLike
 
 class BaseTrainer(abc.ABC):
     """"""
-    _require_solver_for_validation: bool
 
     @abc.abstractmethod
     def _train_step(
@@ -38,6 +37,17 @@ class BaseTrainer(abc.ABC):
         raise NotImplementedError
         # return predictions, target
 
+    def __use_callback_on_grad_step(
+        self,
+        step_idx: int,
+    ) -> bool:
+        """"""
+        if self.grad_steps_log_interval is None:
+            return False
+        if (step_idx + 1)%self.grad_steps_log_interval == 0:
+            return True
+        return False
+
     def __train_step(
         self,
         step_idx: int,
@@ -55,7 +65,8 @@ class BaseTrainer(abc.ABC):
             self.lr_scheduler.step()
         # running callbacks
         if self.callbacks is not None:
-            self.callbacks.run_on_grad_step()
+            if self.__use_callback_on_grad_step(step_idx):
+                self.callbacks.run_on_grad_step(log_dict)
         return log_dict
 
     def __validation_step(
@@ -73,8 +84,8 @@ class BaseTrainer(abc.ABC):
             self.lr_scheduler.step()
         # running callbacks
         if self.callbacks is not None:
-            self.callbacks.run_on_valid_step()
-        return val_preds, val_gt
+            metrics = self.callbacks.run_on_valid_step()
+        return metrics
 
     def __update_logs(
         self,
@@ -104,6 +115,10 @@ class BaseTrainer(abc.ABC):
         if do_validation and valid_freq is None:
             valid_freq = num_training_steps
 
+        # running callbacks
+        if self.callbacks is not None:
+            self.callbacks.run_on_train_begin()
+
         for grad_step in iterator:
             batch = train_dataloader.sample()
             log_dict = self.__train_step(grad_step, batch)
@@ -120,18 +135,15 @@ class BaseTrainer(abc.ABC):
                     # skipping if no dataloader provided
                     if validation_dataloader is None:
                         continue
-                    # sanity check
-                    if self._require_solver_for_validation:
-                        msg = "To perform the validation step `self.solver_class` must be an instance of `ODESolver`, found `None`."
-                        assert self.solver_class is not None, msg
 
                     batch = validation_dataloader.sample()
-                    val_preds, val_gt = self.__validation_step(batch)
+                    metrics = self.__validation_step(batch)
+                    self.__update_logs(metrics)
 
-                    # computing metrics
-                    if self.callbacks is not None:
-                        metrics = self.callbacks.run_on_valid_step(val_preds, val_gt)
-                        self.__update_logs(metrics)
+                # running callbacks
+        if self.callbacks is not None:
+            self.callbacks.run_on_train_end()
+
 
     def plot_training_logs(
         self,
