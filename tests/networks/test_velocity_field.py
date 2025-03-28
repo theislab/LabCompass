@@ -56,10 +56,10 @@ perturbation_layers_before_pooling_no_encoding = {
     "treatment0_dose": {
         "input_dim": 1
     },
-    "treatment0_id": {
+    "treatment1_id": {
         "input_dim": treatment1_dim
     },
-    "treatment0_dose": {
+    "treatment1_dose": {
         "input_dim": 1
     }
 }
@@ -74,12 +74,12 @@ perturbation_layers_before_pooling_linear_encode = {
         "output_dim": perturbation_latent_dim,
         **linear_config,
     },
-    "treatment0_id": {
+    "treatment1_id": {
         "input_dim": treatment1_dim,
         "output_dim": perturbation_latent_dim,
         **linear_config,
     },
-    "treatment0_dose": {
+    "treatment1_dose": {
         "input_dim": 1,
         "output_dim": perturbation_latent_dim,
         **linear_config,
@@ -96,12 +96,12 @@ perturbation_layers_before_pooling_mlp_encode = {
         "output_dim": perturbation_latent_dim,
         **linear_config,
     },
-    "treatment0_id": {
+    "treatment1_id": {
         "input_dim": treatment1_dim,
         "output_dim": perturbation_latent_dim,
         **linear_config,
     },
-    "treatment0_dose": {
+    "treatment1_dose": {
         "input_dim": 1,
         "output_dim": perturbation_latent_dim,
         **linear_config,
@@ -179,7 +179,7 @@ class TestNeuralVelocityField:
         if use_sinusoidal_time_features:
             expected_latent_time_dim = time_features_num_freqs*2
         if encode_time:
-            expected_latent_time_dim = time_encoder_mlp_kwargs["output_dim"]
+            expected_latent_time_dim = time_latent_dim
         # retrieve target latent condition dim
         expected_latent_condition_dim = 0
         if use_guidance:
@@ -190,15 +190,21 @@ class TestNeuralVelocityField:
             )
             if encode_conditions:
                 expected_latent_condition_dim = ...
-        expected_joint_latent_dim = expected_latent_state_dim + expected_latent_time_dim + expected_latent_condition_dim
+        # retrieve target latent source dim
+        expected_latent_source_dim = 0
+        if use_source_as_condition:
+            expected_latent_source_dim = flow_dim
+            if encode_source:
+                expected_latent_source_dim = state_latent_dim
+        expected_joint_latent_dim = expected_latent_state_dim + expected_latent_time_dim + expected_latent_condition_dim + expected_latent_source_dim
 
         # sanity check on velocity field output
         msg = f"The velocity field has the wrong shape. Got {vf_out[VFStepFields.VF].shape}, expected {(batch_size, flow_dim)}."
         assert vf_out[VFStepFields.VF].shape == (batch_size, flow_dim), msg
 
         # sanity check on latent states
-        msg = f""
-        assert vf_out[VFStepFields.LATENT_STATE].shape == (batch_size, expected_latent_state_dim)
+        msg = f"Shape mismatch state latent repr. Got: {vf_out[VFStepFields.LATENT_STATE].shape}, expected: {(batch_size, expected_latent_state_dim)}"
+        assert vf_out[VFStepFields.LATENT_STATE].shape == (batch_size, expected_latent_state_dim), msg
 
-        msg = f""
-        assert vf_out[VFStepFields.LATENT_REPR].shape == (batch_size, expected_joint_latent_dim)
+        msg = f"Shape mismatch joint latent repr. Got: {vf_out[VFStepFields.LATENT_REPR].shape}, expected: {(batch_size, expected_joint_latent_dim)}"
+        assert vf_out[VFStepFields.LATENT_REPR].shape == (batch_size, expected_joint_latent_dim), msg
