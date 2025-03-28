@@ -37,17 +37,6 @@ class BaseTrainer(abc.ABC):
         raise NotImplementedError
         # return predictions, target
 
-    def __use_callback_on_grad_step(
-        self,
-        step_idx: int,
-    ) -> bool:
-        """"""
-        if self.grad_steps_log_interval is None:
-            return False
-        if (step_idx + 1)%self.grad_steps_log_interval == 0:
-            return True
-        return False
-
     def __train_step(
         self,
         step_idx: int,
@@ -63,10 +52,6 @@ class BaseTrainer(abc.ABC):
         # learning rate scheduler step
         if self.lr_scheduler_step == "grad_step" and self.lr_scheduler is not None:
             self.lr_scheduler.step()
-        # running callbacks
-        if self.callbacks is not None:
-            if self.__use_callback_on_grad_step(step_idx):
-                self.callbacks.run_on_grad_step(log_dict)
         return log_dict
 
     def __validation_step(
@@ -173,5 +158,3 @@ class BaseTrainer(abc.ABC):
         if show:
             fig.show()
         return fig, axes
-
-
