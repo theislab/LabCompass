@@ -136,6 +136,8 @@ class WandBLogger(LoggingCallBack):
             settings=settings,
         )
 
+        # storing run name as an attribute
+        self.run_name = wandb.run.name
 
     def run_on_valid_step(
         self,
