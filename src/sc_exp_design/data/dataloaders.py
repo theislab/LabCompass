@@ -232,7 +232,7 @@ class ValidationDataLoader(BaseDataLoader):
         if self.data.seen_combinatorial_perturbations is None:
             return None
         # retrieving the maximum number of treatements to load if specified
-        if self.num_treatment_to_load is not None:
+        if self.num_treatments_to_load is not None:
             return random.choices(self.data.seen_combinatorial_perturbations, k=self.num_treatments_to_load)
         # returning all the treaments otherwise
         return self.data.seen_combinatorial_perturbations
@@ -246,12 +246,12 @@ class ValidationDataLoader(BaseDataLoader):
 
         # retrieving target data
         target_data = {
-            perturbation: self.data.get_treatments(self.batch_size, perturbation) for perturbation in perturbations
+            tuple(perturbation): self.data.get_treatments(self.batch_size, perturbation) for perturbation in perturbations
         }
 
         # matching the groups
         matched_indices = {
-            perturbation: {"target_idx": np.arange(self.batch_size)} for perturbation in target_data.keys()
+            tuple(perturbation): {"target_idx": np.arange(self.batch_size)} for perturbation in target_data.keys()
         }
         if self.has_controls:
             ctrl_data = self.data.get_controls(self.batch_size)
@@ -288,7 +288,7 @@ class ValidationDataLoader(BaseDataLoader):
             target = torch.from_numpy(trtm_states[target_idx]).to(self.device).float()
 
             # retrieving optional control indices
-            if self.had_controls:
+            if self.has_controls:
                 source_idx = indices_dict["source_idx"]
                 source = torch.from_numpy(ctrl_states[source_idx]).to(self.device).float()
 
@@ -312,13 +312,13 @@ class ValidationDataLoader(BaseDataLoader):
 
             # handling target data
             if self.data.target_perturbation_repr is not None:
-                trtm_perts_target_rep = trtm_data[DataFields.PERTURBATION_TARGET_REPR]
+                trtm_perts_target_rep = perturbation_data[DataFields.PERTURBATION_TARGET_REPR]
                 trtm_perts_target_rep = {key: torch.from_numpy(val[target_idx]).to(self.device).float()
                                         for key, val in trtm_perts_target_rep.items()}
                 out_dict[DataFields.PERTURBATION_TARGET_REPR] = trtm_perts_target_rep
             
             # storing output dictionary for current perturbation
-            matched_data[perturbation] = out_dict
+            matched_data[tuple(perturbation)] = out_dict
         return matched_data
 
      

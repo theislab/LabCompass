@@ -103,8 +103,6 @@ class NeuralVelocityField(BaseModule):
             nn.Module: The model in evaluation mode.
         """
         self = super().eval()
-        if self.config.learn_posterior_on_perts:
-            self.pert_approximate_posterior = self.pert_approximate_posterior.eval()
         if self.condition_encoder is not None:
             self.condition_encoder = self.condition_encoder.eval()
         return self

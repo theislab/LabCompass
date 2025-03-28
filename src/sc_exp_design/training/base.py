@@ -61,16 +61,14 @@ class BaseTrainer(abc.ABC):
         """"""
         self.model.eval()
         with torch.no_grad():
-            val_preds, val_gt = self._validation_step(batch)
-            val_preds = val_preds.cpu().numpy()
-            val_gt = val_gt.cpu().numpy()
+            prediction_dict = self._validation_step(batch)
         # learning rate scheduler step
         if self.lr_scheduler_step == "valid_step" and self.lr_scheduler is not None:
             self.lr_scheduler.step()
         # running callbacks
         if self.callbacks is not None:
-            metrics = self.callbacks.run_on_valid_step()
-        return metrics
+            self.callbacks.run_on_valid_step(prediction_dict)
+        return val_preds, val_gt
 
     def __update_logs(
         self,

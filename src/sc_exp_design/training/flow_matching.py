@@ -8,7 +8,7 @@ from matplotlib.figure import Figure
 from torch import Tensor
 from tqdm import tqdm
 
-from sc_exp_design.constants import DataFields, LossFields, VFStepFields
+from sc_exp_design.constants import DataFields, LossFields, PredictionFields, VFStepFields
 from sc_exp_design.data import (
     TrainDataLoader,
     ValidationDataLoader,
@@ -44,11 +44,7 @@ class CFMTrainer(BaseTrainer):
         callbacks: BaseCallBack | None = None,
         grad_step_interval_log: int = 1000,
         num_time_steps: int = 100,
-        gamma_fn: Callable[[Tensor, Tensor], Tensor] | None = None,
         solver_kwargs: dict[str, Any] = None,
-        posterior_on_cond_vars_update_step: int | None = None,
-        posterior_on_perts_update_step: int | None = None,
-        posterior_on_latent_perts_update_step: int | None = None,
         has_controls: bool = True,
         generate_from_noise: bool = False,
         noise_distribution: Callable[[Sequence[int]], Tensor] = torch.randn,
@@ -64,11 +60,7 @@ class CFMTrainer(BaseTrainer):
         self.callbacks = callbacks
         self.grad_step_interval_log = grad_step_interval_log
         self.num_time_steps = num_time_steps
-        self.gamma_fn = gamma_fn
         self.solver_kwargs = solver_kwargs
-        self.posterior_on_cond_vars_update_step = posterior_on_cond_vars_update_step
-        self.posterior_on_perts_update_step = posterior_on_perts_update_step
-        self.posterior_on_latent_perts_update_step = posterior_on_latent_perts_update_step
         self.has_controls = has_controls
         self.generate_from_noise = generate_from_noise
         self.noise_distribution = noise_distribution
@@ -116,26 +108,67 @@ class CFMTrainer(BaseTrainer):
         loss = torch.nn.functional.mse_loss(vt, ut)
         return loss, {LossFields.LOSS: loss.detach().cpu().item()}
 
-    def _validation_step(
+    def __validation_step(
         self,
-        batch: dict[str, TensorLike],
+        perturbation_batch: dict[str, TensorLike],
     ) -> tuple[TensorLike]:
         """"""
-        # parsing batch dictionary
-        source = batch[DataFields.SOURCE_STATE]
-        target = batch[DataFields.TARGET_STATE]
+        # handling source
+        source = None
+        if self.has_controls:
+            source = perturbation_batch[DataFields.SOURCE_STATE]
+        # retrieving target
+        target = perturbation_batch[DataFields.TARGET_STATE]
         # optional condition key
         condition = None
-        if DataFields.PERTURBATION_DATA in batch.keys():
-            condition = batch[DataFields.PERTURBATION_DATA]
+        if DataFields.PERTURBATION_DATA in perturbation_batch.keys():
+            condition = perturbation_batch[DataFields.PERTURBATION_DATA]
         # defining velocity function
-        vf = self.velocity_field.get_vf_fn(condition, gamma_fn=self.gamma_fn)
+        vf = self.velocity_field.get_vf_fn(condition, source=source)
         # initializing the sampler clss
         ode_sampler = ODESolver(
             vf,
             num_time_steps=self.num_time_steps,
-            gamma_fn=self.gamma_fn,
             solver_kwargs=self.solver_kwargs,
         )
         predictions = ode_sampler.integrate(source)
         return predictions, target
+
+    def _validation_step(
+        self,
+        batch: dict[str, dict[str, TensorLike]],
+    ) -> dict[str, dict[str, TensorLike]]:
+        """"""
+        # list to store all the results
+        predictions = []
+        targets = []
+        
+        # dictionary to store the results per perturbation
+        predictions_dict = {}
+
+        # iterating over the perturbations of the current batch
+        for perturbation, perturbation_batch in batch.items():
+            # performing validation step on single perturbation
+            perturbation_predictions, perturbation_targets = self.__validation_step(perturbation_batch)
+
+            # appending to the list of all results
+            predictions.append(perturbation_predictions)
+            targets.append(perturbation_targets)
+
+            # storing the results to the output grouped per perturbation
+            predictions_dict[perturbation] = {
+                PredictionFields.PREDICTION_DATA: perturbation_predictions.cpu().numpy(),
+                DataFields.TARGET_STATE: perturbation_targets.cpu().numpy()
+            }
+        
+        # concatenating the results for all conditions
+        predictions = torch.concatenate(predictions, dim=0)
+        targets = torch.concatenate(targets, dim=0)
+
+        # updating results dictionary with predictions concatenated over all conditions
+        predictions_dict[("all_conditions")] = {
+            PredictionFields.PREDICTION_DATA: predictions.cpu().numpy(),
+            DataFields.TARGET_STATE: targets.cpu().numpy()
+        }
+
+        return prediction_dict

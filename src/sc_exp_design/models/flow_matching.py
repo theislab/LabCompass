@@ -300,10 +300,7 @@ class FlowMatching:
         state_transforms: Transform | None = None,
         callbacks: BaseCallBack | None = None,
         grad_step_interval_log: int = 100,
-        posterior_on_cond_vars_update_step: int | None = None,
-        posterior_on_perts_update_step: int | None = None,
-        posterior_on_latent_perts_update_step: int | None = None,
-        gamma_fn: Callable[[Tensor, Tensor], Tensor] | None = None
+        num_treatments_to_load: int | None = None,
     ) -> None:
         """Trains the model.
 
@@ -354,6 +351,9 @@ class FlowMatching:
         msg = "Model not initialized, run `prepare_model` before training the model"
         assert self.velocity_field is not None, msg
 
+        # storing state transforms as attribute
+        self.state_transforms = state_transforms
+
         self.trainer = CFMTrainer(
             self.velocity_field,
             self.flow,
@@ -364,11 +364,7 @@ class FlowMatching:
             callbacks=callbacks,
             grad_step_interval_log=grad_step_interval_log,
             num_time_steps=self.num_time_steps,
-            gamma_fn=gamma_fn,
             solver_kwargs=self.solver_kwargs,
-            posterior_on_cond_vars_update_step=posterior_on_cond_vars_update_step,
-            posterior_on_perts_update_step=posterior_on_perts_update_step,
-            posterior_on_latent_perts_update_step=posterior_on_latent_perts_update_step,
             has_controls=self.has_controls,
             generate_from_noise=self.generate_from_noise,
             noise_distribution=self.noise_distribution,
@@ -378,14 +374,22 @@ class FlowMatching:
             self.train_data,
             self.coupling,
             train_batch_size,
-            state_transforms,
-            self.device_id,
-            self.has_controls,
+            state_transforms=self.state_transforms,
+            device_id=self.device_id,
+            has_controls=self.has_controls,
         )
 
         self.validation_dataloader = None
         if self.validation_data is not None:
-            raise NotImplementedError
+            self.validation_dataloader = ValidationDataLoader(
+                self.validation_data,
+                self.coupling,
+                validation_batch_size,
+                state_transforms=state_transforms,
+                device_id=self.device_id,
+                has_controls=self.has_controls,
+                num_treatments_to_load=num_treatments_to_load
+            )
 
         self.trainer.fit(
             num_training_steps,
