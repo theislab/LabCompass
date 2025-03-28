@@ -180,12 +180,12 @@ class NeuralVelocityField(BaseModule):
         t = torch.unsqueeze(t, dim=-1)
         t_latent = t
         if self.config.use_sinusoidal_time_features:
-            t = sinusoidal_time_features(
+            t_latent = sinusoidal_time_features(
                 t,
                 num_freqs=self.config.time_features_num_freqs,
             )
         if self.config.encode_time:
-            t_latent = self.time_encoder(t)
+            t_latent = self.time_encoder(t_latent)
             
         # encoding conditions
         condition_latent = cond
