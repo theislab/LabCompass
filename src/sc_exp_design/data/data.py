@@ -116,7 +116,7 @@ class AnnotatedPerturbationData(BaseDataStruct):
     def get_treatments(
         self,
         batch_size: int | None = None,
-        treatments: int | None = None,
+        treatments: Sequence[str] | None = None,
     ) -> tuple[TensorLike, TensorLike]:
         """
         Retrieve treatment group data.

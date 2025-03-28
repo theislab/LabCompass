@@ -33,6 +33,63 @@ class BaseDataLoader(abc.ABC):
         raise NotImplementedError
 
 
+class BaseCoupledDataLoader(BaseDataLoader):
+    """"""
+
+    def _get_matched_data(
+        self,
+        treatments: Sequence[str] | None,
+        control_states: TensorLike | None,
+    ) -> dict[str, TensorLike | dict[str, TensorLike]]:
+        """"""
+        # sanity check
+        if self.has_controls:
+            msg = f""
+            assert control_states is not None, msg
+
+        # treatment states
+        trtm_data = self.data.get_treatments(self.batch_size, treatments)
+        trtm_states = trtm_data[DataFields.STATE_DATA]
+
+        # control states
+        target_idx = np.arange(self.batch_size)
+        if self.has_controls:
+
+            # matching the two groups
+            source_idx, target_idx = self.coupling.match_groups(control_states, trtm_states)
+
+        # moving states to torch tensors
+        if self.has_controls:
+            source = torch.from_numpy(control_states[source_idx]).to(self.device).float()
+        target = torch.from_numpy(trtm_states[target_idx]).to(self.device).float()
+
+        # handling transformations
+        if self.state_transforms is not None:
+            if self.has_controls:
+                source = self.state_transforms.transform(source)
+            target = self.state_transforms.transform(target)
+
+        # constructing output dictionary
+        out_dict = {DataFields.TARGET_STATE: target}
+        if self.has_controls:
+            out_dict[DataFields.SOURCE_STATE] = source 
+
+        # handling perturbation data
+        if self.data.perturbation_data is not None:
+            trtm_perts = trtm_data[DataFields.PERTURBATION_DATA]
+            condition = {cond: torch.from_numpy(cond_data[target_idx]).to(self.device).float()
+                         for cond, cond_data in trtm_perts.items()}
+            out_dict[DataFields.PERTURBATION_DATA] = condition
+            
+        if self.data.target_perturbation_repr is not None:
+            trtm_perts_target_rep = trtm_data[DataFields.PERTURBATION_TARGET_REPR]
+            trtm_perts_target_rep = {key: torch.from_numpy(val[target_idx]).to(self.device).float()
+                                     for key, val in trtm_perts_target_rep.items()}
+            out_dict[DataFields.PERTURBATION_TARGET_REPR] = trtm_perts_target_rep
+        
+        return out_dict
+
+
 class SequentialDataLoader(BaseDataLoader):
     """"""
     def __init__(
@@ -85,7 +142,7 @@ class SequentialDataLoader(BaseDataLoader):
         return out
 
 
-class TrainDataLoader(BaseDataLoader):
+class TrainDataLoader(BaseCoupledDataLoader):
     """
     Data loader for training that samples matched control and perturbed cell states.
     """
@@ -151,52 +208,17 @@ class TrainDataLoader(BaseDataLoader):
         if isinstance(self.coupling, OTCoupling):
             treatments = self.__sample_perturbation_id()
 
-        # treatment states
-        trtm_data = self.data.get_treatments(self.batch_size, treatments)
-        trtm_states = trtm_data[DataFields.STATE_DATA]
-        
         # control states
-        target_idx = np.arange(self.batch_size)
+        control_states = None
         if self.has_controls:
-            ctrl_data = self.data.get_controls(self.batch_size)
-            ctrl_states = ctrl_data[DataFields.STATE_DATA]
+            control_data = self.data.get_controls(self.batch_size)
+            control_states = control_data[DataFields.STATE_DATA]
 
-            # matching the two groups
-            source_idx, target_idx = self.coupling.match_groups(ctrl_states, trtm_states)
-
-        # moving states to torch tensors
-        if self.has_controls:
-            source = torch.from_numpy(ctrl_states[source_idx]).to(self.device).float()
-        target = torch.from_numpy(trtm_states[target_idx]).to(self.device).float()
-
-        # handling transformations
-        if self.state_transforms is not None:
-            if self.has_controls:
-                source = self.state_transforms.transform(source)
-            target = self.state_transforms.transform(target)
-
-        # constructing output dictionary
-        out_dict = {DataFields.TARGET_STATE: target}
-        if self.has_controls:
-            out_dict[DataFields.SOURCE_STATE] = source 
-
-        # handling perturbation data
-        if self.data.perturbation_data is not None:
-            trtm_perts = trtm_data[DataFields.PERTURBATION_DATA]
-            condition = {cond: torch.from_numpy(cond_data[target_idx]).to(self.device).float()
-                         for cond, cond_data in trtm_perts.items()}
-            out_dict[DataFields.PERTURBATION_DATA] = condition
-            
-        if self.data.target_perturbation_repr is not None:
-            trtm_perts_target_rep = trtm_data[DataFields.PERTURBATION_TARGET_REPR]
-            trtm_perts_target_rep = {key: torch.from_numpy(val[target_idx]).to(self.device).float()
-                                     for key, val in trtm_perts_target_rep.items()}
-            out_dict[DataFields.PERTURBATION_TARGET_REPR] = trtm_perts_target_rep
-        
-        return out_dict
+        # retrieving matched data
+        return self._get_matched_data(treatments, control_states)
 
 
-class ValidationDataLoader(BaseDataLoader):
+class ValidationDataLoader(BaseCoupledDataLoader):
     """"""
 
     def __init__(
@@ -243,87 +265,28 @@ class ValidationDataLoader(BaseDataLoader):
     ) -> dict[str, TensorLike | dict[str, TensorLike]]:
         """"""
         # retrieving the perturbations to validate on for the current batch
-        perturbations = self.__sample_perturbation_id()
+        treatments = self.__sample_perturbation_id()
 
-        # retrieving target data
-        target_data = {
-            tuple(perturbation): self.data.get_treatments(self.batch_size, perturbation) for perturbation in perturbations
-        }
-
-        # matching the groups
-        matched_indices = {
-            tuple(perturbation): {"target_idx": np.arange(self.batch_size)} for perturbation in target_data.keys()
-        }
+        # control states
+        control_states = None
         if self.has_controls:
-            ctrl_data = self.data.get_controls(self.batch_size)
-            ctrl_states = ctrl_data[DataFields.STATE_DATA]
+            control_data = self.data.get_controls(self.batch_size)
+            control_states = control_data[DataFields.STATE_DATA]
 
-            # constructing dictionary to store matched data
-            matched_indices = {}
+        # constructing output dictionary
+        out_dict = {}
 
-            # matching each group
-            for perturbation, perturbation_data in target_data.items():
-                # retrieving the treatment states
-                trtm_states = perturbation_data[DataFields.STATE_DATA]
+        # iterating over the perturbations
+        for treatment in treatments:
+            # retrieving matched treatment data
+            treatement_data = self._get_matched_data(treatment, control_states)
 
-                # matching the two groups
-                source_idx, target_idx = self.coupling.match_groups(ctrl_states, trtm_states)
-
-                # storing matched indices
-                matched_indices[perturbation] = {
-                    "source_idx": source_idx,
-                    "target_idx": target_idx,
-                }
-        
-        # retrieving matched data
-        matched_data = {}
-        for perturbation, indices_dict in matched_indices.items():
-            # retrieving data associated to current perturbation
-            perturbation_data = target_data[perturbation]
-
-            # retrieving states
-            trtm_states = perturbation_data[DataFields.STATE_DATA]
-
-            # retrieving target indices
-            target_idx = indices_dict["target_idx"]
-            target = torch.from_numpy(trtm_states[target_idx]).to(self.device).float()
-
-            # retrieving optional control indices
-            if self.has_controls:
-                source_idx = indices_dict["source_idx"]
-                source = torch.from_numpy(ctrl_states[source_idx]).to(self.device).float()
-
-            # handling transformations
-            if self.state_transforms is not None:
-                if self.has_controls:
-                    source = self.state_transforms.transform(source)
-                target = self.state_transforms.transform(target)
-            
-            # constructing output dictionary
-            out_dict = {DataFields.TARGET_STATE: target}
-            if self.has_controls:
-                out_dict[DataFields.SOURCE_STATE] = source 
-
-            # handling perturbation data
-            if self.data.perturbation_data is not None:
-                trtm_perts = perturbation_data[DataFields.PERTURBATION_DATA]
-                condition = {cond: torch.from_numpy(cond_data[target_idx]).to(self.device).float()
-                            for cond, cond_data in trtm_perts.items()}
-                out_dict[DataFields.PERTURBATION_DATA] = condition
-
-            # handling target data
-            if self.data.target_perturbation_repr is not None:
-                trtm_perts_target_rep = perturbation_data[DataFields.PERTURBATION_TARGET_REPR]
-                trtm_perts_target_rep = {key: torch.from_numpy(val[target_idx]).to(self.device).float()
-                                        for key, val in trtm_perts_target_rep.items()}
-                out_dict[DataFields.PERTURBATION_TARGET_REPR] = trtm_perts_target_rep
-            
             # constructing perturbation identifier to store the results
-            perturbation_id = "_".join(perturbation)
+            treatment_id = "_".join(treatment)
 
             # storing output dictionary for current perturbation
-            matched_data[perturbation_id] = out_dict
-        return matched_data
+            out_dict[treatment_id] = treatement_data
+        return out_dict
 
      
 class PredictionDataLoader(BaseDataLoader):
