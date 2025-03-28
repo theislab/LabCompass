@@ -8,13 +8,13 @@ import sc_exp_design
 from sc_exp_design.constants import ParamsFields, VFStepFields
 
 # dimensionalities
-batch_size = 64
+batch_size = 4
 flow_dim = 2
 treatment0_dim = 5
 treatment1_dim = 7
 perturbation_latent_dim = 16
 state_latent_dim = 16
-time_features_num_freqs = 128
+time_features_num_freqs = 8
 time_latent_dim = 16
 
 # input data
@@ -168,7 +168,7 @@ class TestNeuralVelocityField:
         cvf = sc_exp_design.networks.NeuralVelocityField(
             config,
         )
-        vf_out = cvf.forward(t_test, x_test, cond)
+        vf_out = cvf.forward(t_test, x_test, cond, source=source)
   
         # retrieve target latent state dim
         expected_latent_state_dim = flow_dim
