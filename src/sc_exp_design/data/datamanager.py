@@ -130,6 +130,9 @@ class DataManager:
         # sanity check as we need to have initialized `self.adata` attribute
         msg = f""
         assert self.adata is not None, msg
+        # no perturbation found
+        if self.perturbations is None:
+            return None
         # no representation found
         if self.perturbation_reps is None:
             return None
