@@ -21,6 +21,7 @@ from sc_exp_design.flows import (
     RectifiedFlow,
     VariancePreservingFlow,
 )
+from sc_exp_design.models.base import BaseModel
 from sc_exp_design.networks import NeuralVelocityField
 from sc_exp_design.ode import push_forward
 from sc_exp_design.training import BaseCallBack, CFMTrainer
@@ -31,7 +32,7 @@ logger = logging.getLogger(__name__)
 __all__ = ["FlowMatching"]
 
 
-class FlowMatching:
+class FlowMatching(BaseModel):
     """Initializes the :class:`FlowMatching` model.
 
     :param flow_type: The flow used to define the target dynamics. Should be a reference to

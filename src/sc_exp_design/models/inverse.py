@@ -17,6 +17,7 @@ from sc_exp_design.networks.inverse import (
     NeuralInverseModel,
 )
 from sc_exp_design.networks.inference_networks import PerturbationApproximatePosterior
+from sc_exp_design.models.base import BaseModel
 from sc_exp_design.training import BaseCallBack, TargetPredictionTrainer, InverseModelTrainer
 from sc_exp_design.transforms import Transform
 
@@ -25,7 +26,7 @@ logger = logging.getLogger(__name__)
 __all__ = ["InverseModel"]
 
 
-class InverseModel:
+class InverseModel(BaseModel):
     """"""
     def __init__(
         self,
