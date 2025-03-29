@@ -10,7 +10,7 @@ def adata() -> anndata.AnnData:
 
     # defining state data
     num_unique_treatments = 5
-    num_unique_groups = 2
+    num_unique_groups = 3
     num_control_cells = 100
     num_perturbed_cells = 150
     tot_perturbed_cells = num_perturbed_cells*num_unique_treatments
@@ -35,14 +35,11 @@ def adata() -> anndata.AnnData:
     }
 
     # defining group maps
-    id_to_group_map = {
-        0: "control",
+    pert_to_group_map = {
+        "control": 0,
         **{
-            g: f"group{g}" for g in range(1, num_unique_groups + 1) 
-        },
-    }
-    group_to_id_map = {
-        v:k for k, v in id_to_group_map.items()
+            f"drug{u}": (u%num_unique_groups + 1) for u in range(1, num_unique_treatments + 1)
+        }
     }
 
     # defining function for retrieving all the perturbation data associated to a treatment
@@ -55,16 +52,14 @@ def adata() -> anndata.AnnData:
         perturbation_ids =  np.concatenate([np.ones((num_perturbed_cells))*u for u in range(1, num_unique_treatments + 1)])
         # (perturbation reps) retrieving perturbation labels
         perturbation_labels = np.vectorize(id_to_label_map.get)(perturbation_ids)
-        # (perturbation reps) retrieving perturbation group ids
-        group_ids = np.vectorize(lambda x: (x % num_unique_groups) + 1)(perturbation_ids)
         # (perturbation reps) retrieving perturbation group label
-        group_labels = np.vectorize(id_to_group_map.get)(group_ids)
-        return dosages, times, perturbation_ids, perturbation_labels, group_ids, group_labels
+        group_labels = np.vectorize(pert_to_group_map.get)(perturbation_ids)
+        return dosages, times, perturbation_labels, group_labels
 
     # retrieving data for treatment0
-    treatment0_dosages, treatment0_times, treatment0_perturbation_ids, treatment0_perturbation_labels, treatment0_group_ids, treatment0_group_labels = get_treatment_data()
+    treatment0_dosages, treatment0_times, treatment0_perturbation_labels, treatment0_group_labels = get_treatment_data()
     # retrieving data for treatment0
-    treatment1_dosages, treatment1_times, treatment1_perturbation_ids, treatment1_perturbation_labels, treatment1_group_ids, treatment1_group_labels = get_treatment_data()
+    treatment1_dosages, treatment1_times, treatment1_perturbation_labels, treatment1_group_labels = get_treatment_data()
 
     # shuffling treatment0 data
     shuffled_indices = np.random.permutation(tot_perturbed_cells)
@@ -132,9 +127,9 @@ def adata() -> anndata.AnnData:
     # defining mappings for uns
     uns = {
         f"{treatment0_label}_label": {label: np.array([label_id]) for label, label_id in label_to_id_map.items()},
-        f"{treatment0_label}_group": {group: np.array([group_id]) for group, group_id in group_to_id_map.items()},
+        f"{treatment0_label}_group": {label: np.array([group_id]) for label, group_id in pert_to_group_map.items()},
         f"{treatment1_label}_label": {label: np.array([label_id]) for label, label_id in label_to_id_map.items()},
-        f"{treatment1_label}_group": {group: np.array([group_id]) for group, group_id in group_to_id_map.items()},
+        f"{treatment1_label}_group": {label: np.array([group_id]) for label, group_id in pert_to_group_map.items()},
     }
 
     # definig mappings for obs
@@ -142,20 +137,18 @@ def adata() -> anndata.AnnData:
         control_key: is_control,
         target0_label: target0_data,
         target1_label: target1_data,
-        f"{treatment0_label}_label": treatment0_perturbation_labels,
-        f"{treatment0_label}_group": treatment0_group_labels,
-        f"{treatment0_label}_dose": treatment0_dosages,
-        f"{treatment0_label}_time": treatment0_times,
-        f"{treatment1_label}_label": treatment1_perturbation_labels,
-        f"{treatment1_label}_group": treatment1_group_labels,
-        f"{treatment1_label}_dose": treatment1_dosages,
-        f"{treatment1_label}_time": treatment1_times,
+        treatment0_label: treatment0_perturbation_labels,
+        treatment1_label: treatment1_perturbation_labels,
     }
 
     # defining mappings obsm
     sample_rep = "states"
     obsm = {
         sample_rep: states,
+        f"{treatment0_label}_dose": treatment0_dosages,
+        f"{treatment0_label}_time": treatment0_times,
+        f"{treatment1_label}_dose": treatment1_dosages,
+        f"{treatment1_label}_time": treatment1_times,
     }
 
     return anndata.AnnData(
@@ -164,5 +157,3 @@ def adata() -> anndata.AnnData:
         uns=uns,
         obsm=obsm,
     )
-
-
