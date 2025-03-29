@@ -22,7 +22,7 @@ from sc_exp_design.flows import (
     VariancePreservingFlow,
 )
 from sc_exp_design.networks import NeuralVelocityField
-from sc_exp_design.ode import ODESolver
+from sc_exp_design.ode import push_forward
 from sc_exp_design.training import BaseCallBack, CFMTrainer
 from sc_exp_design.transforms import Transform
 
@@ -301,6 +301,7 @@ class FlowMatching:
         callbacks: BaseCallBack | None = None,
         grad_step_interval_log: int = 100,
         num_treatments_to_load: int | None = None,
+        num_samples_per_validation_step: int | None = None
     ) -> None:
         """Trains the model.
 
@@ -368,6 +369,8 @@ class FlowMatching:
             has_controls=self.has_controls,
             generate_from_noise=self.generate_from_noise,
             noise_distribution=self.noise_distribution,
+            device_id=self.device_id,
+            num_samples_per_validation_step=num_samples_per_validation_step,
         )
 
         self.train_dataloader = TrainDataLoader(
@@ -432,52 +435,19 @@ class FlowMatching:
         if DataFields.PERTURBATION_DATA in batch.keys():
             condition = batch[DataFields.PERTURBATION_DATA]
 
-        # handling batch size
-        if source is not None:
-            batch_size = source.shape[: -1]
-        if batch_size is None:
-            batch_size = (1, )
-        
-        if isinstance(batch_size, int):
-            batch_size = (batch_size,)
-        
-        # handling number of samples
-        if num_samples is not None:
-            if not self.generate_from_noise:
-                msg = f""
-                logger.warning(msg)
-                num_samples = 1
-        else:
-            num_samples = 1
-        msg = f""
-        assert isinstance(num_samples, int), msg
-        if condition is not None:
-            condition = {
-                condition_covariate: condition_data.repeat(num_samples, *(1 for _ in condition_data.shape)).squeeze()
-                for condition_covariate, condition_data in condition.items()
-            }
-        if source is not None:
-            source = source.repeat(num_samples, *(1 for _ in source.shape)).squeeze()
-
-        # handling latent state
-        initial_state = source
-        if self.generate_from_noise:
-            initial_state = self.noise_distribution((num_samples, *batch_size, self.cvf_config.flow_dim)).squeeze().to(self.device)
-        msg = f""
-        assert initial_state is not None, msg
-
-        # defining velocity function
-        vf = self.velocity_field.get_vf_fn(condition, source=source)
-        # initializing the sampler clss
-        ode_solver = ODESolver(
-            vf,
-            num_time_steps=self.num_time_steps,
-            solver_kwargs=self.solver_kwargs,
-            device_id=self.device_id,
+        # pushing forward particles
+        predictions = push_forward(
+            self.velocity_field,
+            source,
+            condition,
+            self.generate_from_noise,
+            self.noise_distribution,
+            self.num_time_steps,
+            self.solver_kwargs,
+            self.device_id,
+            return_trajectory=return_trajectory,
+            no_grad=no_grad,
+            num_samples=num_samples,
+            batch_size=batch_size,
         )
-        if no_grad:
-            with torch.no_grad():
-                predictions = ode_solver.integrate(initial_state, return_trajectory=return_trajectory)
-        else:
-            predictions = ode_solver.integrate(initial_state, return_trajectory=return_trajectory)
         return predictions

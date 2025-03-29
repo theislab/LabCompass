@@ -15,7 +15,7 @@ from sc_exp_design.data import (
 )
 from sc_exp_design.flows import BaseFlow
 from sc_exp_design.networks import NeuralVelocityField
-from sc_exp_design.ode import ODESolver
+from sc_exp_design.ode import push_forward
 from sc_exp_design.training.callbacks import BaseCallBack
 from sc_exp_design.training.utils import (
     compute_cond_vars_inference_loss,
@@ -48,7 +48,9 @@ class CFMTrainer(BaseTrainer):
         has_controls: bool = True,
         generate_from_noise: bool = False,
         noise_distribution: Callable[[Sequence[int]], Tensor] = torch.randn,
-        grad_steps_log_interval: bool | None = None
+        grad_steps_log_interval: bool | None = None,
+        device_id: Literal["cuda", "cpu"] = "cuda",
+        num_samples_per_validation_step: int | None = None
     ) -> None:
         """"""
         self.velocity_field = velocity_field
@@ -65,6 +67,8 @@ class CFMTrainer(BaseTrainer):
         self.generate_from_noise = generate_from_noise
         self.noise_distribution = noise_distribution
         self.grad_steps_log_interval = grad_steps_log_interval
+        self.device_id = device_id
+        self.num_samples_per_validation_step = num_samples_per_validation_step
 
     @property
     def model(
@@ -123,15 +127,35 @@ class CFMTrainer(BaseTrainer):
         condition = None
         if DataFields.PERTURBATION_DATA in perturbation_batch.keys():
             condition = perturbation_batch[DataFields.PERTURBATION_DATA]
-        # defining velocity function
-        vf = self.velocity_field.get_vf_fn(condition, source=source)
-        # initializing the sampler clss
-        ode_sampler = ODESolver(
-            vf,
-            num_time_steps=self.num_time_steps,
-            solver_kwargs=self.solver_kwargs,
+        # pushing forward the particles
+        predictions = push_forward(
+            self.velocity_field,
+            source,
+            condition,
+            self.generate_from_noise,
+            self.noise_distribution,
+            self.num_time_steps,
+            self.solver_kwargs,
+            self.device_id,
+            return_trajectory=False,
+            no_grad=True,
+            num_samples=self.num_samples_per_validation_step,
+            batch_size=target.shape[0],
         )
-        predictions = ode_sampler.integrate(source)
+        if self.num_samples_per_validation_step is None:
+            return predictions, target
+        # handling number of samples
+        if num_samples is not None:
+            if not generate_from_noise:
+                msg = f""
+                logger.warning(msg)
+                num_samples = 1
+        else:
+            num_samples = 1
+        msg = f""
+        assert isinstance(num_samples, int), msg
+        # handling the shape of the target when we sample multiple predictions
+        target = torch.repeat(num_samples, *(1 for _ in predictions.shape[1:]))
         return predictions, target
 
     def _validation_step(
