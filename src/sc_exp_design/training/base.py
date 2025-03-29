@@ -16,7 +16,6 @@ from sc_exp_design.types import TensorLike
 
 class BaseTrainer(abc.ABC):
     """"""
-    _require_solver_for_validation: bool
 
     @abc.abstractmethod
     def _train_step(
@@ -53,9 +52,6 @@ class BaseTrainer(abc.ABC):
         # learning rate scheduler step
         if self.lr_scheduler_step == "grad_step" and self.lr_scheduler is not None:
             self.lr_scheduler.step()
-        # running callbacks
-        if self.callbacks is not None:
-            self.callbacks.run_on_grad_step()
         return log_dict
 
     def __validation_step(
@@ -73,8 +69,8 @@ class BaseTrainer(abc.ABC):
             self.lr_scheduler.step()
         # running callbacks
         if self.callbacks is not None:
-            self.callbacks.run_on_valid_step()
-        return val_preds, val_gt
+            metrics = self.callbacks.run_on_valid_step()
+        return metrics
 
     def __update_logs(
         self,
@@ -104,6 +100,10 @@ class BaseTrainer(abc.ABC):
         if do_validation and valid_freq is None:
             valid_freq = num_training_steps
 
+        # running callbacks
+        if self.callbacks is not None:
+            self.callbacks.run_on_train_begin()
+
         for grad_step in iterator:
             batch = train_dataloader.sample()
             log_dict = self.__train_step(grad_step, batch)
@@ -120,18 +120,15 @@ class BaseTrainer(abc.ABC):
                     # skipping if no dataloader provided
                     if validation_dataloader is None:
                         continue
-                    # sanity check
-                    if self._require_solver_for_validation:
-                        msg = "To perform the validation step `self.solver_class` must be an instance of `ODESolver`, found `None`."
-                        assert self.solver_class is not None, msg
 
                     batch = validation_dataloader.sample()
-                    val_preds, val_gt = self.__validation_step(batch)
+                    metrics = self.__validation_step(batch)
+                    self.__update_logs(metrics)
 
-                    # computing metrics
-                    if self.callbacks is not None:
-                        metrics = self.callbacks.run_on_valid_step(val_preds, val_gt)
-                        self.__update_logs(metrics)
+                # running callbacks
+        if self.callbacks is not None:
+            self.callbacks.run_on_train_end()
+
 
     def plot_training_logs(
         self,
@@ -161,5 +158,3 @@ class BaseTrainer(abc.ABC):
         if show:
             fig.show()
         return fig, axes
-
-

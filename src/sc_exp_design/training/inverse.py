@@ -12,7 +12,7 @@ from sc_exp_design.constants import DataFields, LossFields, VFStepFields
 from sc_exp_design.data import SequentialDataLoader
 from sc_exp_design.networks.blocks import BaseModule
 from sc_exp_design.training.base import BaseTrainer
-from sc_exp_design.training.callbacks import CallBack
+from sc_exp_design.training.callbacks import BaseCallBack
 from sc_exp_design.training.utils import compute_pert_inference_loss
 from sc_exp_design.types import TensorLike
 
@@ -22,7 +22,6 @@ __all__ = ["TargetPredictionTrainer", "InverseModelTrainer", ]
 
 class TargetPredictionTrainer(BaseTrainer):
     """"""
-    _require_solver_for_validation: bool = False
 
     def __init__(
         self,
@@ -30,8 +29,8 @@ class TargetPredictionTrainer(BaseTrainer):
         optimizer: torch.optim.Optimizer,
         lr_scheduler: torch.optim.lr_scheduler.LRScheduler | None = None,
         lr_scheduler_step: Literal["grad_step", "valid_step"] = "grad_step",
-        callbacks: CallBack | None = None,
-        grad_step_interval_log: int = 1000,
+        callbacks: BaseCallBack | None = None,
+        grad_steps_log_interval: int | None = None
     ) -> None:
         """"""
         self.target_prediction_model = target_prediction_model
@@ -39,7 +38,7 @@ class TargetPredictionTrainer(BaseTrainer):
         self.lr_scheduler = lr_scheduler
         self.lr_scheduler_step = lr_scheduler_step
         self.callbacks = callbacks
-        self.grad_step_interval_log = grad_step_interval_log
+        self.grad_steps_log_interval = grad_steps_log_interval
 
     @property
     def model(
@@ -83,7 +82,6 @@ class TargetPredictionTrainer(BaseTrainer):
 
 class InverseModelTrainer(BaseTrainer):
     """"""
-    _require_solver_for_validation: bool = False
 
     def __init__(
         self,
@@ -93,8 +91,8 @@ class InverseModelTrainer(BaseTrainer):
         optimizer: torch.optim.Optimizer,
         lr_scheduler: torch.optim.lr_scheduler.LRScheduler | None = None,
         lr_scheduler_step: Literal["grad_step", "valid_step"] = "grad_step",
-        callbacks: CallBack | None = None,
-        grad_step_interval_log: int = 1000,
+        callbacks: BaseCallBack | None = None,
+        grad_steps_log_interval: int | None = None,
     ) -> None:
         """"""
         super().__init__()
@@ -106,7 +104,7 @@ class InverseModelTrainer(BaseTrainer):
         self.lr_scheduler = lr_scheduler
         self.lr_scheduler_step = lr_scheduler_step
         self.callbacks = callbacks
-        self.grad_step_interval_log = grad_step_interval_log 
+        self.grad_steps_log_interval = grad_steps_log_interval 
 
     @property
     def model(

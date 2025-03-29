@@ -1,4 +1,5 @@
 import logging
+import os
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any, Literal
 
@@ -22,7 +23,7 @@ from sc_exp_design.flows import (
 )
 from sc_exp_design.networks import NeuralVelocityField
 from sc_exp_design.ode import ODESolver
-from sc_exp_design.training import CallBack, CFMTrainer
+from sc_exp_design.training import BaseCallBack, CFMTrainer
 from sc_exp_design.transforms import Transform
 
 logger = logging.getLogger(__name__)
@@ -297,7 +298,7 @@ class FlowMatching:
         train_batch_size: int = 1024,
         validation_batch_size: int = 512,
         state_transforms: Transform | None = None,
-        callbacks: CallBack | None = None,
+        callbacks: BaseCallBack | None = None,
         grad_step_interval_log: int = 100,
         posterior_on_cond_vars_update_step: int | None = None,
         posterior_on_perts_update_step: int | None = None,
@@ -325,7 +326,7 @@ class FlowMatching:
         :type state_transforms: class:`Transforms`
 
         :param callbacks: (Optional) callbacks that will be called during training. Still work in progress, defaults to `None`.
-        :type callbacks: class:`CallBack`
+        :type callbacks: class:`BaseCallBack`
 
         :param grad_step_interval_log: The number of gradient steps after which to update the progress bar, defaults to `100`.
         :type grad_step_interval_log: class:`int`

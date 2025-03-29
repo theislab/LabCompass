@@ -17,7 +17,7 @@ from sc_exp_design.networks.inverse import (
     NeuralInverseModel,
 )
 from sc_exp_design.networks.inference_networks import PerturbationApproximatePosterior
-from sc_exp_design.training import CallBack, TargetPredictionTrainer, InverseModelTrainer
+from sc_exp_design.training import BaseCallBack, TargetPredictionTrainer, InverseModelTrainer
 from sc_exp_design.transforms import Transform
 
 logger = logging.getLogger(__name__)
@@ -159,7 +159,7 @@ class InverseModel:
         train_batch_size: int = 1024,
         validation_batch_size: int = 512,
         state_transforms: Transform | None = None,
-        callbacks: CallBack | None = None,
+        callbacks: BaseCallBack | None = None,
         grad_step_interval_log: int = 100,
     ) -> None:
         """"""
@@ -493,7 +493,7 @@ class InverseModel:
         train_batch_size: int = 1024,
         validation_batch_size: int = 512,
         state_transforms: Transform | None = None,
-        callbacks: CallBack | None = None,
+        callbacks: BaseCallBack | None = None,
         grad_step_interval_log: int = 100,
     ) -> None:
         """"""
