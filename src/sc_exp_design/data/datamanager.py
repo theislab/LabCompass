@@ -65,38 +65,33 @@ class DataManager:
 
         # preparing the attributes
         if perturbations is not None:
+            # handling type of perturbations argument
             if isinstance(perturbations, str):
                 perturbations = (perturbations,)
+            # iterating over the perturbations
             for perturbation in perturbations:
-                perturbation_found = False
-                
-                # cell level covariates
-                if perturbation_covariates is not None:
-                    if perturbation in perturbation_covariates.keys():
-                        covariates = perturbation_covariates[perturbation]
-                        if isinstance(covariates, str):
-                            covariates = (covariates,)
-                        perturbation_found = True
-                    else:
-                        covariates = ()
-                    perturbation_covariates[perturbation] = covariates
-                    
                 # perturbation level covariates
                 if perturbation_reps is not None:
                     if perturbation in perturbation_reps.keys():
                         rep = perturbation_reps[perturbation]
                         if isinstance(rep, str):
                             rep = (rep,)
-                        perturbation_found = True
+                        perturbation_reps[perturbation] = rep
+                    # skip perturbation if no representation found, warn
                     else:
-                        rep = ()
-                    perturbation_reps[perturbation] = rep
+                        msg = f"{perturbation} in `self.perturbation` has no representation associated to it, skipping."
+                        logger.warning(msg)
+                        continue
+                # cell level covariates
+                if perturbation_covariates is not None:
+                    if perturbation in perturbation_covariates.keys():
+                        covariates = perturbation_covariates[perturbation]
+                        if isinstance(covariates, str):
+                            covariates = (covariates,)
+                    else:
+                        covariates = ()
+                    perturbation_covariates[perturbation] = covariates
                     
-                # warning if perturbation not found
-                if not perturbation_found:
-                    msg = f"{perturbation} in `self.perturbation` has neither any representation nor covariates associates, skipping."
-                    logger.warning(msg)
-
         self.perturbations = perturbations
         self.perturbation_covariates = perturbation_covariates
         self.perturbation_reps = perturbation_reps
@@ -301,7 +296,7 @@ class DataManager:
                 out_dict[condition_target_covariate] = covariate_target_rep_data
         return out_dict
 
-    def get_train_data(
+    def get_data(
         self,
         adata: anndata.AnnData | None = None,
     ) -> AnnotatedPerturbationData:

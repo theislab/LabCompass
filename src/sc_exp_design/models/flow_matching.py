@@ -194,7 +194,7 @@ class FlowMatching:
             target_covariates_kwargs=target_covariates_kwargs,
             has_controls=has_controls,
         )
-        train_data = data_manager.get_train_data(train_adata)
+        train_data = data_manager.get_data(train_adata)
 
         self.data_manager = data_manager
         self.train_data = train_data
@@ -209,7 +209,7 @@ class FlowMatching:
         :param validation_adata: An instance of :class:`anndata.AnnData` containing the validation data.
         :type validation_adata: class:`anndata.AnnData`
         """
-        validation_data = self.data_manager.get_train_data(validation_adata)
+        validation_data = self.data_manager.get_data(validation_adata)
         self.validation_data = validation_data
 
     def prepare_model(
