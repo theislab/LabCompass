@@ -4,6 +4,7 @@ from typing import Any, Literal
 import omegaconf
 import wandb
 
+from sc_exp_design.constants import DataFields, PredictionFields
 from sc_exp_design.metrics import Metrics
 from sc_exp_design.transforms import Transform
 from sc_exp_design.types import TensorLike
@@ -29,8 +30,7 @@ class BaseCallBack:
 
     def run_on_valid_step(
         self,
-        *args,
-        **kwargs,
+        prediction_dict: dict[str, dict[str, TensorLike]],
     ) -> None:
         """"""
         pass
@@ -48,25 +48,10 @@ class ComputationalCallBack(BaseCallBack):
     """"""
     callback_type: Literal["computational", "logging"] = "computational"
 
-    def run_on_valid_step(
-        self,
-        preds: TensorLike,
-        target: TensorLike,
-    ) -> dict[str, Any]:
-        """"""
-        raise NotImplementedError
-
 
 class LoggingCallBack(BaseCallBack):
     """"""
     callback_type: Literal["computational", "logging"] = "logging"
-
-    def run_on_valid_step(
-        self,
-        log_dict: dict[str, Any],
-    ) -> None:
-        """"""
-        raise NotImplementedError
 
 
 class MetricsCallBack(ComputationalCallBack):
@@ -81,7 +66,7 @@ class MetricsCallBack(ComputationalCallBack):
         self.metric_ids = metric_ids
         self.state_transforms = state_transforms
 
-    def run_on_valid_step(
+    def _run_on_valid_step(
             self,
             preds: TensorLike,
             target: TensorLike,
@@ -95,6 +80,32 @@ class MetricsCallBack(ComputationalCallBack):
             metric = vars(Metrics())[metric_id]
             metrics[metric_id] = metric(preds, target)
         return metrics
+    
+    def run_on_valid_step(
+        self,
+        predictions_dict: dict[str, dict[str, TensorLike]],
+    ) -> dict[str, float]:
+        """"""
+        # defining output dictionary
+        metrics = {}
+        
+        # iterating over the predictions for each condition
+        for perturbation, perturbation_prediction_data in predictions_dict.items():
+            # parsing prediction data dictionary
+            predictions = perturbation_prediction_data[PredictionFields.PREDICTION_DATA]
+            targets = perturbation_prediction_data[DataFields.TARGET_STATE]
+            
+            # computing the metrics for the current perturbation
+            perturbation_metrics = self._run_on_valid_step(predictions, targets)
+
+            # updating the metrics 
+            metrics.update(
+                {
+                    f"{perturbation}_{metric_id}": metric_value for metric_id, metric_value in perturbation_metrics.items()
+                }
+            )
+        return metrics
+
 
 
 class WandBLogger(LoggingCallBack):
@@ -186,14 +197,13 @@ class TrainingCallBacks(BaseCallBack):
 
     def run_on_valid_step(
         self,
-        preds: TensorLike,
-        target: TensorLike,
+        prediction_dict: dict[str, dict[str, TensorLike]],
     ) -> dict[str, Any]:
         """"""
         # run computational callbacks first
         callback_out = {}
         for callback in self.computational_callbacks:
-            callback_metrics = callback.run_on_valid_step(preds, target)
+            callback_metrics = callback.run_on_valid_step(prediction_dict)
             callback_out.update(callback_metrics)
         # then log the results
         for callback in self.logging_callbacks:

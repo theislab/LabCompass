@@ -6,7 +6,7 @@ import numpy as np
 import torch
 
 from sc_exp_design.constants import DataFields
-from sc_exp_design.data.dataloaders import TrainData, SequentialDataLoader
+from sc_exp_design.data.dataloaders import AnnotatedPerturbationData, SequentialDataLoader
 from sc_exp_design.models.flow_matching import FlowMatching
 from sc_exp_design.models.inverse_utils import LangevinOptimizer
 from sc_exp_design.networks.blocks import BaseModule, BaseForwardModel
@@ -152,8 +152,8 @@ class InverseModel:
 
     def train_target_prediction_model(
         self,
-        train_data: TrainData | None = None,
-        validation_data: TrainData | None = None,
+        train_data: AnnotatedPerturbationData | None = None,
+        validation_data: AnnotatedPerturbationData | None = None,
         num_training_steps: int = 500,
         valid_freq: int | None = None,
         train_batch_size: int = 1024,
@@ -173,7 +173,7 @@ class InverseModel:
             train_data = self.forward_model.train_data
 
         msg = f""
-        assert isinstance(train_data, TrainData), msg
+        assert isinstance(train_data, AnnotatedPerturbationData), msg
 
         msg = f""
         assert train_data.target_perturbation_repr is not None, msg
@@ -486,8 +486,8 @@ class InverseModel:
 
     def train_inverse_model(
         self,
-        train_data: TrainData | None = None,
-        validation_data: TrainData | None = None,
+        train_data: AnnotatedPerturbationData | None = None,
+        validation_data: AnnotatedPerturbationData | None = None,
         num_training_steps: int = 500,
         valid_freq: int | None = None,
         train_batch_size: int = 1024,
@@ -510,7 +510,7 @@ class InverseModel:
             train_data = self.forward_model.train_data
 
         msg = f""
-        assert isinstance(train_data, TrainData), msg
+        assert isinstance(train_data, AnnotatedPerturbationData), msg
 
         msg = f""
         assert train_data.target_perturbation_repr is not None, msg
