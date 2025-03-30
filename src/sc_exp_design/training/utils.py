@@ -12,8 +12,6 @@ __all__ = [
     "neg_bin_rec_loss",
     "binary_classification_loss",
     "reconstruction_loss_noise_model",
-    "compute_cond_vars_inference_loss",
-    "compute_pert_inference_loss",
 ]
 
 
@@ -107,29 +105,24 @@ def compute_pert_inference_loss(
     pert_noise_models: dict[str, str],
     pert_cov_estimation_modes: dict[str, str] | None = None,
     add_loss: bool = True,
+    allow_noise_model_to_be_none: bool = False
 ) -> tuple[Tensor, dict[str, Tensor]]:
     """"""
     loss_dict = {}
     for pert_target_cov_id, pert_target_cov_params in pert_posterior_params.items():
+        # retrieving settings for current target covariate
         target_rep = pert_target_rep[pert_target_cov_id]
         noise_model = pert_noise_models[pert_target_cov_id]
-        if noise_model is None:
-            pert_posterior_loss_fn = binary_classification_loss
-        elif noise_model == "gaussian":
-            msg = f"With {noise_model=} `pert_cov_estimation_mode` needs to be in `['isotropic', 'anisotropic']`, found `None`."
-            assert pert_cov_estimation_modes is not None, msg
-            cov_estimation_mode = pert_cov_estimation_modes[pert_target_cov_id]
-            pert_posterior_loss_fn = partial(gaussian_rec_loss, cov_estimation_mode=cov_estimation_mode)
-        elif noise_model == "neg_bin":
-            pert_posterior_loss_fn = neg_bin_rec_loss
-        else:
-            msg = f"{noise_model=} not supported (possible values `['gaussian', 'neg_bin']`)."
-            raise ValueError(msg)
-
-        pert_posterior_loss = pert_posterior_loss_fn(
+        cov_estimation_mode = pert_cov_estimation_modes[pert_target_cov_id]
+        # computing loss for noise model
+        loss = reconstruction_loss_noise_model(
             pert_target_cov_params,
             target_rep,
+            noise_model,
+            cov_estimation_mode=cov_estimation_mode,
+            allow_noise_model_to_be_none=allow_noise_model_to_be_none,
         )
+
         # adding loss
         if add_loss:
             loss = loss + pert_posterior_loss

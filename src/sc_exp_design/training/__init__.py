@@ -9,8 +9,6 @@ from sc_exp_design.training.flow_matching import CFMTrainer
 from sc_exp_design.training.utils import (
     binary_classification_loss,
     compute_pert_inference_loss,
-    gaussian_rec_loss,
-    neg_bin_rec_loss,
     reconstruction_loss_noise_model,
 )
 

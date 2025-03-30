@@ -108,10 +108,14 @@ class BaseTrainer(abc.ABC):
             log_dict = self.__train_step(grad_step, batch)
             self.__update_logs(log_dict)
 
-            # updaring progress bar
-            if (grad_step + 1) % self.grad_step_interval_log and grad_step > 0:
+            # updating progress bar
+            grad_steps_log_interval = self.grad_steps_log_interval
+            if self.grad_steps_log_interval is None:
+                grad_steps_log_interval = 1
+            if (grad_step + 1) % grad_steps_log_interval == 0 and grad_step > 0:
                 prog_bar.set_description(f"Loss: {log_dict[LossFields.LOSS]:.4f}")
-                prog_bar.update()
+            prog_bar.update()
+        
 
             # validation step
             if do_validation:
