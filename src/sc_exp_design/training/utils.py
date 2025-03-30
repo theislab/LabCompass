@@ -12,9 +12,6 @@ __all__ = [
     "neg_bin_rec_loss",
     "binary_classification_loss",
     "reconstruction_loss_noise_model",
-    "compute_cond_vars_inference_loss",
-    "compute_pert_inference_loss",
-    "compute_latent_perturbation_inference_loss",
 ]
 
 
@@ -77,7 +74,7 @@ def reconstruction_loss_noise_model(
     samples: Tensor,
     noise_model: Literal["gaussian", "neg_bin"] | None,
     cov_estimation_mode: Literal["isotropic", "anisotropic"] | None = None,
-    allow_noise_model_to_be_none: bool = False
+    allow_noise_model_to_be_none: bool = True
 ) -> Tensor:
     """"""
     # loss on the source posterior
@@ -101,97 +98,36 @@ def reconstruction_loss_noise_model(
     )
     return loss
 
-
-def compute_cond_vars_inference_loss(
-    loss: Tensor,
-    source: Tensor,
-    target: Tensor,
-    src_posterior_params: dict[str, Tensor],
-    tgt_posterior_params: dict[str, Tensor],
-    src_noise_model: str,
-    tgt_noise_model: str,
-    src_cov_estimation_mode: str | None,
-    tgt_cov_estimation_mode: str | None,
-    add_loss: bool = True,
-) -> tuple[Tensor, dict[str, Tensor]]:
-    """"""
-    # loss on the source posterior
-    src_posterior_loss = reconstruction_loss_noise_model(
-        src_posterior_params,
-        source,
-        src_noise_model,
-        src_cov_estimation_mode,
-    )
-    # loss on the target posterior
-    tgt_posterior_loss = reconstruction_loss_noise_model(
-        tgt_posterior_params,
-        target,
-        tgt_noise_model,
-        tgt_cov_estimation_mode,
-    )
-    # adding loss and updating creating log dictionary
-    if add_loss:
-        loss = loss + src_posterior_loss + tgt_posterior_loss
-    loss_dict = {
-        LossFields.SOURCE_LOSS: src_posterior_loss.detach().cpu().item(),
-        LossFields.TARGET_LOSS: src_posterior_loss.detach().cpu().item(),
-    }
-    return loss, loss_dict
-
-
 def compute_pert_inference_loss(
-    loss: Tensor,
     pert_posterior_params: dict[str, Tensor],
     pert_target_rep: dict[str, Tensor],
     pert_noise_models: dict[str, str],
     pert_cov_estimation_modes: dict[str, str] | None = None,
     add_loss: bool = True,
+    allow_noise_model_to_be_none: bool = True,
 ) -> tuple[Tensor, dict[str, Tensor]]:
     """"""
+    loss = torch.zeros((), requires_grad=True)
     loss_dict = {}
     for pert_target_cov_id, pert_target_cov_params in pert_posterior_params.items():
+        # retrieving settings for current target covariate
         target_rep = pert_target_rep[pert_target_cov_id]
         noise_model = pert_noise_models[pert_target_cov_id]
-        if noise_model is None:
-            pert_posterior_loss_fn = binary_classification_loss
-        elif noise_model == "gaussian":
-            msg = f"With {noise_model=} `pert_cov_estimation_mode` needs to be in `['isotropic', 'anisotropic']`, found `None`."
-            assert pert_cov_estimation_modes is not None, msg
-            cov_estimation_mode = pert_cov_estimation_modes[pert_target_cov_id]
-            pert_posterior_loss_fn = partial(gaussian_rec_loss, cov_estimation_mode=cov_estimation_mode)
-        elif noise_model == "neg_bin":
-            pert_posterior_loss_fn = neg_bin_rec_loss
-        else:
-            msg = f"{noise_model=} not supported (possible values `['gaussian', 'neg_bin']`)."
-            raise ValueError(msg)
-
-        pert_posterior_loss = pert_posterior_loss_fn(
+        cov_estimation_mode = pert_cov_estimation_modes[pert_target_cov_id]
+        # computing loss for noise model
+        pert_posterior_loss = reconstruction_loss_noise_model(
             pert_target_cov_params,
             target_rep,
+            noise_model,
+            cov_estimation_mode=cov_estimation_mode,
+            allow_noise_model_to_be_none=allow_noise_model_to_be_none,
         )
+
         # adding loss
-        if add_loss:
-            loss = loss + pert_posterior_loss
+        loss = loss + pert_posterior_loss
 
         # updating log dict
         cov_loss_id = f"{pert_target_cov_id}_{LossFields.PERTURBATION_LOSS}"
         loss_dict[cov_loss_id] = pert_posterior_loss.detach().cpu().item()
 
-    return loss, loss_dict
-
-
-def compute_latent_perturbation_inference_loss(
-    loss: Tensor,
-    params: dict[str, Tensor],
-    latent_perturbation: Tensor,
-    cov_estimation_mode: Literal["isotropic", "anisotropic"],
-    add_loss: bool = True,
-) -> tuple[Tensor, dict[str, Tensor]]:
-    """"""
-    latent_pert_inference_loss = reconstruction_loss_noise_model(
-        params, latent_perturbation, "gaussian", cov_estimation_mode=cov_estimation_mode
-    )
-    loss_dict = {LossFields.LATENT_PERTURBATION_INF_LOSS: latent_pert_inference_loss.detach().cpu().item()}
-    if add_loss:
-        loss = loss + latent_pert_inference_loss
     return loss, loss_dict
