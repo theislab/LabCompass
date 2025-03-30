@@ -111,7 +111,7 @@ class BaseTrainer(abc.ABC):
             # updating progress bar
             grad_steps_log_interval = self.grad_steps_log_interval
             if self.grad_steps_log_interval is None:
-                grad_steps_log_interval = 1
+                grad_steps_log_interval = 100
             if (grad_step + 1) % grad_steps_log_interval == 0 and grad_step > 0:
                 prog_bar.set_description(f"Loss: {log_dict[LossFields.LOSS]:.4f}")
             prog_bar.update()

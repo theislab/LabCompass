@@ -495,7 +495,7 @@ class InverseModel(BaseModel):
         validation_batch_size: int = 512,
         state_transforms: Transform | None = None,
         callbacks: BaseCallBack | None = None,
-        grad_step_interval_log: int = 100,
+        grad_steps_log_interval: int = 100,
     ) -> None:
         """"""
         # sanity checks
@@ -525,7 +525,7 @@ class InverseModel(BaseModel):
             lr_scheduler=self.inverse_model_lr_scheduler,
             lr_scheduler_step=self.inverse_model_lr_scheduler_step,
             callbacks=callbacks,
-            grad_step_interval_log=grad_step_interval_log,
+            grad_steps_log_interval=grad_steps_log_interval,
         )
 
         # retrieving control indices
