@@ -2,6 +2,7 @@ import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
 from dataclasses import field as dc_field
+from functools import partial
 from typing import Any, Literal
 
 from torch import nn
@@ -203,7 +204,18 @@ class NeuralVelocityFieldConfig:
         """
         Compatibility checks and edits for a valid configuration 
         """
-  
+        # sanity check on mlp configurations
+        mlp_kwargs_verifier = partial(
+            LayersDict.verify_keys, 
+            require_layer_type_key=False,
+            require_input_dim_key=False,
+            require_output_dim_key=False,
+        )
+        mlp_kwargs_verifier(self.state_encoder_mlp_kwargs)
+        mlp_kwargs_verifier(self.time_encoder_mlp_kwargs)
+        mlp_kwargs_verifier(self.decoder_mlp_kwargs)
+        mlp_kwargs_verifier(self.source_encoder_mlp_kwargs)
+
         # sanity check on condition encoder
         if self.use_guidance:
             msg = f"With {self.use_guidance=} you need to pass a dictionary in the proper format as the `self.perturbation_layers_before_pooling` attribute, found `None`"
