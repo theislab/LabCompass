@@ -300,7 +300,7 @@ class FlowMatching(BaseModel):
         validation_batch_size: int = 512,
         state_transforms: Transform | None = None,
         callbacks: BaseCallBack | None = None,
-        grad_step_interval_log: int = 100,
+        grad_steps_log_interval: int = 100,
         num_treatments_to_load: int | None = None,
         num_samples_per_validation_step: int | None = None
     ) -> None:
@@ -364,7 +364,7 @@ class FlowMatching(BaseModel):
             lr_scheduler_step=self.lr_scheduler_step,
             time_sampler=self.time_sampler,
             callbacks=callbacks,
-            grad_step_interval_log=grad_step_interval_log,
+            grad_steps_log_interval=grad_steps_log_interval,
             num_time_steps=self.num_time_steps,
             solver_kwargs=self.solver_kwargs,
             has_controls=self.has_controls,
