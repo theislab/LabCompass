@@ -142,7 +142,7 @@ class WandBLogger(LoggingCallBack):
         wandb.login()
         wandb.init(
             project=self.project_name,
-            config=config,
+            config=omegaconf.OmegaConf.to_container(config, resolve=True),
             dir=self.log_dir,
             settings=settings,
         )
