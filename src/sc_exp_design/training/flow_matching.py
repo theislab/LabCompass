@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Callable, Sequence
 from typing import Any, Literal
 
@@ -19,6 +20,8 @@ from sc_exp_design.ode import push_forward
 from sc_exp_design.training.callbacks import BaseCallBack
 from sc_exp_design.training.base import BaseTrainer
 from sc_exp_design.types import TensorLike
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "CFMTrainer",
@@ -141,7 +144,7 @@ class CFMTrainer(BaseTrainer):
             return predictions, target
         # handling number of samples
         if num_samples is not None:
-            if not generate_from_noise:
+            if not self.generate_from_noise:
                 msg = f""
                 logger.warning(msg)
                 num_samples = 1
