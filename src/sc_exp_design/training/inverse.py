@@ -11,8 +11,9 @@ from tqdm import tqdm
 from sc_exp_design.constants import DataFields, LossFields, VFStepFields
 from sc_exp_design.data import SequentialDataLoader
 from sc_exp_design.networks.blocks import BaseModule
+from sc_exp_design.networks.neural_noise_models import MLPGaussianNoiseModel
 from sc_exp_design.training.base import BaseTrainer
-from sc_exp_design.training.callbacks import CallBack
+from sc_exp_design.training.callbacks import BaseCallBack
 from sc_exp_design.training.utils import compute_pert_inference_loss
 from sc_exp_design.types import TensorLike
 
@@ -22,7 +23,6 @@ __all__ = ["TargetPredictionTrainer", "InverseModelTrainer", ]
 
 class TargetPredictionTrainer(BaseTrainer):
     """"""
-    _require_solver_for_validation: bool = False
 
     def __init__(
         self,
@@ -30,8 +30,8 @@ class TargetPredictionTrainer(BaseTrainer):
         optimizer: torch.optim.Optimizer,
         lr_scheduler: torch.optim.lr_scheduler.LRScheduler | None = None,
         lr_scheduler_step: Literal["grad_step", "valid_step"] = "grad_step",
-        callbacks: CallBack | None = None,
-        grad_step_interval_log: int = 1000,
+        callbacks: BaseCallBack | None = None,
+        grad_steps_log_interval: int | None = None
     ) -> None:
         """"""
         self.target_prediction_model = target_prediction_model
@@ -39,7 +39,7 @@ class TargetPredictionTrainer(BaseTrainer):
         self.lr_scheduler = lr_scheduler
         self.lr_scheduler_step = lr_scheduler_step
         self.callbacks = callbacks
-        self.grad_step_interval_log = grad_step_interval_log
+        self.grad_steps_log_interval = grad_steps_log_interval
 
     @property
     def model(
@@ -47,6 +47,19 @@ class TargetPredictionTrainer(BaseTrainer):
     ) -> BaseModule:
         """"""
         return self.target_prediction_model
+
+    @property
+    def pert_cov_estimation_modes(
+        self
+    ) -> dict[str, Literal["isotropic", "anisotropic"] | None]:
+        """"""
+        covariance_estimation_modes = {}
+        for covariate, covariate_approximate_posterior in self.target_prediction_model.pert_approximate_posterior.items():
+            estimation_mode = None
+            if isinstance(covariate_approximate_posterior, MLPGaussianNoiseModel):
+                estimation_mode = covariate_approximate_posterior.cov_estimation_mode
+            covariance_estimation_modes[covariate] = estimation_mode
+        return covariance_estimation_modes
 
     def _train_step(
         self,
@@ -60,14 +73,12 @@ class TargetPredictionTrainer(BaseTrainer):
         # forward pass on the model
         predictions = self.target_prediction_model(states)
         # computing loss
-        loss = torch.zeros((), requires_grad=True)
         loss, log_dict = compute_pert_inference_loss(
-            loss,
             predictions,
             targets,
             self.target_prediction_model.noise_models,
-            pert_cov_estimation_modes=..., # TODO: we dont need it for the moment but we will need to pass it at some point.
-            add_loss=True,
+            pert_cov_estimation_modes=self.pert_cov_estimation_modes, # TODO: we dont need it for the moment but we will need to pass it at some point.
+            allow_noise_model_to_be_none=True,
         )
         return loss, {LossFields.LOSS: loss.item(), **log_dict}
     
@@ -83,7 +94,6 @@ class TargetPredictionTrainer(BaseTrainer):
 
 class InverseModelTrainer(BaseTrainer):
     """"""
-    _require_solver_for_validation: bool = False
 
     def __init__(
         self,
@@ -93,8 +103,8 @@ class InverseModelTrainer(BaseTrainer):
         optimizer: torch.optim.Optimizer,
         lr_scheduler: torch.optim.lr_scheduler.LRScheduler | None = None,
         lr_scheduler_step: Literal["grad_step", "valid_step"] = "grad_step",
-        callbacks: CallBack | None = None,
-        grad_step_interval_log: int = 1000,
+        callbacks: BaseCallBack | None = None,
+        grad_steps_log_interval: int | None = None,
     ) -> None:
         """"""
         super().__init__()
@@ -106,7 +116,7 @@ class InverseModelTrainer(BaseTrainer):
         self.lr_scheduler = lr_scheduler
         self.lr_scheduler_step = lr_scheduler_step
         self.callbacks = callbacks
-        self.grad_step_interval_log = grad_step_interval_log 
+        self.grad_steps_log_interval = grad_steps_log_interval 
 
     @property
     def model(

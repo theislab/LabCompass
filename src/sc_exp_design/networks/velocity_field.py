@@ -103,8 +103,6 @@ class NeuralVelocityField(BaseModule):
             nn.Module: The model in evaluation mode.
         """
         self = super().eval()
-        if self.config.learn_posterior_on_perts:
-            self.pert_approximate_posterior = self.pert_approximate_posterior.eval()
         if self.condition_encoder is not None:
             self.condition_encoder = self.condition_encoder.eval()
         return self
@@ -147,7 +145,7 @@ class NeuralVelocityField(BaseModule):
             self.source_encoder = MLPBlock(
                 self.config.flow_dim,
                 self.config.source_latent_dim,
-                **self.config.source_mlp_kwargs,
+                **self.config.source_encoder_mlp_kwargs,
             )
         # decoder
         self.decoder = MLPBlock(
@@ -185,7 +183,7 @@ class NeuralVelocityField(BaseModule):
                 num_freqs=self.config.time_features_num_freqs,
             )
         if self.config.encode_time:
-            t_latent = self.time_encoder(t)
+            t_latent = self.time_encoder(t_latent)
             
         # encoding conditions
         condition_latent = cond

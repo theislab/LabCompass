@@ -9,7 +9,7 @@ import torch
 
 from sc_exp_design.constants import DataFields
 from sc_exp_design.couplings import Coupling, OTCoupling
-from sc_exp_design.data.data import PredictionData, TrainData
+from sc_exp_design.data.data import AnnotatedPerturbationData
 from sc_exp_design.transforms import Transform
 from sc_exp_design.types import TensorLike
 
@@ -33,11 +33,68 @@ class BaseDataLoader(abc.ABC):
         raise NotImplementedError
 
 
+class BaseCoupledDataLoader(BaseDataLoader):
+    """"""
+
+    def _get_matched_data(
+        self,
+        treatments: Sequence[str] | None,
+        control_states: TensorLike | None,
+    ) -> dict[str, TensorLike | dict[str, TensorLike]]:
+        """"""
+        # sanity check
+        if self.has_controls:
+            msg = f""
+            assert control_states is not None, msg
+
+        # treatment states
+        trtm_data = self.data.get_treatments(self.batch_size, treatments)
+        trtm_states = trtm_data[DataFields.STATE_DATA]
+
+        # control states
+        target_idx = np.arange(self.batch_size)
+        if self.has_controls:
+
+            # matching the two groups
+            source_idx, target_idx = self.coupling.match_groups(control_states, trtm_states)
+
+        # moving states to torch tensors
+        if self.has_controls:
+            source = torch.from_numpy(control_states[source_idx]).to(self.device).float()
+        target = torch.from_numpy(trtm_states[target_idx]).to(self.device).float()
+
+        # handling transformations
+        if self.state_transforms is not None:
+            if self.has_controls:
+                source = self.state_transforms.transform(source)
+            target = self.state_transforms.transform(target)
+
+        # constructing output dictionary
+        out_dict = {DataFields.TARGET_STATE: target}
+        if self.has_controls:
+            out_dict[DataFields.SOURCE_STATE] = source 
+
+        # handling perturbation data
+        if self.data.perturbation_data is not None:
+            trtm_perts = trtm_data[DataFields.PERTURBATION_DATA]
+            condition = {cond: torch.from_numpy(cond_data[target_idx]).to(self.device).float()
+                         for cond, cond_data in trtm_perts.items()}
+            out_dict[DataFields.PERTURBATION_DATA] = condition
+            
+        if self.data.target_perturbation_repr is not None:
+            trtm_perts_target_rep = trtm_data[DataFields.PERTURBATION_TARGET_REPR]
+            trtm_perts_target_rep = {key: torch.from_numpy(val[target_idx]).to(self.device).float()
+                                     for key, val in trtm_perts_target_rep.items()}
+            out_dict[DataFields.PERTURBATION_TARGET_REPR] = trtm_perts_target_rep
+        
+        return out_dict
+
+
 class SequentialDataLoader(BaseDataLoader):
     """"""
     def __init__(
         self,
-        data: TrainData,
+        data: AnnotatedPerturbationData,
         batch_size: int,
         state_transforms: Transform | None = None,
         device_id: Literal["cuda", "cpu"] = "cuda"
@@ -85,14 +142,14 @@ class SequentialDataLoader(BaseDataLoader):
         return out
 
 
-class TrainDataLoader(BaseDataLoader):
+class TrainDataLoader(BaseCoupledDataLoader):
     """
     Data loader for training that samples matched control and perturbed cell states.
     """
 
     def __init__(
         self,
-        data: TrainData,
+        data: AnnotatedPerturbationData,
         coupling: Coupling,
         batch_size: int,
         state_transforms: Transform | None = None,
@@ -103,7 +160,7 @@ class TrainDataLoader(BaseDataLoader):
         Initializes the training data loader.
 
         :param data: Training dataset containing control and perturbed cell states.
-        :type data: class:`TrainData`
+        :type data: class:`AnnotatedPerturbationData`
         :param coupling: Coupling strategy used to match control and perturbed states.
         :type coupling: class:`Coupling`
         :param batch_size: Number of samples per batch.
@@ -132,7 +189,7 @@ class TrainDataLoader(BaseDataLoader):
         :return: Integer containing the index for the perturbation used in the current batch of data.
         :rtype: int
         """
-        # no perturbation data is passed to the TrainData object
+        # no perturbation data is passed to the AnnotatedPerturbationData object
         if self.data.seen_combinatorial_perturbations is None:
             return None
         # need to sample one perturbation from the set of unique perturbations
@@ -151,52 +208,86 @@ class TrainDataLoader(BaseDataLoader):
         if isinstance(self.coupling, OTCoupling):
             treatments = self.__sample_perturbation_id()
 
-        # treatment states
-        trtm_data = self.data.get_treatments(self.batch_size, treatments)
-        trtm_states = trtm_data[DataFields.STATE_DATA]
-        
         # control states
-        target_idx = np.arange(self.batch_size)
+        control_states = None
         if self.has_controls:
-            ctrl_data = self.data.get_controls(self.batch_size)
-            ctrl_states = ctrl_data[DataFields.STATE_DATA]
+            control_data = self.data.get_controls(self.batch_size)
+            control_states = control_data[DataFields.STATE_DATA]
 
-            # matching the two groups
-            source_idx, target_idx = self.coupling.match_groups(ctrl_states, trtm_states)
+        # retrieving matched data
+        return self._get_matched_data(treatments, control_states)
 
-        # moving states to torch tensors
-        if self.has_controls:
-            source = torch.from_numpy(ctrl_states[source_idx]).to(self.device).float()
-        target = torch.from_numpy(trtm_states[target_idx]).to(self.device).float()
 
-        # handling transformations
-        if self.state_transforms is not None:
-            if self.has_controls:
-                source = self.state_transforms.transform(source)
-            target = self.state_transforms.transform(target)
-
-        # constructing output dictionary
-        out_dict = {DataFields.TARGET_STATE: target}
-        if self.has_controls:
-            out_dict[DataFields.SOURCE_STATE] = source 
-
-        # handling perturbation data
-        if self.data.perturbation_data is not None:
-            trtm_perts = trtm_data[DataFields.PERTURBATION_DATA]
-            condition = {cond: torch.from_numpy(cond_data[target_idx]).to(self.device).float()
-                         for cond, cond_data in trtm_perts.items()}
-            out_dict[DataFields.PERTURBATION_DATA] = condition
-            
-        if self.data.target_perturbation_repr is not None:
-            trtm_perts_target_rep = trtm_data[DataFields.PERTURBATION_TARGET_REPR]
-            trtm_perts_target_rep = {key: torch.from_numpy(val[target_idx]).to(self.device).float()
-                                     for key, val in trtm_perts_target_rep.items()}
-            out_dict[DataFields.PERTURBATION_TARGET_REPR] = trtm_perts_target_rep
-        
-        return out_dict
-
-class ValidationDataLoader(BaseDataLoader):
+class ValidationDataLoader(BaseCoupledDataLoader):
     """"""
 
+    def __init__(
+        self,
+        data: AnnotatedPerturbationData,
+        coupling: Coupling,
+        batch_size: int,
+        state_transforms: Transform | None = None,
+        device_id: Literal["cuda", "cpu"] = "cuda",
+        has_controls: bool = True,
+        num_treatments_to_load: int | None = None
+    ) -> None:
+        """"""
+        self.data = data
+        self.coupling = coupling
+        self.batch_size = batch_size
+        self.device_id = device_id
+        self.state_transforms = state_transforms
+        self.device = torch.device(self.device_id)
+        self.has_controls = has_controls
+        self.num_treatments_to_load = num_treatments_to_load 
+    
+    def __sample_perturbation_id(
+        self,
+    ) -> Sequence[str]:
+        """
+        Samples the treatment for the current batch when using Optimal Transport couplings.
+        This is needed as the OT problem should be solved individually for each perturbation.
+        
+        :return: Integer containing the index for the perturbation used in the current batch of data.
+        :rtype: int
+        """
+        # no perturbation data is passed to the AnnotatedPerturbationData object
+        if self.data.seen_combinatorial_perturbations is None:
+            return (None, )
+        # retrieving the maximum number of treatements to load if specified
+        if self.num_treatments_to_load is not None:
+            return random.choices(self.data.seen_combinatorial_perturbations, k=self.num_treatments_to_load)
+        # returning all the treaments otherwise
+        return self.data.seen_combinatorial_perturbations
+
+    def sample(
+        self,
+    ) -> dict[str, TensorLike | dict[str, TensorLike]]:
+        """"""
+        # retrieving the perturbations to validate on for the current batch
+        treatments = self.__sample_perturbation_id()
+
+        # control states
+        control_states = None
+        if self.has_controls:
+            control_data = self.data.get_controls(self.batch_size)
+            control_states = control_data[DataFields.STATE_DATA]
+
+        # constructing output dictionary
+        out_dict = {}
+
+        # iterating over the perturbations
+        for treatment in treatments:
+            # retrieving matched treatment data
+            treatement_data = self._get_matched_data(treatment, control_states)
+
+            # constructing perturbation identifier to store the results
+            treatment_id = "_".join(treatment)
+
+            # storing output dictionary for current perturbation
+            out_dict[treatment_id] = treatement_data
+        return out_dict
+
+     
 class PredictionDataLoader(BaseDataLoader):
     """"""

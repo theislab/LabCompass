@@ -6,7 +6,7 @@ import numpy as np
 import torch
 
 from sc_exp_design.constants import DataFields
-from sc_exp_design.data.dataloaders import TrainData, SequentialDataLoader
+from sc_exp_design.data.dataloaders import AnnotatedPerturbationData, SequentialDataLoader
 from sc_exp_design.models.flow_matching import FlowMatching
 from sc_exp_design.models.inverse_utils import LangevinOptimizer
 from sc_exp_design.networks.blocks import BaseModule, BaseForwardModel
@@ -17,7 +17,8 @@ from sc_exp_design.networks.inverse import (
     NeuralInverseModel,
 )
 from sc_exp_design.networks.inference_networks import PerturbationApproximatePosterior
-from sc_exp_design.training import CallBack, TargetPredictionTrainer, InverseModelTrainer
+from sc_exp_design.models.base import BaseModel
+from sc_exp_design.training import BaseCallBack, TargetPredictionTrainer, InverseModelTrainer
 from sc_exp_design.transforms import Transform
 
 logger = logging.getLogger(__name__)
@@ -25,7 +26,7 @@ logger = logging.getLogger(__name__)
 __all__ = ["InverseModel"]
 
 
-class InverseModel:
+class InverseModel(BaseModel):
     """"""
     def __init__(
         self,
@@ -152,15 +153,15 @@ class InverseModel:
 
     def train_target_prediction_model(
         self,
-        train_data: TrainData | None = None,
-        validation_data: TrainData | None = None,
+        train_data: AnnotatedPerturbationData | None = None,
+        validation_data: AnnotatedPerturbationData | None = None,
         num_training_steps: int = 500,
         valid_freq: int | None = None,
         train_batch_size: int = 1024,
         validation_batch_size: int = 512,
         state_transforms: Transform | None = None,
-        callbacks: CallBack | None = None,
-        grad_step_interval_log: int = 100,
+        callbacks: BaseCallBack | None = None,
+        grad_steps_log_interval: int = 100,
     ) -> None:
         """"""
         # sanity checks
@@ -173,7 +174,7 @@ class InverseModel:
             train_data = self.forward_model.train_data
 
         msg = f""
-        assert isinstance(train_data, TrainData), msg
+        assert isinstance(train_data, AnnotatedPerturbationData), msg
 
         msg = f""
         assert train_data.target_perturbation_repr is not None, msg
@@ -194,7 +195,7 @@ class InverseModel:
             lr_scheduler=self.target_prediction_lr_scheduler,
             lr_scheduler_step=self.target_prediction_lr_scheduler_step,
             callbacks=callbacks,
-            grad_step_interval_log=grad_step_interval_log,
+            grad_steps_log_interval=grad_steps_log_interval,
         )
 
         # optional validation data
@@ -486,15 +487,15 @@ class InverseModel:
 
     def train_inverse_model(
         self,
-        train_data: TrainData | None = None,
-        validation_data: TrainData | None = None,
+        train_data: AnnotatedPerturbationData | None = None,
+        validation_data: AnnotatedPerturbationData | None = None,
         num_training_steps: int = 500,
         valid_freq: int | None = None,
         train_batch_size: int = 1024,
         validation_batch_size: int = 512,
         state_transforms: Transform | None = None,
-        callbacks: CallBack | None = None,
-        grad_step_interval_log: int = 100,
+        callbacks: BaseCallBack | None = None,
+        grad_steps_log_interval: int = 100,
     ) -> None:
         """"""
         # sanity checks
@@ -510,7 +511,7 @@ class InverseModel:
             train_data = self.forward_model.train_data
 
         msg = f""
-        assert isinstance(train_data, TrainData), msg
+        assert isinstance(train_data, AnnotatedPerturbationData), msg
 
         msg = f""
         assert train_data.target_perturbation_repr is not None, msg
@@ -524,7 +525,7 @@ class InverseModel:
             lr_scheduler=self.inverse_model_lr_scheduler,
             lr_scheduler_step=self.inverse_model_lr_scheduler_step,
             callbacks=callbacks,
-            grad_step_interval_log=grad_step_interval_log,
+            grad_steps_log_interval=grad_steps_log_interval,
         )
 
         # retrieving control indices

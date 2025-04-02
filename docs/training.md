@@ -9,7 +9,7 @@
 
     training.CFMTrainer
     training.MetricsCallBack
-    training.CallBack
+    training.BaseCallBack
     training.binary_classification_loss
     training.compute_cond_vars_inference_loss
     training.compute_latent_perturbation_inference_loss

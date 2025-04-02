@@ -1,5 +1,5 @@
-from sc_exp_design.ode.solvers import (
-    ODESolver,
+from sc_exp_design.ode.utils import (
+    push_forward,
 )
 
 __all__ = [
