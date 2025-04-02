@@ -282,7 +282,8 @@ class NeuralVelocityFieldConfig:
         """
         # Initialize the dim as the output of the pooling layer 
         dim = 0
-        
+
+        # Perturbations to pull
         if self.perturbation_covariates_not_pooled is not None:
             perturbation_covariate_pooled = [perturbation
                                             for perturbation in self.perturbation_layers_before_pooling
@@ -308,8 +309,8 @@ class NeuralVelocityFieldConfig:
                 layers_dict = self.perturbation_layers_before_pooling[condition]
                 if isinstance(layers_dict, LayersDict):
                     layers_dict = vars(layers_dict)
-            output_dim = layers_dict["output_dim"]
-            dim = dim + output_dim
+                output_dim = layers_dict["output_dim"]
+                dim = dim + output_dim
         return dim
 
     @property
