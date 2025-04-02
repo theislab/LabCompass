@@ -323,6 +323,5 @@ class DataManager:
         # condition target representation
         target_data = None
         if self.load_target_covariates:
-
             target_data = self.__get_target_data(adata)
         return AnnotatedPerturbationData(adata, self.control_key, state_data, perturbation_data, target_data, self.perturbations_with_rep, self.has_controls)
