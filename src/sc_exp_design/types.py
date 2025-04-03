@@ -14,17 +14,7 @@ TensorLike = Tensor | ndarray
 
 @dataclass(frozen=True)
 class MLPConfigFields:
-    fields: Sequence[str] = dc_field(default_factory=lambda: [
-            "input_dim",
-            "output_dim",
-            "hidden_dims",
-            "use_batchnorm",
-            "use_dropout",
-            "dropout_rate",
-            "activation_class",
-            "final_activation_class"
-        ]
-    )
+    """"""
     types: dict[str, type] = dc_field(default_factory=lambda: {
             "input_dim": int,
             "output_dim": int, 
@@ -37,17 +27,25 @@ class MLPConfigFields:
         }
     )
 
+    @property
+    def fields(
+        self,
+    ) -> Sequence[str]:
+        """"""
+        return list(self.types.keys())
+
 
 @dataclass
 class LayersDict:
+    """"""
     layer_type: Literal["mlp", "self_attention"] | None = None
     input_dim: int | None = None
     output_dim: int | None = None
-    hidden_dims: Sequence[int] = (128, 64, 32)
+    hidden_dims: Sequence[int] = (64, 64, 64)
     use_batchnorm: bool = False
     use_dropout: bool = False
     dropout_rate: float = 0.0
-    activation_class: nn.Module = nn.ELU
+    activation_class: nn.Module = nn.SELU
     final_activation_class: nn.Module = nn.Identity
     embed_dim: int | Sequence[int] | None = None
     num_heads: int | Sequence[int] | None = None
@@ -69,9 +67,10 @@ class LayersDict:
         layer_type: Literal["mlp", "self_attention"] = "mlp",
     ) -> None:
         """"""
+        # retrieving the input dictionary keys
+        keys = layers_dict.keys()
         # optional check on layer type key
         if require_layer_type_key:
-            keys = layers_dict.keys()
             msg = f"{keys=}"
             assert "layer_type" in keys, msg
             layer_type = layers_dict["layer_type"]
@@ -80,18 +79,18 @@ class LayersDict:
             # optional check on input dimension
             if require_input_dim_key:
                 # verify that the key is present in the dictionary
-                msg = f"With {layers_dict['layer_type']=}, the dictionary is expected to contain the `'input_dim'` key."
+                msg = f"With {layer_type=}, the dictionary is expected to contain the `'input_dim'` key."
                 assert "input_dim" in keys, msg
                 # verify that the value is not None
-                msg = f"With {layers_dict['layer_type']=}, `'input_dim'` value should be an integer, found `None`."
+                msg = f"With {layer_type=}, `'input_dim'` value should be an integer, found `None`."
                 assert layers_dict["input_dim"] is not None, msg
             # optional check on output dimension
             if require_output_dim_key:
                 # verify that the key is present in the dictionary
-                msg = f"With {layers_dict['layer_type']=}, the dictionary is expected to contain the `'output_dim'` key."
+                msg = f"With {layer_type=}, the dictionary is expected to contain the `'output_dim'` key."
                 assert "output_dim" in keys, msg
                 # verify that the value is not None
-                msg = f"With {layers_dict['layer_type']=}, `'output_dim'` value should be an integer, found `None`."
+                msg = f"With {layer_type=}, `'output_dim'` value should be an integer, found `None`."
                 assert layers_dict["output_dim"] is not None, msg
             # cheking the other keys
             expected_fields = MLPConfigFields().fields
@@ -105,7 +104,7 @@ class LayersDict:
                 assert isinstance(value, expected_types[key]), msg
         # self attention block
         elif layer_type == "self_attention":
-            msg = f"With {layers_dict['layer_type']=}, the dictionary is expected to contain the `'num_embeddings'` key."
+            msg = f"With {layer_type=}, the dictionary is expected to contain the `'num_embeddings'` key."
             assert "num_embeddings" in keys, msg
-            msg = f"With {layers_dict['layer_type']=}, `'num_embeddings'` value should be an integer, found `None`."
+            msg = f"With {layer_type=}, `'num_embeddings'` value should be an integer, found `None`."
             assert layers_dict["num_embeddings"] is not None, msg

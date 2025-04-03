@@ -12,6 +12,7 @@ batch_size = 4
 flow_dim = 2
 treatment0_dim = 5
 treatment1_dim = 7
+perturbation_dim_before_pooling = 32
 perturbation_latent_dim = 16
 state_latent_dim = 16
 time_features_num_freqs = 8
@@ -66,47 +67,26 @@ perturbation_layers_before_pooling_no_encoding = {
 perturbation_layers_before_pooling_linear_encode = {
     "treatment0_id": {
         "input_dim": treatment0_dim,
-        "output_dim": perturbation_latent_dim,
+        "output_dim": perturbation_dim_before_pooling,
         **linear_config,
     },
     "treatment0_dose": {
         "input_dim": 1,
-        "output_dim": perturbation_latent_dim,
+        "output_dim": perturbation_dim_before_pooling,
         **linear_config,
     },
     "treatment1_id": {
         "input_dim": treatment1_dim,
-        "output_dim": perturbation_latent_dim,
+        "output_dim": perturbation_dim_before_pooling,
         **linear_config,
     },
     "treatment1_dose": {
         "input_dim": 1,
-        "output_dim": perturbation_latent_dim,
+        "output_dim": perturbation_dim_before_pooling,
         **linear_config,
     }
 }
-perturbation_layers_before_pooling_mlp_encode = {
-    "treatment0_id": {
-        "input_dim": treatment0_dim,
-        "output_dim": perturbation_latent_dim,
-        **linear_config,
-    },
-    "treatment0_dose": {
-        "input_dim": 1,
-        "output_dim": perturbation_latent_dim,
-        **linear_config,
-    },
-    "treatment1_id": {
-        "input_dim": treatment1_dim,
-        "output_dim": perturbation_latent_dim,
-        **linear_config,
-    },
-    "treatment1_dose": {
-        "input_dim": 1,
-        "output_dim": perturbation_latent_dim,
-        **linear_config,
-    }
-}
+
 
 class TestNeuralVelocityField:
     @pytest.mark.parametrize("encode_state", [True, False])
@@ -115,9 +95,9 @@ class TestNeuralVelocityField:
     @pytest.mark.parametrize("use_sinusoidal_time_features", [True, False])
     @pytest.mark.parametrize("time_encoder_mlp_kwargs", [linear_config, mlp_config])
     @pytest.mark.parametrize("use_guidance", [True, False])
-    # @pytest.mark.parametrize("encode_conditions", [True, False])
-    @pytest.mark.parametrize("encode_conditions", [False, ])
+    @pytest.mark.parametrize("encode_conditions", [True, False])
     @pytest.mark.parametrize("perturbation_pooling", ["mean", "sum", "self_attention"])
+    @pytest.mark.parametrize("perturbation_layers_after_pooling", [linear_config, mlp_config])
     @pytest.mark.parametrize("decoder_mlp_kwargs", [linear_config, mlp_config])
     @pytest.mark.parametrize("use_source_as_condition", [True, False])
     @pytest.mark.parametrize("encode_source", [True, False])
@@ -132,6 +112,7 @@ class TestNeuralVelocityField:
         use_guidance: bool,
         encode_conditions: bool,
         perturbation_pooling: Literal["mean", "sum", "self_attention"],
+        perturbation_layers_after_pooling: dict[str, Any],
         decoder_mlp_kwargs: Sequence[int],
         use_source_as_condition: bool,
         encode_source: bool,
@@ -141,7 +122,13 @@ class TestNeuralVelocityField:
         # retrieving current settings
         perturbation_layers_before_pooling = perturbation_layers_before_pooling_no_encoding
         if encode_conditions:
-            perturbation_layers_before_pooling = ...
+            perturbation_layers_before_pooling = perturbation_layers_before_pooling_linear_encode
+
+        # preparing layers after pooling
+        perturbation_layers_after_pooling = {
+            "layer_type": "mlp",
+            **perturbation_layers_after_pooling,
+        }
 
         # initializing configurations
         config = sc_exp_design.config.NeuralVelocityFieldConfig(
@@ -156,7 +143,10 @@ class TestNeuralVelocityField:
             time_encoder_mlp_kwargs=time_encoder_mlp_kwargs,
             use_guidance=use_guidance,
             encode_conditions=encode_conditions,
+            perturbation_latent_dim=perturbation_latent_dim,
+            perturbation_pooling=perturbation_pooling,
             perturbation_layers_before_pooling=perturbation_layers_before_pooling,
+            perturbation_layers_after_pooling=perturbation_layers_after_pooling,
             decoder_mlp_kwargs=decoder_mlp_kwargs,
             use_source_as_condition=use_source_as_condition,
             encode_source=encode_source,
@@ -189,7 +179,7 @@ class TestNeuralVelocityField:
                 ]
             )
             if encode_conditions:
-                expected_latent_condition_dim = ...
+                expected_latent_condition_dim = perturbation_latent_dim
         # retrieve target latent source dim
         expected_latent_source_dim = 0
         if use_source_as_condition:

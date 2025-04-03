@@ -8,7 +8,7 @@ from typing import Any, Literal
 from torch import nn
 
 from sc_exp_design.types import LayersDict
-from sc_exp_design.utils import conditions_to_pool
+from sc_exp_design.utils import get_conditions_to_pool
 
 logger = logging.getLogger(__name__)
 
@@ -226,7 +226,7 @@ class NeuralVelocityFieldConfig:
                 assert self.perturbation_latent_dim is not None, msg
                 for condition, layers_dict in self.perturbation_layers_before_pooling.items():
                     if isinstance(layers_dict, dict):
-                        LayersDict.verify_keys(layers_dict)
+                        LayersDict.verify_keys(layers_dict, require_layer_type_key=False, layer_type="mlp")
                         layers_dict = LayersDict(**layers_dict)
                     msg = f"`layers_dict` is expected to be an instance of `LayersDict`, found {type(layers_dict)}"
                     assert isinstance(layers_dict, LayersDict), msg
@@ -261,7 +261,7 @@ class NeuralVelocityFieldConfig:
         Collect the condition input dimensions for the encoding process from the configuration.
         """
         dim = 0
-        for condition, layers_dict in self.perturbation_layers_before_pooling.items():
+        for layers_dict in self.perturbation_layers_before_pooling.values():
             if isinstance(layers_dict, LayersDict):
                 layers_dict = vars(layers_dict)
             if self.encode_conditions:
@@ -285,12 +285,10 @@ class NeuralVelocityFieldConfig:
         dim = 0
 
         # Perturbations to pull
-        if self.perturbation_covariates_not_pooled is not None:
-            perturbation_covariate_pooled = conditions_to_pool(list(self.perturbation_layers_before_pooling.keys()), 
-                                                               list(self.perturbation_covariates_not_pooled.keys()))
-        else:
-            perturbation_covariate_pooled = list(self.perturbation_layers_before_pooling.keys())
-            
+        perturbation_covariate_pooled = get_conditions_to_pool(
+            self.perturbation_layers_before_pooling,
+            self.perturbation_covariates_not_pooled
+        )    
         # Pooled layers 
         if len(perturbation_covariate_pooled) > 0:
             for perturbation_to_pool in perturbation_covariate_pooled:

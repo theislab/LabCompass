@@ -1,4 +1,6 @@
+from collections.abc import Sequence
 import random
+from typing import Any
 
 import numpy as np
 import torch
@@ -90,9 +92,17 @@ def sinusoidal_time_features(
     features = torch.concatenate((cos, sin), dim=-1)
     return features
 
-def conditions_to_pool(perturbations, perturbations_to_pool):
-    conditions_to_pool = [perturbation
-                          for perturbation in perturbations
-                          if perturbation not in perturbations_to_pool
-                          ]
-    return conditions_to_pool
+
+def get_conditions_to_pool(
+    layers_before_pooling: dict[str, Any],
+    covariates_not_pooled: Sequence[str] | None,
+) -> Sequence[str]:
+    if covariates_not_pooled is not None:
+        covariates_to_pool = [
+            covariate
+            for covariate in layers_before_pooling.keys()
+            if covariate not in covariates_not_pooled
+        ]
+    else:
+        covariates_to_pool = list(layers_before_pooling.keys())
+    return covariates_to_pool
