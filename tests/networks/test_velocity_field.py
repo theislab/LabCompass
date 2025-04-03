@@ -124,12 +124,6 @@ class TestNeuralVelocityField:
         if encode_conditions:
             perturbation_layers_before_pooling = perturbation_layers_before_pooling_linear_encode
 
-        # preparing layers after pooling
-        perturbation_layers_after_pooling = {
-            "layer_type": "mlp",
-            **perturbation_layers_after_pooling,
-        }
-
         # initializing configurations
         config = sc_exp_design.config.NeuralVelocityFieldConfig(
             flow_dim,

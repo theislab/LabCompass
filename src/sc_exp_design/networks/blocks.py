@@ -601,7 +601,7 @@ class ConditionEncoder(BaseModule):
         # initializing the layers before pooling
         self.before_pooling = {}
         for covariate, layers_dict in self.layers_before_pooling.items():
-            covariate_layers = self._get_layers(layers_dict)
+            covariate_layers = MLPBlock(**vars(layers_dict))
             self.before_pooling[covariate] = covariate_layers
 
         # pooling modules
@@ -616,7 +616,7 @@ class ConditionEncoder(BaseModule):
             raise ValueError(msg)
 
         # layers after pooling
-        self.after_pooling = self._get_layers(self.layers_after_pooling)
+        self.after_pooling = MLPBlock(**vars(self.layers_after_pooling))
 
     def __get_mask(
         self,
@@ -627,44 +627,6 @@ class ConditionEncoder(BaseModule):
         """Retrieves the mask for attention blocks (still to be correctly implemented)"""
         mask = torch.ones((batch_size, sequence_length, sequence_length), device=device)
         return mask
-
-    def _get_layers(
-        self,
-        layers_dict: LayersDict,
-    ) -> nn.Module:
-        """Initializes a given layer with the settings provided in :param:`layers_dict`.
-
-        :param layers_dict: Instance of :class:`LayersDict` with the configurations used to initialize the layer
-        :type layers_dict: class:`LayersDict`
-        """
-        if layers_dict.layer_type == "mlp":
-            layer = MLPBlock(
-                layers_dict.input_dim,
-                layers_dict.output_dim,
-                hidden_dims=layers_dict.hidden_dims,
-                use_batchnorm=layers_dict.use_batchnorm,
-                use_dropout=layers_dict.use_dropout,
-                dropout_rate=layers_dict.dropout_rate,
-                activation_class=layers_dict.activation_class,
-                final_activation_class=layers_dict.final_activation_class,
-            )
-        elif layers_dict.layer_type == "self_attention":
-            layer = SelfAttentionBlock(
-                layers_dict.embed_dim,
-                layers_dict.num_heads,
-                layers_dict.dropout_rate,
-                num_embeddings=layers_dict.num_embeddings,
-                embedding_dim=layers_dict.embedding_dim,
-                padding_idx=layers_dict.padding_idx,
-                max_norm=layers_dict.max_norm,
-                norm_type=layers_dict.norm_type,
-                scale_grad_by_freq=layers_dict.scale_grad_by_freq,
-                sparse=layers_dict.sparse,
-            )
-        else:
-            msg = f"{layers_dict.layer_type=} not available, possible options are `['mlp', 'self_attention']`"
-            raise ValueError(msg)
-        return layer
 
     def forward(
         self,

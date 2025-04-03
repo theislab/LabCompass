@@ -208,14 +208,13 @@ class NeuralVelocityFieldConfig:
         # sanity check on mlp configurations
         mlp_kwargs_verifier = partial(
             LayersDict.verify_keys, 
-            require_layer_type_key=False,
             require_input_dim_key=False,
             require_output_dim_key=False,
         )
-        mlp_kwargs_verifier(self.state_encoder_mlp_kwargs)
-        mlp_kwargs_verifier(self.time_encoder_mlp_kwargs)
-        mlp_kwargs_verifier(self.decoder_mlp_kwargs)
-        mlp_kwargs_verifier(self.source_encoder_mlp_kwargs)
+        self.state_encoder_mlp_kwargs  = mlp_kwargs_verifier(self.state_encoder_mlp_kwargs)
+        self.time_encoder_mlp_kwargs = mlp_kwargs_verifier(self.time_encoder_mlp_kwargs)
+        self.decoder_mlp_kwargs = mlp_kwargs_verifier(self.decoder_mlp_kwargs)
+        self.source_encoder_mlp_kwargs = mlp_kwargs_verifier(self.source_encoder_mlp_kwargs)
 
         # sanity check on condition encoder
         if self.use_guidance:
@@ -226,7 +225,7 @@ class NeuralVelocityFieldConfig:
                 assert self.perturbation_latent_dim is not None, msg
                 for condition, layers_dict in self.perturbation_layers_before_pooling.items():
                     if isinstance(layers_dict, dict):
-                        LayersDict.verify_keys(layers_dict, require_layer_type_key=False, layer_type="mlp")
+                        layers_dict = LayersDict.verify_keys(layers_dict)
                         layers_dict = LayersDict(**layers_dict)
                     msg = f"`layers_dict` is expected to be an instance of `LayersDict`, found {type(layers_dict)}"
                     assert isinstance(layers_dict, LayersDict), msg
@@ -236,7 +235,7 @@ class NeuralVelocityFieldConfig:
                 if isinstance(self.perturbation_layers_after_pooling, dict):
                     self.perturbation_layers_after_pooling["input_dim"] = self.perturbation_layers_after_pooling_input_dim
                     self.perturbation_layers_after_pooling["output_dim"] = self.perturbation_latent_dim
-                    LayersDict.verify_keys(self.perturbation_layers_after_pooling)
+                    self.perturbation_layers_after_pooling = LayersDict.verify_keys(self.perturbation_layers_after_pooling)
                     self.perturbation_layers_after_pooling = LayersDict(**self.perturbation_layers_after_pooling)
                 msg = f"`self.perturbation_layers_after_pooling` is expected to be an instance of `LayersDict`, found {type(self.perturbation_layers_after_pooling)}"
                 assert isinstance(self.perturbation_layers_after_pooling, LayersDict), msg
