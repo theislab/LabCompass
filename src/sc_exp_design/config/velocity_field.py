@@ -8,6 +8,7 @@ from typing import Any, Literal
 from torch import nn
 
 from sc_exp_design.types import LayersDict
+from sc_exp_design.utils import conditions_to_pool
 
 logger = logging.getLogger(__name__)
 
@@ -285,10 +286,8 @@ class NeuralVelocityFieldConfig:
 
         # Perturbations to pull
         if self.perturbation_covariates_not_pooled is not None:
-            perturbation_covariate_pooled = [perturbation
-                                            for perturbation in self.perturbation_layers_before_pooling
-                                            if perturbation not in self.perturbation_covariates_not_pooled
-                                            ]
+            perturbation_covariate_pooled = conditions_to_pool(list(self.perturbation_layers_before_pooling.keys()), 
+                                                               list(self.perturbation_covariates_not_pooled.keys()))
         else:
             perturbation_covariate_pooled = list(self.perturbation_layers_before_pooling.keys())
             

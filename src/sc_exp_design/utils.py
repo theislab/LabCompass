@@ -89,3 +89,10 @@ def sinusoidal_time_features(
     sin = torch.sin(times)
     features = torch.concatenate((cos, sin), dim=-1)
     return features
+
+def conditions_to_pool(perturbations, perturbations_to_pool):
+    conditions_to_pool = [perturbation
+                          for perturbation in perturbations
+                          if perturbation not in perturbations_to_pool
+                          ]
+    return conditions_to_pool

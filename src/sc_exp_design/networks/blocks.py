@@ -8,6 +8,7 @@ from torch import Tensor, nn
 
 from sc_exp_design.types import LayersDict
 from sc_exp_design.constants import DataFields
+from sc_exp_design.utils import conditions_to_pool
 
 __all__ = ["ConditionEncoder", "BaseModule", "MLPBlock", "SelfAttentionBlock", "AttentionPooling"]
 
@@ -539,11 +540,10 @@ class ConditionEncoder(BaseModule):
     ) -> Sequence[str]:
         """Returns the name of the perturbation covariates that needs to be pooled."""
         if self.covariates_not_pooled is not None:
-            covariates_to_pool = [
-                covariate
-                for covariate in self.layers_before_pooling.keys()
-                if covariate not in self.covariates_not_pooled
-            ]
+            covariates_to_pool = conditions_to_pool(
+                list(self.layers_before_pooling.keys()),
+                list(self.covariates_not_pooled.keys())
+            )
         else:
             covariates_to_pool = list(self.layers_before_pooling.keys())
         return covariates_to_pool
