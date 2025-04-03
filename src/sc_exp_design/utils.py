@@ -1,6 +1,7 @@
 import random
 
 import numpy as np
+import math
 import torch
 from torch import Tensor
 
@@ -90,7 +91,7 @@ def sinusoidal_time_features(t: torch.Tensor,
     """
     half = num_freqs // 2
     freqs = torch.exp(
-        -torch.log(max_period)
+        -math.log(max_period)
         * torch.arange(start=0, 
                        end=half, 
                        dtype=torch.float32, 
