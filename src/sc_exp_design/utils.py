@@ -78,14 +78,27 @@ def set_reproducibility(random_seed: int) -> None:
     random.seed(random_seed)
     np.random.seed(random_seed)
 
+def sinusoidal_time_features(t: torch.Tensor, 
+                             num_freqs: int = 128, 
+                             max_period: int = 10000):
+    """Create sinusoidal timestep embeddings.
 
-def sinusoidal_time_features(
-    t: torch.Tensor,
-    num_freqs: int = 128,
-) -> torch.Tensor:
-    """"""
-    times = 2*np.pi*torch.arange(1, num_freqs + 1, device=t.device)*t
-    cos = torch.cos(times)
-    sin = torch.sin(times)
-    features = torch.concatenate((cos, sin), dim=-1)
-    return features
+    :param timesteps: a 1-D Tensor of N indices, one per batch element. These may be fractional.
+    :param dim: the dimension of the output.
+    :param max_period: controls the minimum frequency of the embeddings.
+    :return: an [N x dim] Tensor of positional embeddings.
+    """
+    half = num_freqs // 2
+    freqs = torch.exp(
+        -torch.log(max_period)
+        * torch.arange(start=0, 
+                       end=half, 
+                       dtype=torch.float32, 
+                       device=t.device)
+        / half
+    )
+    args = t[:, None].float() * freqs[None]
+    embedding = torch.cat([torch.cos(args), torch.sin(args)], dim=-1)
+    if num_freqs % 2:
+        embedding = torch.cat([embedding, torch.zeros_like(embedding[:, :1])], dim=-1)
+    return embedding

@@ -184,6 +184,7 @@ class NeuralVelocityFieldConfig:
     encode_time: bool = False
     use_sinusoidal_time_features: bool = False
     time_features_num_freqs: int = 128
+    time_features_max_periods: int = 10000
     time_encoder_output_dim: int = 10
     time_encoder_mlp_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
     use_guidance: bool = True
@@ -249,7 +250,7 @@ class NeuralVelocityFieldConfig:
     ) -> int:
         """"""
         if self.use_sinusoidal_time_features:
-            return self.time_features_num_freqs*2
+            return self.time_features_num_freqs
         return 1
 
     @property
