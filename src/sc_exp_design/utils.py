@@ -89,6 +89,9 @@ def sinusoidal_time_features(t: torch.Tensor,
     :param max_period: controls the minimum frequency of the embeddings.
     :return: an [N x dim] Tensor of positional embeddings.
     """
+    if len(t.shape)==1:
+        t = t.unsqueeze(1)
+        
     half = num_freqs // 2
     freqs = torch.exp(
         -math.log(max_period)
@@ -98,7 +101,7 @@ def sinusoidal_time_features(t: torch.Tensor,
                        device=t.device)
         / half
     )
-    args = t[:, None].float() * freqs[None]
+    args = t.float() * freqs[None]
     embedding = torch.cat([torch.cos(args), torch.sin(args)], dim=-1)
     if num_freqs % 2:
         embedding = torch.cat([embedding, torch.zeros_like(embedding[:, :1])], dim=-1)
