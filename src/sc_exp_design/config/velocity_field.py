@@ -199,10 +199,10 @@ class NeuralVelocityFieldConfig:
     encode_source: bool = False
     source_latent_dim: int = 10
     source_encoder_mlp_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {},)
+    use_resnet_blocks: bool = False 
     n_resnet_blocks: int = 3
     resnet_dropout_prob: float = 0.0
     resnet_normalization: str | None = None
-    use_resnet_blocks: bool = False 
     
     def __post_init__(self) -> None:
         """
@@ -322,9 +322,9 @@ class NeuralVelocityFieldConfig:
         if self.use_source_as_condition:
             source_latent_dim = self.flow_dim
             if self.encode_source:
-                source_latent_dim = self.source_latent_dim
+                source_latent_dim = self.source_latent_dim       
+        # concatenation state, conditions, source and time 
         if not self.use_resnet_blocks:
-            # states
             state_latent_dim = self.flow_dim
             if self.encode_state:
                 state_latent_dim = self.state_encoder_output_dim 

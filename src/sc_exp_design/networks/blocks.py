@@ -699,11 +699,11 @@ class ResnetBlock(nn.Module):
     """
     def __init__(
         self,
-        in_dim,
-        out_dim=None,
-        dropout_prob=0.0,
-        embedding_dim=None, 
-        normalization=None):
+        in_dim: int,
+        out_dim: int | None = None,
+        dropout_prob: float = 0.0,
+        embedding_dim: int = 128, 
+        normalization: str | None = None):
         
         super().__init__()
         
@@ -778,3 +778,4 @@ class ResnetBlock(nn.Module):
         assert x.shape == h.shape
         
         return x + h
+    
