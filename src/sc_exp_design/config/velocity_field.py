@@ -5,8 +5,6 @@ from dataclasses import field as dc_field
 from functools import partial
 from typing import Any, Literal
 
-from torch import nn
-
 from sc_exp_design.types import LayersDict
 from sc_exp_design.utils import get_conditions_to_pool
 
