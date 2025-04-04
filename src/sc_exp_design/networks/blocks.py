@@ -7,6 +7,8 @@ import torch
 from torch import Tensor, nn
 
 from sc_exp_design.types import LayersDict
+from sc_exp_design.constants import DataFields
+from sc_exp_design.utils import get_conditions_to_pool
 
 __all__ = ["ConditionEncoder", "BaseModule", "MLPBlock", "SelfAttentionBlock", "AttentionPooling"]
 
@@ -518,7 +520,7 @@ class ConditionEncoder(BaseModule):
         latent_dim: int,
         layers_before_pooling: dict[str, LayersDict] | None = None,
         covariates_not_pooled: Sequence[str] | None = None,
-        pooling: Literal["mean", "self_attention"] = "mean",
+        pooling: Literal["mean", "sum", "self_attention"] = "mean",
         pooling_kwargs: dict[str, Any] | None = None,
         layers_after_pooling: LayersDict | None = None,
     ) -> None:
@@ -537,15 +539,10 @@ class ConditionEncoder(BaseModule):
         self,
     ) -> Sequence[str]:
         """Returns the name of the perturbation covariates that needs to be pooled."""
-        if self.covariates_not_pooled is not None:
-            covariates_to_pool = [
-                covariate
-                for covariate in self.layers_before_pooling.keys()
-                if covariate not in self.covariates_not_pooled
-            ]
-        else:
-            covariates_to_pool = list(self.layers_before_pooling.keys())
-        return covariates_to_pool
+        return get_conditions_to_pool(
+            self.layers_before_pooling,
+            self.covariates_not_pooled
+        )
 
     def to(
         self,
@@ -604,67 +601,33 @@ class ConditionEncoder(BaseModule):
         # initializing the layers before pooling
         self.before_pooling = {}
         for covariate, layers_dict in self.layers_before_pooling.items():
-            covariate_layers = self._get_layers(layers_dict)
+            covariate_layers = MLPBlock(**layers_dict)
             self.before_pooling[covariate] = covariate_layers
 
         # pooling modules
         if self.pooling == "mean":
-            self.pooling_layer = lambda x, mask: torch.mean(x * mask, dim=-2)
+            self.pooling_layer = lambda x: torch.mean(x, dim=1)
+        elif self.pooling == "sum":
+            self.pooling_layer = lambda x: torch.sum(x, dim=1)
         elif self.pooling == "self_attention":
-            self.pooling_layer = AttentionPooling(**self.pooling_kwargs)
+            msg = f""
+            raise NotImplementedError(msg)
         else:
             msg = f"{self.pooling=} not available, possible options are `['mean', 'self_attention']`"
             raise ValueError(msg)
 
         # layers after pooling
-        self.after_pooling = self._get_layers(self.layers_after_pooling)
+        self.after_pooling = MLPBlock(**self.layers_after_pooling)
 
     def __get_mask(
         self,
+        batch_size: int,
         sequence_length: int,
         device: torch.device,
     ) -> Tensor:
         """Retrieves the mask for attention blocks (still to be correctly implemented)"""
-        mask = torch.ones((sequence_length, sequence_length), device=device)
+        mask = torch.ones((batch_size, sequence_length, sequence_length), device=device)
         return mask
-
-    def _get_layers(
-        self,
-        layers_dict: LayersDict,
-    ) -> nn.Module:
-        """Initializes a given layer with the settings provided in :param:`layers_dict`.
-
-        :param layers_dict: Instance of :class:`LayersDict` with the configurations used to initialize the layer
-        :type layers_dict: class:`LayersDict`
-        """
-        if layers_dict.layer_type == "mlp":
-            layer = MLPBlock(
-                layers_dict.input_dim,
-                layers_dict.output_dim,
-                hidden_dims=layers_dict.hidden_dims,
-                use_batchnorm=layers_dict.use_batchnorm,
-                use_dropout=layers_dict.use_dropout,
-                dropout_rate=layers_dict.dropout_rate,
-                activation_class=layers_dict.activation_class,
-                final_activation_class=layers_dict.final_activation_class,
-            )
-        elif layers_dict.layer_type == "self_attention":
-            layer = SelfAttentionBlock(
-                layers_dict.embed_dim,
-                layers_dict.num_heads,
-                layers_dict.dropout_rate,
-                num_embeddings=layers_dict.num_embeddings,
-                embedding_dim=layers_dict.embedding_dim,
-                padding_idx=layers_dict.padding_idx,
-                max_norm=layers_dict.max_norm,
-                norm_type=layers_dict.norm_type,
-                scale_grad_by_freq=layers_dict.scale_grad_by_freq,
-                sparse=layers_dict.sparse,
-            )
-        else:
-            msg = f"{layers_dict.layer_type=} not available, possible options are `['mlp', 'self_attention']`"
-            raise ValueError(msg)
-        return layer
 
     def forward(
         self,
@@ -682,11 +645,7 @@ class ConditionEncoder(BaseModule):
             if covariate not in self.layers_before_pooling:
                 continue
             before_pooling = self.before_pooling[covariate]
-            if isinstance(before_pooling, SelfAttentionBlock):
-                mask = self.__get_mask(covariate_data.shape[1], covariate_data.device)
-                encoded_covariate = before_pooling(covariate_data, mask)
-            else:
-                encoded_covariate = before_pooling(covariate_data)
+            encoded_covariate = before_pooling(covariate_data)
             encoded_covariates[covariate] = encoded_covariate
 
         # concatenating in two separete arrays the covariates
@@ -694,38 +653,37 @@ class ConditionEncoder(BaseModule):
         if self.covariates_not_pooled is not None:
             encoded_covariates_not_pooled = torch.concatenate(
                 [encoded_covariates[covariate] for covariate in self.covariates_not_pooled], dim=-1
-            )
+            )  # B x N_conditions x (D * N_cov_not_pooled)
             encoded_covariates_pooled = None
             if len(self.covariates_to_pool) > 0:
-                encoded_covariates_pooled = torch.concatenate(
+                encoded_covariates_pooled = torch.stack(
                     [
                         encoded_covariate
                         for covariate, encoded_covariate in encoded_covariates.items()
                         if covariate in self.covariates_to_pool
                     ],
                     dim=-1,
-                )
+                )  # B x N_conditions x D 
         else:
-            encoded_covariates_pooled = torch.concatenate(
-                [encoded_covariate for covariate, encoded_covariate in encoded_covariates.items()], dim=-1
-            )
+            encoded_covariates_pooled = torch.stack(
+                [encoded_covariate for covariate, encoded_covariate in encoded_covariates.items()], dim=1
+            )  # B x N_conditions x D 
 
         if encoded_covariates_pooled is not None:
             # pooling the covariates
-            mask = self.__get_mask(encoded_covariates_pooled.shape[1], encoded_covariates_pooled.device)
-            z = self.pooling_layer(encoded_covariates_pooled, mask)
+            if self.pooling == "attention":
+                mask = self.__get_mask(encoded_covariates_pooled.shape[0], encoded_covariates_pooled.shape[1], encoded_covariates_pooled.device)
+                z = self.pooling_layer(encoded_covariates_pooled, mask)
+            else:
+                z = self.pooling_layer(encoded_covariates_pooled)
             # concatenating with the covariates not pooled
             if self.covariates_not_pooled is not None:
                 z = torch.concatenate((z, encoded_covariates_not_pooled), dim=-1)
         elif self.covariates_not_pooled is not None and encoded_covariates_pooled is None:
             z = encoded_covariates_not_pooled
-
+        
         # layers after pooling
-        if isinstance(self.after_pooling, SelfAttentionBlock):
-            mask = self.__get_mask(z.shape[1], z.device)
-            z = self.after_pooling(z, mask)
-        else:
-            z = self.after_pooling(z)
+        z = self.after_pooling(z)
         return z
 
 class ResnetBlock(nn.Module):

@@ -193,6 +193,7 @@ class NeuralVelocityField(BaseModule):
             t_latent = sinusoidal_time_features(
                 t,
                 num_freqs=self.config.time_features_num_freqs,
+                max_period=self.config.time_features_max_periods
             )
         if self.config.encode_time:
             t_latent = self.time_encoder(t_latent)
