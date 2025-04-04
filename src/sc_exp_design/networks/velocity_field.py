@@ -148,7 +148,7 @@ class NeuralVelocityField(BaseModule):
         # ResNet
         if self.config.use_resnet_blocks:
             msg = f"You must encode the state when using the ResNet"
-            assert self.config.encode_conditions, msg
+            assert self.config.encode_state, msg
             
             resnet_blocks = []
             for _ in range(self.config.n_resnet_blocks):
