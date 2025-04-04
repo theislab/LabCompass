@@ -177,7 +177,7 @@ class TestNeuralVelocityField:
         # retrieve target latent time dim
         expected_latent_time_dim = 1
         if use_sinusoidal_time_features:
-            expected_latent_time_dim = time_features_num_freqs*2
+            expected_latent_time_dim = time_features_num_freqs
         if encode_time:
             expected_latent_time_dim = time_latent_dim
         # retrieve target latent condition dim
