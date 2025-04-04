@@ -727,3 +727,96 @@ class ConditionEncoder(BaseModule):
         else:
             z = self.after_pooling(z)
         return z
+
+class ResnetBlock(nn.Module):
+    """
+    A block for a Multi-Layer Perceptron (MLP) with skip connection.
+
+    Args:
+        input_dim (int): Dimension of the input features.
+        output_dim (int, optional): Dimension of the output features. Defaults to None, in which case it's set equal to input_dim.
+        condition_dim (int, optional): Dimension of the conditional input. Defaults to None.
+        dropout_prob (float, optional): Dropout probability. Defaults to 0.0.
+        norm_groups (int, optional): Number of groups for layer normalization. Defaults to 32.
+    """
+    def __init__(
+        self,
+        in_dim,
+        out_dim=None,
+        dropout_prob=0.0,
+        embedding_dim=None, 
+        normalization=None):
+        
+        super().__init__()
+        
+        # Dimension of the embedding
+        self.embedding_dim = embedding_dim
+    
+        # Set output_dim to input_dim if not provided
+        out_dim = in_dim if out_dim is None else out_dim
+        self.out_dim = out_dim
+
+        # First linear block with LayerNorm and SiLU activation
+        if normalization is None:
+            self.net1 = nn.Sequential(
+                nn.SiLU(),
+                nn.Linear(in_dim, out_dim))          
+        elif normalization in ["layer", "batch"]:
+            self.net1 = nn.Sequential(
+                nn.LayerNorm(in_dim) if normalization=="layer" else nn.BatchNorm1d(num_features=in_dim),
+                nn.SiLU(),
+                nn.Linear(in_dim, out_dim))
+        else: 
+            raise NotImplementedError
+        
+        # Projections for conditions 
+        self.cond_proj = nn.Sequential(nn.SiLU(), nn.Linear(self.embedding_dim, out_dim))
+            
+        # Second linear block with LayerNorm, SiLU activation, and optional dropout
+        if normalization is None:
+            self.net2 = nn.Sequential(
+                nn.SiLU(),
+                *([nn.Dropout(dropout_prob)] * (dropout_prob > 0.0)),
+                nn.Linear(out_dim, out_dim))
+        elif normalization in ["layer", "batch"]:
+            self.net2 = nn.Sequential(
+                nn.LayerNorm(out_dim) if normalization=="layer" else nn.BatchNorm1d(num_features=out_dim),
+                nn.SiLU(),
+                *([nn.Dropout(dropout_prob)] * (dropout_prob > 0.0)),
+                nn.Linear(out_dim, out_dim))
+        else:
+            raise NotImplementedError
+
+        # Linear projection for skip connection if input_dim and output_dim differ
+        if in_dim != out_dim:
+            self.skip_proj = nn.Linear(in_dim, out_dim)
+
+    def forward(self, x, cond):
+        """
+        Forward pass of the MLP block.
+
+        Args:
+            x (torch.Tensor): Input features.
+            condition (torch.Tensor, optional): Conditional input. Defaults to None.
+
+        Returns:
+            torch.Tensor: Output features.
+        """
+        # Forward pass through the first linear block
+        h = self.net1(x)
+
+        # Condition time and library size 
+        emb = self.cond_proj(cond)     
+        h = h + emb
+                
+        # Forward pass through the second linear block
+        h = self.net2(h)
+
+        # Linear projection for skip connection if input_dim and output_dim differ
+        if x.shape[1] != self.out_dim:
+            x = self.skip_proj(x)
+
+        # Add skip connection to the output
+        assert x.shape == h.shape
+        
+        return x + h
