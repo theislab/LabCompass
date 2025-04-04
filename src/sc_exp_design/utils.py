@@ -1,4 +1,6 @@
+from collections.abc import Sequence
 import random
+from typing import Any
 
 import numpy as np
 import math
@@ -79,11 +81,27 @@ def set_reproducibility(random_seed: int) -> None:
     random.seed(random_seed)
     np.random.seed(random_seed)
 
+
+def get_conditions_to_pool(
+    layers_before_pooling: dict[str, Any],
+    covariates_not_pooled: Sequence[str] | None,
+) -> Sequence[str]:
+    """"""
+    if covariates_not_pooled is not None:
+        covariates_to_pool = [
+            covariate
+            for covariate in layers_before_pooling.keys()
+            if covariate not in covariates_not_pooled
+        ]
+    else:
+        covariates_to_pool = list(layers_before_pooling.keys())
+    return covariates_to_pool
+
+
 def sinusoidal_time_features(t: torch.Tensor, 
                              num_freqs: int = 128, 
                              max_period: int = 10000):
     """Create sinusoidal timestep embeddings.
-
     :param timesteps: a 1-D Tensor of N indices, one per batch element. These may be fractional.
     :param dim: the dimension of the output.
     :param max_period: controls the minimum frequency of the embeddings.
