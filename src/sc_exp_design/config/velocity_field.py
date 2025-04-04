@@ -103,7 +103,7 @@ class NeuralVelocityFieldConfig:
 
     :param perturbation_layers_before_pooling: Dictionary mapping each condition to be encoded to the configuration of its encoder.
         Each key of :attr:`.NeuralVelocityFieldConfig.condiion_layers_before_pooling` will be given by a :class:`str` with
-        the identifier of the perturbation covariate to decode, while each value will be either an instance of :class:`LayersDict`,
+        # the identifier of the perturbation covariate to decode, while each value will be either an instance of :class:`LayersDict`,
         or a :class:`dict` that satisfies the following conditions:
         - It needs to contain a key named `"layer_type"`, with values either given by `"mlp"` or `"self_attention"`,
             which will respectively instantiate, for the given condition, an :class:`MLPBlock` or a :class:`SelfAttentionBlock`. The other key value pairs will be used
@@ -211,10 +211,10 @@ class NeuralVelocityFieldConfig:
             require_input_dim_key=False,
             require_output_dim_key=False,
         )
-        self.state_encoder_mlp_kwargs  = mlp_kwargs_verifier(self.state_encoder_mlp_kwargs)
-        self.time_encoder_mlp_kwargs = mlp_kwargs_verifier(self.time_encoder_mlp_kwargs)
-        self.decoder_mlp_kwargs = mlp_kwargs_verifier(self.decoder_mlp_kwargs)
-        self.source_encoder_mlp_kwargs = mlp_kwargs_verifier(self.source_encoder_mlp_kwargs)
+        mlp_kwargs_verifier(self.state_encoder_mlp_kwargs)
+        mlp_kwargs_verifier(self.time_encoder_mlp_kwargs)
+        mlp_kwargs_verifier(self.decoder_mlp_kwargs)
+        mlp_kwargs_verifier(self.source_encoder_mlp_kwargs)
 
         # sanity check on condition encoder
         if self.use_guidance:
@@ -224,21 +224,17 @@ class NeuralVelocityFieldConfig:
                 msg = f"With {self.encode_conditions=} you need to pass an integer value as the `self.perturbation_latent_dim` attribute, found `None`"
                 assert self.perturbation_latent_dim is not None, msg
                 for condition, layers_dict in self.perturbation_layers_before_pooling.items():
-                    if isinstance(layers_dict, dict):
-                        layers_dict = LayersDict.verify_keys(layers_dict)
-                        layers_dict = LayersDict(**layers_dict)
-                    msg = f"`layers_dict` is expected to be an instance of `LayersDict`, found {type(layers_dict)}"
-                    assert isinstance(layers_dict, LayersDict), msg
+                    msg = f"`layers_dict` is expected to be an instance of `dict`, found {type(layers_dict)}"
+                    assert isinstance(layers_dict, dict), msg
+                    LayersDict.verify_keys(layers_dict)
                     self.perturbation_layers_before_pooling[condition] = layers_dict
                 msg = f"With {self.encode_conditions=} you need to pass a dictionary in the proper format as the `self.perturbation_layers_after_pooling` attribute, found `None`"
                 assert self.perturbation_layers_after_pooling is not None, msg
-                if isinstance(self.perturbation_layers_after_pooling, dict):
-                    self.perturbation_layers_after_pooling["input_dim"] = self.perturbation_layers_after_pooling_input_dim
-                    self.perturbation_layers_after_pooling["output_dim"] = self.perturbation_latent_dim
-                    self.perturbation_layers_after_pooling = LayersDict.verify_keys(self.perturbation_layers_after_pooling)
-                    self.perturbation_layers_after_pooling = LayersDict(**self.perturbation_layers_after_pooling)
-                msg = f"`self.perturbation_layers_after_pooling` is expected to be an instance of `LayersDict`, found {type(self.perturbation_layers_after_pooling)}"
-                assert isinstance(self.perturbation_layers_after_pooling, LayersDict), msg
+                msg = f"`self.perturbation_layers_after_pooling` is expected to be an instance of `dict`, found {type(self.perturbation_layers_after_pooling)}"
+                assert isinstance(self.perturbation_layers_after_pooling, dict), msg
+                self.perturbation_layers_after_pooling["input_dim"] = self.perturbation_layers_after_pooling_input_dim
+                self.perturbation_layers_after_pooling["output_dim"] = self.perturbation_latent_dim
+                LayersDict.verify_keys(self.perturbation_layers_after_pooling)
         else:
             msg = f"With {self.use_guidance=} an unguided flow model will be initialized, thus the settings for the condition encoder will be ignored."
             logger.warning(msg)
@@ -261,15 +257,11 @@ class NeuralVelocityFieldConfig:
         """
         dim = 0
         for layers_dict in self.perturbation_layers_before_pooling.values():
-            if isinstance(layers_dict, LayersDict):
-                layers_dict = vars(layers_dict)
-            if self.encode_conditions:
-                if layers_dict["layer_type"] == "mlp":
-                    input_dim = layers_dict["input_dim"]
-                else:
-                    raise NotImplementedError
-            else:
+            if isinstance(layers_dict, dict):
                 input_dim = layers_dict["input_dim"]
+            else:
+                msg = f""
+                raise TypeError(msg)
             dim = dim + input_dim
         return dim
 
@@ -292,8 +284,6 @@ class NeuralVelocityFieldConfig:
         if len(perturbation_covariate_pooled) > 0:
             for perturbation_to_pool in perturbation_covariate_pooled:
                 covariate_pool_dict = self.perturbation_layers_before_pooling[perturbation_to_pool]
-                if isinstance(covariate_pool_dict, LayersDict):
-                    covariate_pool_dict = vars(covariate_pool_dict)
                 if dim == 0:
                     dim = dim + covariate_pool_dict["output_dim"]
                 msg = f"The output layers of the pooled variables must all have the same dimensionality."
@@ -303,8 +293,6 @@ class NeuralVelocityFieldConfig:
         if self.perturbation_covariates_not_pooled is not None:
             for condition in self.perturbation_covariates_not_pooled:
                 layers_dict = self.perturbation_layers_before_pooling[condition]
-                if isinstance(layers_dict, LayersDict):
-                    layers_dict = vars(layers_dict)
                 output_dim = layers_dict["output_dim"]
                 dim = dim + output_dim
         return dim

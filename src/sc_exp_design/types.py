@@ -38,15 +38,6 @@ class MLPConfigFields:
 @dataclass
 class LayersDict:
     """"""
-    layer_type: Literal["mlp", "self_attention"] | None = None
-    input_dim: int | None = None
-    output_dim: int | None = None
-    hidden_dims: Sequence[int] = (64, 64, 64)
-    use_batchnorm: bool = False
-    use_dropout: bool = False
-    dropout_rate: float = 0.0
-    activation_class: nn.Module = nn.SELU
-    final_activation_class: nn.Module = nn.Identity
 
     @classmethod
     def verify_keys(
@@ -54,7 +45,7 @@ class LayersDict:
         layers_dict: dict[str, Any],
         require_input_dim_key: bool = True,
         require_output_dim_key: bool = True,
-    ) -> dict[str, Any]:
+    ) -> None:
         """"""
         # retrieving the input dictionary keys
         keys = layers_dict.keys()
@@ -84,4 +75,3 @@ class LayersDict:
             # valid type
             msg = f"Value of {key} expected to be of type {expected_types[key]}, found {type(value)}"
             assert isinstance(value, expected_types[key]), msg
-        return layers_dict

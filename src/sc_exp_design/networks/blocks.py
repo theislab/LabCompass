@@ -601,7 +601,7 @@ class ConditionEncoder(BaseModule):
         # initializing the layers before pooling
         self.before_pooling = {}
         for covariate, layers_dict in self.layers_before_pooling.items():
-            covariate_layers = MLPBlock(**vars(layers_dict))
+            covariate_layers = MLPBlock(**layers_dict)
             self.before_pooling[covariate] = covariate_layers
 
         # pooling modules
@@ -610,13 +610,14 @@ class ConditionEncoder(BaseModule):
         elif self.pooling == "sum":
             self.pooling_layer = lambda x: torch.sum(x, dim=1)
         elif self.pooling == "self_attention":
-            self.pooling_layer = AttentionPooling(**self.pooling_kwargs)
+            msg = f""
+            raise NotImplementedError(msg)
         else:
             msg = f"{self.pooling=} not available, possible options are `['mean', 'self_attention']`"
             raise ValueError(msg)
 
         # layers after pooling
-        self.after_pooling = MLPBlock(**vars(self.layers_after_pooling))
+        self.after_pooling = MLPBlock(**self.layers_after_pooling)
 
     def __get_mask(
         self,

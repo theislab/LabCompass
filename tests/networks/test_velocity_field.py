@@ -32,7 +32,7 @@ cond = {
 
 
 # mlp configurations
-linear_config = {
+linear_config = lambda: {
     "hidden_dims": (),
     "use_batchnorm": False,
     "use_dropout": False,
@@ -40,7 +40,7 @@ linear_config = {
     "activation_class": torch.nn.Identity,
     "final_activation_class": torch.nn.Identity,
 }
-mlp_config = {
+mlp_config = lambda: {
     "hidden_dims": (32, 32,),
     "use_batchnorm": False,
     "use_dropout": False,
@@ -68,22 +68,22 @@ perturbation_layers_before_pooling_linear_encode = {
     "treatment0_id": {
         "input_dim": treatment0_dim,
         "output_dim": perturbation_dim_before_pooling,
-        **linear_config,
+        **linear_config(),
     },
     "treatment0_dose": {
         "input_dim": 1,
         "output_dim": perturbation_dim_before_pooling,
-        **linear_config,
+        **linear_config(),
     },
     "treatment1_id": {
         "input_dim": treatment1_dim,
         "output_dim": perturbation_dim_before_pooling,
-        **linear_config,
+        **linear_config(),
     },
     "treatment1_dose": {
         "input_dim": 1,
         "output_dim": perturbation_dim_before_pooling,
-        **linear_config,
+        **linear_config(),
     }
 }
 
@@ -96,7 +96,7 @@ class TestNeuralVelocityField:
     @pytest.mark.parametrize("time_encoder_mlp_kwargs", [linear_config, mlp_config])
     @pytest.mark.parametrize("use_guidance", [True, False])
     @pytest.mark.parametrize("encode_conditions", [True, False])
-    @pytest.mark.parametrize("perturbation_pooling", ["mean", "sum", "self_attention"])
+    @pytest.mark.parametrize("perturbation_pooling", ["mean", "sum"])
     @pytest.mark.parametrize("perturbation_layers_after_pooling", [linear_config, mlp_config])
     @pytest.mark.parametrize("decoder_mlp_kwargs", [linear_config, mlp_config])
     @pytest.mark.parametrize("use_source_as_condition", [True, False])
@@ -111,7 +111,7 @@ class TestNeuralVelocityField:
         time_encoder_mlp_kwargs: dict[str, Any],
         use_guidance: bool,
         encode_conditions: bool,
-        perturbation_pooling: Literal["mean", "sum", "self_attention"],
+        perturbation_pooling: Literal["mean", "sum"],
         perturbation_layers_after_pooling: dict[str, Any],
         decoder_mlp_kwargs: Sequence[int],
         use_source_as_condition: bool,
@@ -129,23 +129,23 @@ class TestNeuralVelocityField:
             flow_dim,
             encode_state=encode_state,
             state_encoder_output_dim=state_latent_dim,
-            state_encoder_mlp_kwargs=state_encoder_mlp_kwargs,
+            state_encoder_mlp_kwargs=state_encoder_mlp_kwargs(),
             encode_time=encode_time,
             use_sinusoidal_time_features=use_sinusoidal_time_features,
             time_features_num_freqs=time_features_num_freqs,
             time_encoder_output_dim=time_latent_dim,
-            time_encoder_mlp_kwargs=time_encoder_mlp_kwargs,
+            time_encoder_mlp_kwargs=time_encoder_mlp_kwargs(),
             use_guidance=use_guidance,
             encode_conditions=encode_conditions,
             perturbation_latent_dim=perturbation_latent_dim,
             perturbation_pooling=perturbation_pooling,
             perturbation_layers_before_pooling=perturbation_layers_before_pooling,
-            perturbation_layers_after_pooling=perturbation_layers_after_pooling,
-            decoder_mlp_kwargs=decoder_mlp_kwargs,
+            perturbation_layers_after_pooling=perturbation_layers_after_pooling(),
+            decoder_mlp_kwargs=decoder_mlp_kwargs(),
             use_source_as_condition=use_source_as_condition,
             encode_source=encode_source,
             source_latent_dim=state_latent_dim,
-            source_encoder_mlp_kwargs=source_encoder_mlp_kwargs,
+            source_encoder_mlp_kwargs=source_encoder_mlp_kwargs(),
         )
 
         # forward pass on velocity field
