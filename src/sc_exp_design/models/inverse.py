@@ -79,6 +79,9 @@ class InverseModel(BaseModel):
         target_covariates_dims: int | dict[str, int],
         target_covariates_noise_models: Literal["gaussian", "neg_bin"] | dict[str, None | Literal["gaussian", "neg_bin"]] | None = None,
         target_covariates_predictor_kwargs: dict[str, dict[str, Any]] | None = None,
+        target_covariates_use_shared_representation: bool = False,
+        target_covariates_latent_dim: int = 1024,
+        target_covariates_encoder_mlp_kwargs: dict[str, Any] | None = None,
         optimizer_class: torch.optim.Optimizer = torch.optim.AdamW,
         optimizer_kwargs: Mapping[str, Any] = {"lr": 0.001},
         lr_scheduler_class: torch.optim.lr_scheduler.LRScheduler | None = None,
@@ -125,6 +128,9 @@ class InverseModel(BaseModel):
         self.target_covariates_dims = target_covariates_dims
         self.target_covariates_noise_models = target_covariates_noise_models
         self.target_covariates_predictor_kwargs = target_covariates_predictor_kwargs
+        self.target_covariates_use_shared_representation = target_covariates_use_shared_representation
+        self.target_covariates_latent_dim = target_covariates_latent_dim
+        self.target_covariates_encoder_mlp_kwargs = target_covariates_encoder_mlp_kwargs
 
         # initializing the predictor for each target covariate
         self.target_prediction_model = PerturbationApproximatePosterior(
@@ -133,6 +139,9 @@ class InverseModel(BaseModel):
             target_output_dims=self.target_covariates_dims,
             noise_models=self.target_covariates_noise_models,
             covariate_kwargs=self.target_covariates_predictor_kwargs,
+            use_shared_representation=self.target_covariates_use_shared_representation,
+            latent_dim=self.target_covariates_latent_dim,
+            encoder_mlp_kwargs=self.target_covariates_encoder_mlp_kwargs,
         )
         self.target_prediction_model = self.target_prediction_model.float()
         self.target_prediction_model = self.target_prediction_model.to(self.device)
@@ -268,6 +277,9 @@ class InverseModel(BaseModel):
         perturbation_non_linearities: torch.nn.Module | Callable[[torch.Tensor], torch.Tensor] | dict[str, torch.nn.Module | Callable[[torch.Tensor], torch.Tensor]] | None = None,
         perturbation_covariates_noise_models: Literal["gaussian", "neg_bin"] | dict[str, None | Literal["gaussian", "neg_bin"]] | None = None,
         perturbation_covariates_predictor_kwargs: dict[str, dict[str, Any]] | None = None,
+        perturbation_covariates_use_shared_representation: bool = False,
+        perturbation_covariates_latent_dim: int = 1024,
+        perturbation_encoder_mlp_kwargs: dict[str, Any] | None = None,
         n_samples: int | None = None,
         optimizer_class: torch.optim.Optimizer = torch.optim.AdamW,
         optimizer_kwargs: Mapping[str, Any] = {"lr": 0.001},
@@ -351,6 +363,11 @@ class InverseModel(BaseModel):
                 covariate: {} for covariate in perturbation_covariates
             }
 
+        if perturbation_encoder_mlp_kwargs is None:
+            msg = f""
+            logger.warning(msg)
+            perturbation_encoder_mlp_kwargs = {}
+
         # check types
         msg = f"`perturbation_covariates` nees to be a sequence of perturbation covatiate identifiers, found {type(perturbation_covariates)}"
         assert isinstance(perturbation_covariates, Sequence), msg
@@ -429,6 +446,9 @@ class InverseModel(BaseModel):
         self.perturbation_non_linearities = perturbation_non_linearities
         self.perturbation_covariates_noise_models = perturbation_covariates_noise_models
         self.perturbation_covariates_predictor_kwargs = perturbation_covariates_predictor_kwargs
+        self.perturbation_covariates_use_shared_representation = perturbation_covariates_use_shared_representation
+        self.perturbation_covariates_latent_dim = perturbation_covariates_latent_dim
+        self.perturbation_encoder_mlp_kwargs = perturbation_encoder_mlp_kwargs
         self.n_samples = n_samples
 
         # initializing the inverse model
@@ -447,6 +467,9 @@ class InverseModel(BaseModel):
             perturbation_non_linearities=self.perturbation_non_linearities,
             perturbation_covariates_noise_models=self.perturbation_covariates_noise_models,
             perturbation_covariates_predictor_kwargs=self.perturbation_covariates_predictor_kwargs,
+            perturbation_covariates_use_shared_representation=self.perturbation_covariates_use_shared_representation,
+            perturbation_covariates_latent_dim=self.perturbation_covariates_latent_dim,
+            perturbation_encoder_mlp_kwargs=self.perturbation_encoder_mlp_kwargs,
             n_samples=self.n_samples,
             state_dim=self.state_dim,
             **kwargs
