@@ -301,7 +301,7 @@ class NeuralVelocityFieldConfig:
         return dim
 
     @property
-    def joint_latent_dim(
+    def decoder_input_dim(
         self,
     ) -> int:
         """
