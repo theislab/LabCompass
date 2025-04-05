@@ -226,10 +226,8 @@ class NeuralVelocityField(BaseModule):
                 msg = f""
                 assert cond is not None, msg
                 latent_concat = torch.cat([t_latent, xt_latent, condition_latent], dim=-1)
-                original_concat = torch.cat([t, xt, condition_original], dim=-1)
             else:
                 latent_concat = torch.cat([t_latent, xt_latent], dim=-1)
-                original_concat = torch.cat([t, xt], dim=-1)            
         else:
             latent_concat = xt_latent
             if self.config.use_guidance:
@@ -246,7 +244,6 @@ class NeuralVelocityField(BaseModule):
                 source_latent = self.source_encoder(source)
             if not self.config.use_resnet_blocks:
                 # concatenating to the input for the decoder
-                original_concat = torch.cat([original_concat, source], dim=-1)
                 latent_concat = torch.cat([latent_concat, source_latent], dim=-1)
             else:
                 condition_concat = torch.cat([condition_concat, source_latent], dim=-1)  # concatenate
