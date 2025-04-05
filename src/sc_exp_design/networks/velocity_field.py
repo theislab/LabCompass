@@ -231,7 +231,7 @@ class NeuralVelocityField(BaseModule):
                 latent_concat = torch.cat([t_latent, xt_latent], dim=-1)
                 original_concat = torch.cat([t, xt], dim=-1)            
         else:
-            latent_concat = xt
+            latent_concat = xt_latent
             if self.config.use_guidance:
                 condition_concat = torch.cat([t_latent, condition_latent], dim=-1)  
             else:
