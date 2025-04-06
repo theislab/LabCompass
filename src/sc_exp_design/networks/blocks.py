@@ -685,3 +685,109 @@ class ConditionEncoder(BaseModule):
         # layers after pooling
         z = self.after_pooling(z)
         return z
+
+
+class ResnetBlock(BaseModule):
+    """
+    A residual MLP block with optional normalization, dropout, and conditional embedding.
+
+    Args:
+        in_dim (int): Input feature dimension.
+        out_dim (int, optional): Output feature dimension. Defaults to in_dim.
+        dropout_prob (float, optional): Dropout probability. Defaults to 0.0.
+        embedding_dim (int, optional): Dimensionality of the conditional embedding. Defaults to 128.
+        normalization (str, optional): Type of normalization to use: 'layer', 'batch', or None. Defaults to None.
+    """
+    def __init__(
+        self,
+        in_dim: int,
+        out_dim: int | None = None,
+        dropout_prob: float = 0.0,
+        embedding_dim: int = 128,
+        normalization: Literal["layer", "batch"] | None = None
+    ):
+        super().__init__()
+
+        self.in_dim = in_dim
+        self.out_dim = in_dim if out_dim is None else out_dim
+        self.dropout_prob = dropout_prob
+        self.embedding_dim = embedding_dim
+        self.normalization = normalization
+
+        self._init_modules()
+
+    def _init_modules(self):
+        # First linear block
+        self.net1 = self._build_block(
+            in_dim=self.in_dim,
+            out_dim=self.out_dim,
+            apply_norm=self.normalization is not None,
+            use_dropout=False
+        )
+
+        # Conditional projection block
+        self.cond_proj = nn.Sequential(
+            nn.SiLU(),
+            nn.Linear(self.embedding_dim, self.out_dim)
+        )
+
+        # Second linear block
+        self.net2 = self._build_block(
+            in_dim=self.out_dim,
+            out_dim=self.out_dim,
+            apply_norm=self.normalization is not None,
+            use_dropout=self.dropout_prob > 0.0
+        )
+
+        # Optional skip projection
+        self.skip_proj = (
+            nn.Linear(self.in_dim, self.out_dim)
+            if self.in_dim != self.out_dim
+            else nn.Identity()
+        )
+
+    def _build_block(self, in_dim, out_dim, apply_norm=True, use_dropout=False):
+        layers = []
+
+        if apply_norm:
+            norm_layer = self._get_normalization(in_dim)
+            layers.append(norm_layer)
+
+        layers.append(nn.SiLU())
+
+        if use_dropout:
+            layers.append(nn.Dropout(self.dropout_prob))
+
+        layers.append(nn.Linear(in_dim, out_dim))
+
+        return nn.Sequential(*layers)
+
+    def _get_normalization(self, dim):
+        if self.normalization == "layer":
+            return nn.LayerNorm(dim)
+        elif self.normalization == "batch":
+            return nn.BatchNorm1d(num_features=dim)
+        elif self.normalization is None:
+            return None
+        else:
+            raise NotImplementedError(f"Unsupported normalization: {self.normalization}")
+
+    def forward(self, x: torch.Tensor, cond: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass through the residual block.
+
+        Args:
+            x (torch.Tensor): Input tensor of shape (B, in_dim).
+            cond (torch.Tensor): Conditional tensor of shape (B, embedding_dim).
+
+        Returns:
+            torch.Tensor: Output tensor of shape (B, out_dim).
+        """
+        h = self.net1(x)
+        h = h + self.cond_proj(cond)
+        h = self.net2(h)
+
+        x_proj = self.skip_proj(x)
+
+        assert h.shape == x_proj.shape, f"Shape mismatch: {h.shape} vs {x_proj.shape}"
+        return x_proj + h

@@ -5,8 +5,6 @@ from dataclasses import field as dc_field
 from functools import partial
 from typing import Any, Literal
 
-from torch import nn
-
 from sc_exp_design.types import LayersDict
 from sc_exp_design.utils import get_conditions_to_pool
 
@@ -200,7 +198,11 @@ class NeuralVelocityFieldConfig:
     use_source_as_condition: bool = False
     encode_source: bool = False
     source_latent_dim: int = 10
-    source_encoder_mlp_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
+    source_encoder_mlp_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {},)
+    use_resnet_blocks: bool = False 
+    n_resnet_blocks: int = 3
+    resnet_dropout_prob: float = 0.0
+    resnet_normalization: Literal["layer", "batch"] | None | None = None
     
     def __post_init__(self) -> None:
         """
@@ -216,6 +218,11 @@ class NeuralVelocityFieldConfig:
         mlp_kwargs_verifier(self.time_encoder_mlp_kwargs)
         mlp_kwargs_verifier(self.decoder_mlp_kwargs)
         mlp_kwargs_verifier(self.source_encoder_mlp_kwargs)
+
+        # sanity check resnet block
+        if self.use_resnet_blocks:
+            msg = f"You must encode the state when using the ResNet"
+            assert self.encode_state, msg
 
         # sanity check on condition encoder
         if self.use_guidance:
@@ -299,7 +306,7 @@ class NeuralVelocityFieldConfig:
         return dim
 
     @property
-    def joint_latent_dim(
+    def decoder_input_dim(
         self,
     ) -> int:
         """
@@ -315,17 +322,21 @@ class NeuralVelocityFieldConfig:
         time_latent_dim = self.time_encoder_input_dim
         if self.encode_time:
             time_latent_dim = self.time_encoder_output_dim
-        # states
-        state_latent_dim = self.flow_dim
-        if self.encode_state:
-            state_latent_dim = self.state_encoder_output_dim 
         # source
         source_latent_dim = 0
         if self.use_source_as_condition:
             source_latent_dim = self.flow_dim
             if self.encode_source:
-                source_latent_dim = self.source_latent_dim
-        return state_latent_dim + time_latent_dim + perturbation_latent_dim + source_latent_dim
+                source_latent_dim = self.source_latent_dim       
+        # concatenation state, conditions, source and time 
+        if not self.use_resnet_blocks:
+            state_latent_dim = self.flow_dim
+            if self.encode_state:
+                state_latent_dim = self.state_encoder_output_dim 
+                    
+            return state_latent_dim + time_latent_dim + perturbation_latent_dim + source_latent_dim
+        # concatenation only happens at the conditioning dimension with resnet 
+        return time_latent_dim + perturbation_latent_dim + source_latent_dim
 
     @property
     def joint_original_dim(
@@ -341,7 +352,7 @@ class NeuralVelocityFieldConfig:
         if self.use_source_as_condition:
             source_dim = self.flow_dim
         return self.flow_dim + self.time_encoder_input_dim + perturbation_dim + source_dim
-
+        
     @property
     def initialize_source_encoder(
         self,

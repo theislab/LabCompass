@@ -6,10 +6,8 @@ import torch
 from torch import Tensor, nn
 
 from sc_exp_design.constants import VFStepFields
-from sc_exp_design.networks.blocks import BaseModule, ConditionEncoder, MLPBlock
+from sc_exp_design.networks.blocks import BaseModule, ConditionEncoder, MLPBlock, ResnetBlock
 from sc_exp_design.config.velocity_field import NeuralVelocityFieldConfig
-from sc_exp_design.networks.neural_noise_models import MLPGaussianNoiseModel, MLPNegBinNoiseModel
-from sc_exp_design.networks.inference_networks import PerturbationApproximatePosterior, EndpointsApproximatePosterior
 from sc_exp_design.utils import sinusoidal_time_features
 
 logger = logging.getLogger(__name__)
@@ -113,7 +111,7 @@ class NeuralVelocityField(BaseModule):
         """
         Initializes all necessary neural network modules including encoders, decoders, and inference models.
         """
-        # state encoder
+        # state encoder 
         self.x_encoder = None
         if self.config.encode_state:
             self.x_encoder = MLPBlock(
@@ -147,9 +145,20 @@ class NeuralVelocityField(BaseModule):
                 self.config.source_latent_dim,
                 **self.config.source_encoder_mlp_kwargs,
             )
-        # decoder
+        # ResNet
+        if self.config.use_resnet_blocks:            
+            resnet_blocks = []
+            for _ in range(self.config.n_resnet_blocks):
+                resnet_blocks.append(ResnetBlock(self.config.state_encoder_output_dim, 
+                                                      None,  # dimensionality preserving 
+                                                      self.config.resnet_dropout_prob, 
+                                                      self.config.decoder_input_dim,
+                                                      self.config.resnet_normalization
+                                                      )) 
+            self.resnet_blocks = nn.ModuleList(resnet_blocks)          
+        # Decoder 
         self.decoder = MLPBlock(
-            self.config.joint_latent_dim,
+            self.config.decoder_input_dim if not self.config.use_resnet_blocks else self.config.state_encoder_output_dim,
             self.config.flow_dim,
             **self.config.decoder_mlp_kwargs
         )
@@ -208,16 +217,21 @@ class NeuralVelocityField(BaseModule):
             xt_latent = self.x_encoder(xt)
 
         # concatenating original and latent representations
-        if self.config.use_guidance:
-            # sanity check (condition should be not None)
-            msg = f""
-            assert cond is not None, msg
-            latent_concat = torch.cat([t_latent, xt_latent, condition_latent], dim=-1)
-            original_concat = torch.cat([t, xt, condition_original], dim=-1)
+        if not self.config.use_resnet_blocks:
+            if self.config.use_guidance:
+                # sanity check (condition should be not None)
+                msg = f""
+                assert cond is not None, msg
+                latent_concat = torch.cat([t_latent, xt_latent, condition_latent], dim=-1)
+            else:
+                latent_concat = torch.cat([t_latent, xt_latent], dim=-1)
         else:
-            latent_concat = torch.cat([t_latent, xt_latent], dim=-1)
-            original_concat = torch.cat([t, xt], dim=-1)
-
+            latent_concat = xt_latent
+            if self.config.use_guidance:
+                condition_concat = torch.cat([t_latent, condition_latent], dim=-1)  
+            else:
+                condition_concat = t_latent
+                
         # encoding source
         if self.config.use_source_as_condition:
             msg = f""
@@ -225,10 +239,17 @@ class NeuralVelocityField(BaseModule):
             source_latent = source
             if self.config.encode_source:
                 source_latent = self.source_encoder(source)
-            # concatenating to the input for the decoder
-            original_concat = torch.cat([original_concat, source], dim=-1)
-            latent_concat = torch.cat([latent_concat, source_latent], dim=-1)
-
+            if not self.config.use_resnet_blocks:
+                # concatenating to the input for the decoder
+                latent_concat = torch.cat([latent_concat, source_latent], dim=-1)
+            else:
+                condition_concat = torch.cat([condition_concat, source_latent], dim=-1)  # concatenate
+            
+        # ResNet 
+        if self.config.use_resnet_blocks:
+            for block in self.resnet_blocks:
+                latent_concat = block(latent_concat, condition_concat)
+            
         # forward pass on neural velocity field
         vf = self.decoder(latent_concat)
         # creating output dictionary

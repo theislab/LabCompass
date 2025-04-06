@@ -102,6 +102,8 @@ class TestNeuralVelocityField:
     @pytest.mark.parametrize("use_source_as_condition", [True, False])
     @pytest.mark.parametrize("encode_source", [True, False])
     @pytest.mark.parametrize("source_encoder_mlp_kwargs", [linear_config, mlp_config])
+    @pytest.mark.parametrize("use_resnet_blocks", [False, True])
+    @pytest.mark.parametrize("resnet_normalization", ["layer", "batch", None])
     def test_conditional_velocity_field(
         self,
         encode_state: bool,
@@ -116,13 +118,19 @@ class TestNeuralVelocityField:
         decoder_mlp_kwargs: Sequence[int],
         use_source_as_condition: bool,
         encode_source: bool,
-        source_encoder_mlp_kwargs: dict[str, Any]
+        source_encoder_mlp_kwargs: dict[str, Any],
+        use_resnet_blocks: bool,
+        resnet_normalization: Literal["layer", "batch"] | None,
     ):
 
         # retrieving current settings
         perturbation_layers_before_pooling = perturbation_layers_before_pooling_no_encoding
         if encode_conditions:
             perturbation_layers_before_pooling = perturbation_layers_before_pooling_linear_encode
+
+        # we can only use resnet when encoding states
+        if not encode_state:
+            use_resnet_blocks = False
 
         # initializing configurations
         config = sc_exp_design.config.NeuralVelocityFieldConfig(
