@@ -146,10 +146,7 @@ class NeuralVelocityField(BaseModule):
                 **self.config.source_encoder_mlp_kwargs,
             )
         # ResNet
-        if self.config.use_resnet_blocks:
-            msg = f"You must encode the state when using the ResNet"
-            assert self.config.encode_state, msg
-            
+        if self.config.use_resnet_blocks:            
             resnet_blocks = []
             for _ in range(self.config.n_resnet_blocks):
                 resnet_blocks.append(ResnetBlock(self.config.state_encoder_output_dim, 

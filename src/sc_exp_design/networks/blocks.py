@@ -686,6 +686,7 @@ class ConditionEncoder(BaseModule):
         z = self.after_pooling(z)
         return z
 
+
 class ResnetBlock(BaseModule):
     """
     A residual MLP block with optional normalization, dropout, and conditional embedding.
@@ -703,7 +704,7 @@ class ResnetBlock(BaseModule):
         out_dim: int | None = None,
         dropout_prob: float = 0.0,
         embedding_dim: int = 128,
-        normalization: str | None = None
+        normalization: Literal["layer", "batch"] | None = None
     ):
         super().__init__()
 

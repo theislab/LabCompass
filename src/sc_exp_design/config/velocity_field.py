@@ -202,7 +202,7 @@ class NeuralVelocityFieldConfig:
     use_resnet_blocks: bool = False 
     n_resnet_blocks: int = 3
     resnet_dropout_prob: float = 0.0
-    resnet_normalization: str | None = None
+    resnet_normalization: Literal["layer", "batch"] | None | None = None
     
     def __post_init__(self) -> None:
         """
@@ -218,6 +218,11 @@ class NeuralVelocityFieldConfig:
         mlp_kwargs_verifier(self.time_encoder_mlp_kwargs)
         mlp_kwargs_verifier(self.decoder_mlp_kwargs)
         mlp_kwargs_verifier(self.source_encoder_mlp_kwargs)
+
+        # sanity check resnet block
+        if self.use_resnet_blocks:
+            msg = f"You must encode the state when using the ResNet"
+            assert self.encode_state, msg
 
         # sanity check on condition encoder
         if self.use_guidance:
