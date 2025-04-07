@@ -149,12 +149,15 @@ class NeuralVelocityField(BaseModule):
         if self.config.use_resnet_blocks:            
             resnet_blocks = []
             for _ in range(self.config.n_resnet_blocks):
-                resnet_blocks.append(ResnetBlock(self.config.state_encoder_output_dim, 
-                                                      None,  # dimensionality preserving 
-                                                      self.config.resnet_dropout_prob, 
-                                                      self.config.decoder_input_dim,
-                                                      self.config.resnet_normalization
-                                                      )) 
+                resnet_blocks.append(
+                    ResnetBlock(
+                        self.config.state_encoder_output_dim, 
+                        out_dim=None,  # dimensionality preserving 
+                        dropout_prob=self.config.resnet_dropout_prob, 
+                        embedding_dim=self.config.decoder_input_dim,
+                        normalization=self.config.resnet_normalization
+                    )
+                ) 
             self.resnet_blocks = nn.ModuleList(resnet_blocks)          
         # Decoder 
         self.decoder = MLPBlock(
