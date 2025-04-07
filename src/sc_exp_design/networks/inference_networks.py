@@ -10,7 +10,7 @@ from sc_exp_design.constants import VFStepFields
 from sc_exp_design.networks.blocks import BaseModule, MLPBlock
 from sc_exp_design.networks.neural_noise_models import MLPGaussianNoiseModel, MLPNegBinNoiseModel
 
-__all__ = ["PerturbationApproximatePosterior", "EndpointsApproximatePosterior"]
+__all__ = ["PerturbationApproximatePosterior"]
 
 
 class BaseApproximatePosterior(BaseModule):
@@ -276,106 +276,3 @@ class PerturbationApproximatePosterior(BaseApproximatePosterior):
             pert_posterior_params = cov_decoder(input_pert_posterior)
             pert_posterior_params_dict[cov_id] = pert_posterior_params
         return pert_posterior_params_dict
-
-
-class EndpointsApproximatePosterior(BaseApproximatePosterior):
-    """
-    A class that computes the approximate posterior for source and target endpoints, 
-    each with its own noise model and configuration. This class is useful for scenarios 
-    where two different types of approximate posteriors (source and target) are needed 
-    for a model with shared input dimensions and output dimensions.
-    """
-    _raise_error_if_none: bool = True
-    def __init__(
-        self,
-        input_dim: int,
-        output_dim: int,
-        freeze_grads: bool = True,
-        src_noise_model: Literal["gaussian", "neg_bin"] = "gaussian",
-        src_approximate_posterior_kwargs: dict[str, Any] | None = None,
-        tgt_noise_model: Literal["gaussian", "neg_bin"] = "gaussian",
-        tgt_approximate_posterior_kwargs: dict[str, Any] | None = None
-    ) -> None:
-        """
-        Initializes the EndpointsApproximatePosterior object with specified noise models and configurations 
-        for both source and target endpoints.
-
-        Args:
-            input_dim (int): The input dimension of the model.
-            output_dim (int): The output dimension of the model.
-            freeze_grads (bool, optional): Flag to freeze gradients during training. Defaults to True.
-            src_noise_model (str, optional): The noise model for the source endpoint. Defaults to "gaussian".
-            src_approximate_posterior_kwargs (dict, optional): Additional keyword arguments for the source approximate posterior. Defaults to None.
-            tgt_noise_model (str, optional): The noise model for the target endpoint. Defaults to "gaussian".
-            tgt_approximate_posterior_kwargs (dict, optional): Additional keyword arguments for the target approximate posterior. Defaults to None.
-        """
-        super().__init__()
-        self.input_dim = input_dim
-        self.output_dim = output_dim
-        self.freeze_grads = freeze_grads
-        self.src_noise_model = src_noise_model
-        self.src_approximate_posterior_kwargs = src_approximate_posterior_kwargs
-        self.tgt_noise_model = tgt_noise_model
-        self.tgt_approximate_posterior_kwargs = tgt_approximate_posterior_kwargs
-
-        self._init_modules()
-
-    def _init_modules(
-        self,
-    ) -> None:
-        """
-        Initializes the source and target approximate posterior modules using the provided noise models 
-        and configurations for each endpoint.
-
-        This method sets up the source and target approximate posterior models (e.g., Gaussian or negative binomial)
-        based on the noise models provided during initialization. The models are stored in the attributes `src_approximate_posterior`
-        and `tgt_approximate_posterior`.
-        """
-        # source
-        src_approximate_posterior_class = self._get_noise_model(self.src_noise_model)
-        self.src_approximate_posterior = src_approximate_posterior_class(
-            self.input_dim,
-            self.output_dim,
-            **self.src_approximate_posterior_kwargs,
-        )
-        # target
-        tgt_approximate_posterior_class = self._get_noise_model(self.tgt_noise_model)
-        self.tgt_approximate_posterior = tgt_approximate_posterior_class(
-            self.input_dim,
-            self.output_dim,
-            **self.tgt_approximate_posterior_kwargs,
-        )
-    
-    def forward(
-        self,
-        input_tensor: Tensor,
-    ) -> dict[str, Tensor]:
-        """
-        Performs a forward pass through both the source and target approximate posteriors.
-
-        This method takes an input tensor, clones it (to preserve gradients), detaches it (if freezing gradients),
-        and computes the approximate posterior parameters for both the source and target endpoints. The parameters 
-        are returned in a dictionary with keys defined by `sc_exp_design.constants.DataFields.SOURCE_PARAMS` 
-        and `sc_exp_design.constants.DataFields.TARGET_PARAMS`.
-
-        Args:
-            input_tensor (Tensor): The input tensor to the model.
-
-        Returns:
-            dict[str, Tensor]: A dictionary containing the source and target posterior parameters.
-        """
-        cond_vars_output_dict = {}
-        # cloning to preserve the gradients
-        src_input_tensor = input_tensor.clone()
-        tgt_input_tensor = input_tensor.clone()
-        # freezing the gradients
-        if self.freeze_grads:
-            src_input_tensor = src_input_tensor.detach()
-            tgt_input_tensor = tgt_input_tensor.detach()
-        # forward pass on nn
-        src_posterior_params = self.src_approximate_posterior(input_tensor)
-        tgt_posterior_params = self.tgt_approximate_posterior(input_tensor)
-        # storing the results
-        cond_vars_output_dict[VFStepFields.SOURCE_PARAMS] = src_posterior_params
-        cond_vars_output_dict[VFStepFields.TARGET_PARAMS] = tgt_posterior_params
-        return cond_vars_output_dict
