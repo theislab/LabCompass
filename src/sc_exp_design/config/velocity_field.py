@@ -5,7 +5,7 @@ from dataclasses import field as dc_field
 from functools import partial
 from typing import Any, Literal
 
-from sc_exp_design.types import LayersDict
+from sc_exp_design.types import MLPConfigFields
 from sc_exp_design.utils import get_conditions_to_pool
 
 logger = logging.getLogger(__name__)
@@ -101,7 +101,7 @@ class NeuralVelocityFieldConfig:
 
     :param perturbation_layers_before_pooling: Dictionary mapping each condition to be encoded to the configuration of its encoder.
         Each key of :attr:`.NeuralVelocityFieldConfig.condiion_layers_before_pooling` will be given by a :class:`str` with
-        # the identifier of the perturbation covariate to decode, while each value will be either an instance of :class:`LayersDict`,
+        # the identifier of the perturbation covariate to decode, while each value will be either an instance of :class:`MLPConfigFields`,
         or a :class:`dict` that satisfies the following conditions:
         - It needs to contain a key named `"layer_type"`, with values either given by `"mlp"` or `"self_attention"`,
             which will respectively instantiate, for the given condition, an :class:`MLPBlock` or a :class:`SelfAttentionBlock`. The other key value pairs will be used
@@ -114,7 +114,7 @@ class NeuralVelocityFieldConfig:
             the lookup table for embedding categorical variables in a continuous representation. The other keys, in case not specified in the dictionary,
             will fall back to the default values defined in :class:`SelfAttentionBlock`.
         Defaults to `None`.
-    :type perturbation_layers_before_pooling: class:`dict[str, LayersDict | dict[str, Any]] | None`
+    :type perturbation_layers_before_pooling: class:`dict[str, MLPConfigFields | dict[str, Any]] | None`
 
     :param perturbation_covariates_not_pooled: A sequence with the names of the perturbations covariates that are encoded (i.e.: they appear as keys
         in :attr:`NeuralVelocityFieldConfig.perturbation_layers_before_pooling`) and whose latent representation will be directly concatenated to the
@@ -131,7 +131,7 @@ class NeuralVelocityFieldConfig:
     :type perturbation_pooling_kwargs: class:`dict[str, Any] | None`
 
     :param perturbation_layers_after_pooling: Configuration for the condition decoder, used to initialize the :attr:`ConditionEncoder.after_pooling` attribute of
-        :attr:`NeuralVelocityField.condition_encoder`. Should be either an instance of :class:`LayersDict`, or a :class:`dict` that satisfies the following conditions:
+        :attr:`NeuralVelocityField.condition_encoder`. Should be either an instance of :class:`MLPConfigFields`, or a :class:`dict` that satisfies the following conditions:
         - It needs to contain a key named `"layer_type"`, with values either given by `"mlp"` or `"self_attention"`,
             which will respectively instantiate, for the given condition, an :class:`MLPBlock` or a :class:`SelfAttentionBlock`. The other key value pairs will be used
             to configure the encoder.
@@ -143,7 +143,7 @@ class NeuralVelocityFieldConfig:
             the lookup table for embedding categorical variables in a continuous representation. The other keys, in case not specified in the dictionary,
             will fall back to the default values defined in :class:`SelfAttentionBlock`.
         Defaults to `None`.
-    :type perturbation_layers_after_pooling: class:`LayersDict | None`
+    :type perturbation_layers_after_pooling: class:`MLPConfigFields | None`
 
     ## Decoder Settings
 
@@ -189,11 +189,11 @@ class NeuralVelocityFieldConfig:
     use_guidance: bool = True
     encode_conditions: bool = False
     perturbation_latent_dim: int | None = None
-    perturbation_layers_before_pooling: dict[str, LayersDict | dict[str, Any]] | None = None
+    perturbation_layers_before_pooling: dict[str, MLPConfigFields | dict[str, Any]] | None = None
     perturbation_covariates_not_pooled: Sequence[str] | None = None
     perturbation_pooling: Literal["mean", "self_attention"] = "mean"
     perturbation_pooling_kwargs: dict[str, Any] | None = None
-    perturbation_layers_after_pooling: LayersDict | None = None
+    perturbation_layers_after_pooling: MLPConfigFields | None = None
     decoder_mlp_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
     use_source_as_condition: bool = False
     encode_source: bool = False
@@ -210,7 +210,7 @@ class NeuralVelocityFieldConfig:
         """
         # sanity check on mlp configurations
         mlp_kwargs_verifier = partial(
-            LayersDict.verify_keys, 
+            MLPConfigFields.verify_keys, 
             require_input_dim_key=False,
             require_output_dim_key=False,
         )
@@ -234,7 +234,7 @@ class NeuralVelocityFieldConfig:
                 for condition, layers_dict in self.perturbation_layers_before_pooling.items():
                     msg = f"`layers_dict` is expected to be an instance of `dict`, found {type(layers_dict)}"
                     assert isinstance(layers_dict, dict), msg
-                    LayersDict.verify_keys(layers_dict)
+                    MLPConfigFields.verify_keys(layers_dict)
                     self.perturbation_layers_before_pooling[condition] = layers_dict
                 msg = f"With {self.encode_conditions=} you need to pass a dictionary in the proper format as the `self.perturbation_layers_after_pooling` attribute, found `None`"
                 assert self.perturbation_layers_after_pooling is not None, msg
@@ -242,7 +242,7 @@ class NeuralVelocityFieldConfig:
                 assert isinstance(self.perturbation_layers_after_pooling, dict), msg
                 self.perturbation_layers_after_pooling["input_dim"] = self.perturbation_layers_after_pooling_input_dim
                 self.perturbation_layers_after_pooling["output_dim"] = self.perturbation_latent_dim
-                LayersDict.verify_keys(self.perturbation_layers_after_pooling)
+                MLPConfigFields.verify_keys(self.perturbation_layers_after_pooling)
         else:
             msg = f"With {self.use_guidance=} an unguided flow model will be initialized, thus the settings for the condition encoder will be ignored."
             logger.warning(msg)

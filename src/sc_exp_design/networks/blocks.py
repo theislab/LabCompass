@@ -6,7 +6,7 @@ from typing import Any, Literal
 import torch
 from torch import Tensor, nn
 
-from sc_exp_design.types import LayersDict
+from sc_exp_design.types import MLPConfigFields
 from sc_exp_design.constants import DataFields
 from sc_exp_design.utils import get_conditions_to_pool
 
@@ -492,9 +492,9 @@ class ConditionEncoder(BaseModule):
 
     :param layers_before_pooling: Dictionary mapping each condition to be encoded to the configuration of its encoder.
         Each key of :attr:`.NeuralVelocityFieldConfig.condiion_layers_before_pooling` will be given by a :class:`str` with
-        the identifier of the perturbation covariate to decode, while each value will be an instance of :class:`LayersDict`.
+        the identifier of the perturbation covariate to decode, while each value will be an instance of :class:`MLPConfigFields`.
         Defaults to `None`.
-    :type layers_before_pooling: class:`dict[str, LayersDict]`
+    :type layers_before_pooling: class:`dict[str, MLPConfigFields]`
 
     :param covariates_not_pooled: A sequence with the names of the perturbations covariates that are encoded (i.e.: they appear as keys
         in :attr:`ConditionEncoder.layers_before_pooling`) and whose latent representation will be directly concatenated to the
@@ -511,18 +511,18 @@ class ConditionEncoder(BaseModule):
     :type pooling_kwargs: class:`dict[str, Any]`
 
     :param layers_after_pooling: Configuration for the condition decoder, used to initialize the :attr:`ConditionEncoder.after_pooling` attribute of
-        Should be either an instance of :class:`LayersDict`, defaults to `None`.
-    :type layers_after_pooling: class:`LayersDict`
+        Should be either an instance of :class:`MLPConfigFields`, defaults to `None`.
+    :type layers_after_pooling: class:`MLPConfigFields`
     """
 
     def __init__(
         self,
         latent_dim: int,
-        layers_before_pooling: dict[str, LayersDict] | None = None,
+        layers_before_pooling: dict[str, MLPConfigFields] | None = None,
         covariates_not_pooled: Sequence[str] | None = None,
         pooling: Literal["mean", "sum", "self_attention"] = "mean",
         pooling_kwargs: dict[str, Any] | None = None,
-        layers_after_pooling: LayersDict | None = None,
+        layers_after_pooling: MLPConfigFields | None = None,
     ) -> None:
         super().__init__()
         self.latent_dim = latent_dim
