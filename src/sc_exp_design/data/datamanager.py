@@ -93,6 +93,11 @@ class DataManager:
                         covariates = ()
                     perturbation_covariates[perturbation] = covariates
                     
+        # sanity check perturbations_in_obsm is iterable  
+        if perturbations_in_obsm is not None:
+            if isinstance(perturbations_in_obsm, str):
+                perturbations_in_obsm = (perturbations_in_obsm,)
+                    
         self.perturbations = perturbations
         self.perturbations_in_obsm = perturbations_in_obsm
         self.perturbation_covariates = perturbation_covariates
@@ -137,27 +142,28 @@ class DataManager:
         perturbations_with_rep = {}
         # iterating over each perturbation covariate
         for perturbation in self.perturbations:
-            # This will contain a list with all the representation modalities for the current perturbation. 
-            # It will be automatically constructed even when the perturbation does not have an associated representation
-            # (check `self.__init__`), in which case it will be a 0-elements sequence.
-            # Hence, we can check the length of this list to verify whether the perturbation has an associated representation or not.
-            perturbation_covariate_rep = self.perturbation_reps[perturbation]
-            # when we have at least one element, it means that we have found an associated representation
-            # and we can append the perturbation label to the list of perturbations.
-            if len(perturbation_covariate_rep) > 0:
-                # now we iterate over the different representation and verify that 
-                # they share the same keys (i.e.: the unique values of the current perturbation)
-                # using the first representation as reference
-                reference_keys = list(self.adata.uns[perturbation_covariate_rep[0]].keys())
-                for rep in perturbation_covariate_rep:
-                    # retrieving the covariates and their representations
-                    covariate_reps_keys = list(self.adata.uns[rep].keys())
-                    # sanity check, we should have the same keys for each representation
-                    # associated to the current perturbation
-                    msg = "" # probably should do this check within the `self.__init__` method like the other ones
-                    assert covariate_reps_keys == reference_keys, msg
-                # now we can append the dictionary that maps the current perturbation to its unique values.
-                perturbations_with_rep[perturbation] = reference_keys
+            if (self.perturbation_covariates is not None) and (perturbation not in self.perturbations_in_obsm):
+                # This will contain a list with all the representation modalities for the current perturbation. 
+                # It will be automatically constructed even when the perturbation does not have an associated representation
+                # (check `self.__init__`), in which case it will be a 0-elements sequence.
+                # Hence, we can check the length of this list to verify whether the perturbation has an associated representation or not.
+                perturbation_covariate_rep = self.perturbation_reps[perturbation]
+                # when we have at least one element, it means that we have found an associated representation
+                # and we can append the perturbation label to the list of perturbations.
+                if len(perturbation_covariate_rep) > 0:
+                    # now we iterate over the different representation and verify that 
+                    # they share the same keys (i.e.: the unique values of the current perturbation)
+                    # using the first representation as reference
+                    reference_keys = list(self.adata.uns[perturbation_covariate_rep[0]].keys())
+                    for rep in perturbation_covariate_rep:
+                        # retrieving the covariates and their representations
+                        covariate_reps_keys = list(self.adata.uns[rep].keys())
+                        # sanity check, we should have the same keys for each representation
+                        # associated to the current perturbation
+                        msg = "" # probably should do this check within the `self.__init__` method like the other ones
+                        assert covariate_reps_keys == reference_keys, msg
+                    # now we can append the dictionary that maps the current perturbation to its unique values.
+                    perturbations_with_rep[perturbation] = reference_keys
         return perturbations_with_rep
 
     def __get_state_data(
