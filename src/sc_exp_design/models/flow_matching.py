@@ -134,6 +134,7 @@ class FlowMatching(BaseModel):
         sample_rep: str | None = None,
         control_key: str | None = None,
         perturbations: str | Sequence[str] | None = None,
+        perturbations_in_obsm: dict[str, bool] | None = None,
         perturbation_covariates: dict[str, str | Sequence[str]] | None = None,
         perturbation_reps: dict[str, str | Sequence[str]] | None = None,
         load_target_covariates: bool = False,
@@ -183,11 +184,18 @@ class FlowMatching(BaseModel):
         :type target_covariates_kwargs: class `dict[str, Any] | None`
         """
         has_controls = (control_key is not None)
+        
+        # sanity check when considering perturbation in .obsm 
+        if isinstance(self.coupling, OTCoupling) and perturbations_in_obsm is not None:
+            msg = "With perturbations in obsm the coupling must be independent"
+            raise ValueError(msg)
+        
         data_manager = DataManager(
             train_adata,
             sample_rep=sample_rep,
             control_key=control_key,
             perturbations=perturbations,
+            perturbations_in_obsm=perturbations_in_obsm,
             perturbation_covariates=perturbation_covariates,
             perturbation_reps=perturbation_reps,
             load_target_covariates=load_target_covariates,

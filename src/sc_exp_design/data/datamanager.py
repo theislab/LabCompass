@@ -27,6 +27,7 @@ class DataManager:
         sample_rep: str | dict[str] | None = None,
         control_key: str | None = None,
         perturbations: str | Sequence[str] | None = None,
+        perturbations_in_obsm: dict[str, bool] | None = None, 
         perturbation_covariates: dict[str, str | Sequence[str]] | None = None,
         perturbation_reps: dict[str, str | Sequence[str]] | None = None,
         load_target_covariates: bool = False,
@@ -93,6 +94,7 @@ class DataManager:
                     perturbation_covariates[perturbation] = covariates
                     
         self.perturbations = perturbations
+        self.perturbations_in_obsm = perturbations_in_obsm
         self.perturbation_covariates = perturbation_covariates
         self.perturbation_reps = perturbation_reps
         self.load_target_covariates = load_target_covariates
@@ -197,45 +199,51 @@ class DataManager:
         perturbation_data = {}
         # iterating over each perturbation covariate
         for perturbation in self.perturbations:
-            # sanity check on the input AnnData
-            if perturbation not in adata.obs.keys():
-                msg = f"{perturbation} not found in `adata.obs.keys()`"
-                raise ValueError(msg)
-            
-            # what perturbation was applied
-            covariate_data = adata.obs[perturbation].values
-            # optionally retrieving the representation of such covariate
-            if self.perturbation_reps is not None:
-                perturbation_covariate_rep = self.perturbation_reps[perturbation]
-                for rep in perturbation_covariate_rep:
-                    # sanity check on the input AnnData
-                    if rep not in adata.uns.keys():
-                        msg = f"{perturbation_covariate_rep} not found in `adata.uns.keys()`"
-                        raise ValueError(msg)
-                    # retrieving the covariates and their representations
-                    covariate_reps_dict = adata.uns[rep]
-                    # mapping each observation condition to their representation
-                    covariate_reps = [covariate_reps_dict[covariate] for covariate in covariate_data]
-                    covariate_reps = np.stack(covariate_reps, axis=0)
-                    # storing the results
-                    covariate_rep_key = f"{DataFields.CONDITION_REP}_{perturbation}_{rep}"
-                    perturbation_data[covariate_rep_key] = covariate_reps
-                    
-            # loading perturbation covariates that are individual for each cell
-            if self.perturbation_covariates is not None:
-                perturbation_covariates = self.perturbation_covariates[perturbation]
-                # iterating over each of such covariates associated to the current perturbation
-                # which should be stored in the corresponding obsm field of the AnnData object
-                for covariate in perturbation_covariates:
-                    # sanity check on the input AnnData
-                    if covariate not in adata.obsm.keys():
-                        msg = f"{covariate=} not found in `self.adata.obsm.keys()`"
-                        raise ValueError(msg)
-                    # retrieving the covariate data
-                    covariate_data = adata.obsm[covariate]
-                    # storing the results
-                    covariate_cov_key = f"{DataFields.CONDITION_COV}_{perturbation}_{covariate}"
-                    perturbation_data[covariate_cov_key] = covariate_data
+            if (self.perturbations_in_obsm is not None) and (perturbation in self.perturbations_in_obsm):
+                msg = "Perturbations in .obsm must have only one representation"
+                assert len(self.perturbation_reps[perturbation])==1, msg
+                rep = self.perturbation_reps[perturbation][0]
+                perturbation_data[f"{DataFields.CONDITION_REP}_{perturbation}_{rep}"] = adata.obsm[rep]
+            else:
+                # sanity check on the input AnnData
+                if perturbation not in adata.obs.keys():
+                    msg = f"{perturbation} not found in `adata.obs.keys()`"
+                    raise ValueError(msg)
+                
+                # what perturbation was applied
+                covariate_data = adata.obs[perturbation].values
+                # optionally retrieving the representation of such covariate
+                if self.perturbation_reps is not None:
+                    perturbation_covariate_rep = self.perturbation_reps[perturbation]
+                    for rep in perturbation_covariate_rep:
+                        # sanity check on the input AnnData
+                        if rep not in adata.uns.keys():
+                            msg = f"{perturbation_covariate_rep} not found in `adata.uns.keys()`"
+                            raise ValueError(msg)
+                        # retrieving the covariates and their representations
+                        covariate_reps_dict = adata.uns[rep]
+                        # mapping each observation condition to their representation
+                        covariate_reps = [covariate_reps_dict[covariate] for covariate in covariate_data]
+                        covariate_reps = np.stack(covariate_reps, axis=0)
+                        # storing the results
+                        covariate_rep_key = f"{DataFields.CONDITION_REP}_{perturbation}_{rep}"
+                        perturbation_data[covariate_rep_key] = covariate_reps
+                        
+                # loading perturbation covariates that are individual for each cell
+                if self.perturbation_covariates is not None:
+                    perturbation_covariates = self.perturbation_covariates[perturbation]
+                    # iterating over each of such covariates associated to the current perturbation
+                    # which should be stored in the corresponding obsm field of the AnnData object
+                    for covariate in perturbation_covariates:
+                        # sanity check on the input AnnData
+                        if covariate not in adata.obsm.keys():
+                            msg = f"{covariate=} not found in `self.adata.obsm.keys()`"
+                            raise ValueError(msg)
+                        # retrieving the covariate data
+                        covariate_data = adata.obsm[covariate]
+                        # storing the results
+                        covariate_cov_key = f"{DataFields.CONDITION_COV}_{perturbation}_{covariate}"
+                        perturbation_data[covariate_cov_key] = covariate_data
         return perturbation_data
 
     def __get_target_data(
@@ -323,4 +331,11 @@ class DataManager:
         target_data = None
         if self.load_target_covariates:
             target_data = self.__get_target_data(adata)
-        return AnnotatedPerturbationData(adata, self.control_key, state_data, perturbation_data, target_data, self.perturbations_with_rep, self.has_controls)
+        
+        return AnnotatedPerturbationData(adata,
+                                         self.control_key, 
+                                         state_data,
+                                         perturbation_data,
+                                         target_data,
+                                         self.perturbations_with_rep, 
+                                         self.has_controls)
