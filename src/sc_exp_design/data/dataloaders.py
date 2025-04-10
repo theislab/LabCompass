@@ -286,7 +286,7 @@ class ValidationDataLoader(BaseCoupledDataLoader):
                 treatment_id = "unconditional"
             else:
                 msg = f""
-                assert isinstance(treatment_id, Sequence), msg
+                assert isinstance(treatment, Sequence), msg
                 treatment_id = "_".join(treatment)
 
             # storing output dictionary for current perturbation
