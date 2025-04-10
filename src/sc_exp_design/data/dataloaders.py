@@ -243,7 +243,7 @@ class ValidationDataLoader(BaseCoupledDataLoader):
     
     def __sample_perturbation_id(
         self,
-    ) -> Sequence[str]:
+    ) -> Sequence[str | None]:
         """
         Samples the treatment for the current batch when using Optimal Transport couplings.
         This is needed as the OT problem should be solved individually for each perturbation.
@@ -282,7 +282,12 @@ class ValidationDataLoader(BaseCoupledDataLoader):
             treatement_data = self._get_matched_data(treatment, control_states)
 
             # constructing perturbation identifier to store the results
-            treatment_id = "_".join(treatment)
+            if treatment is None:
+                treatment_id = "unconditional"
+            else:
+                msg = f""
+                assert isinstance(treatment_id, Sequence), msg
+                treatment_id = "_".join(treatment)
 
             # storing output dictionary for current perturbation
             out_dict[treatment_id] = treatement_data
