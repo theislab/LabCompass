@@ -2,12 +2,9 @@ import logging
 from collections.abc import Callable, Sequence
 from typing import Any, Literal
 
-import matplotlib.pyplot as plt
 import torch
-from matplotlib.axes import Axes
-from matplotlib.figure import Figure
+import numpy as np
 from torch import Tensor
-from tqdm import tqdm
 
 from sc_exp_design.constants import DataFields, LossFields, PredictionFields, VFStepFields
 from sc_exp_design.data import (
@@ -173,24 +170,28 @@ class CFMTrainer(BaseTrainer):
             # performing validation step on single perturbation
             perturbation_predictions, perturbation_targets = self.__validation_step(perturbation_batch)
 
+            # detaching predictions from graph and moving tensors to numpy
+            perturbation_predictions = perturbation_predictions.cpu().numpy()
+            perturbation_targets = perturbation_targets.cpu().numpy()
+
             # appending to the list of all results
             predictions.append(perturbation_predictions)
             targets.append(perturbation_targets)
 
             # storing the results to the output grouped per perturbation
             predictions_dict[perturbation] = {
-                PredictionFields.PREDICTION_DATA: perturbation_predictions.cpu().numpy(),
-                DataFields.TARGET_STATE: perturbation_targets.cpu().numpy()
+                PredictionFields.PREDICTION_DATA: perturbation_predictions,
+                DataFields.TARGET_STATE: perturbation_targets
             }
         
         # concatenating the results for all conditions
-        predictions = torch.concatenate(predictions, dim=0)
-        targets = torch.concatenate(targets, dim=0)
+        predictions = np.concatenate(predictions, axis=0)
+        targets = np.concatenate(targets, axis=0)
 
         # updating results dictionary with predictions concatenated over all conditions
         predictions_dict["all_conditions"] = {
-            PredictionFields.PREDICTION_DATA: predictions.cpu().numpy(),
-            DataFields.TARGET_STATE: targets.cpu().numpy()
+            PredictionFields.PREDICTION_DATA: predictions,
+            DataFields.TARGET_STATE: targets
         }
 
         return predictions_dict

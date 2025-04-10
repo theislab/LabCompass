@@ -1,15 +1,9 @@
-from collections.abc import Callable, Sequence
 from typing import Any, Literal
 
-import matplotlib.pyplot as plt
 import torch
-from matplotlib.axes import Axes
-from matplotlib.figure import Figure
 from torch import Tensor
-from tqdm import tqdm
 
-from sc_exp_design.constants import DataFields, LossFields, VFStepFields
-from sc_exp_design.data import SequentialDataLoader
+from sc_exp_design.constants import DataFields, LossFields
 from sc_exp_design.networks.blocks import BaseModule
 from sc_exp_design.networks.neural_noise_models import MLPGaussianNoiseModel
 from sc_exp_design.training.base import BaseTrainer
