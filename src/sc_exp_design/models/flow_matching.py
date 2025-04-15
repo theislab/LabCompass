@@ -1,3 +1,4 @@
+
 import logging
 import os
 from collections.abc import Callable, Mapping, Sequence
@@ -435,6 +436,18 @@ class FlowMatching(BaseModel):
         condition = None
         if DataFields.PERTURBATION_DATA in batch.keys():
             condition = batch[DataFields.PERTURBATION_DATA]
+
+	# handling batch size
+	if self.generate_from_noise:
+	    # inferring the batch size
+	    if batch_size is None:
+                # if it exists, infer it from validation dataloader
+		# otherwise uses the train dataloader.
+	        if self.validation_dataloader is not None:
+		    batch_size = self.validation_dataloader.batch_size
+                else:
+                    batch_size = self.train_dataloader.batch_size
+
 
         # pushing forward particles
         predictions = push_forward(
