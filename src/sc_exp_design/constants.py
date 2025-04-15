@@ -7,7 +7,7 @@ __all__ = ["DataFields", "LossFields", "VFStepFields", "ParamsFields"]
 class DataFields:
     STATE_DATA: str = "state_data"
     PERTURBATION_DATA: str = "condition"
-    TARGET_DATA: str = "perturbation_target_repr"
+    TARGET_DATA: str = "target_data"
     SOURCE_STATE: str = "source"
     TARGET_STATE: str = "target"
     CONDITION_REP: str = "repr"
