@@ -448,7 +448,6 @@ class FlowMatching(BaseModel):
                 else:
                     batch_size = self.train_dataloader.batch_size
 
-
         # pushing forward particles
         predictions = push_forward(
             self.velocity_field,
