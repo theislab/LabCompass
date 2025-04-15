@@ -164,6 +164,8 @@ class DataManager:
                         assert covariate_reps_keys == reference_keys, msg
                     # now we can append the dictionary that maps the current perturbation to its unique values.
                     perturbations_with_rep[perturbation] = reference_keys
+            else:
+                perturbations_with_rep = None
         return perturbations_with_rep
 
     def __get_state_data(
