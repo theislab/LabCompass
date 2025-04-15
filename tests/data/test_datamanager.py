@@ -161,7 +161,7 @@ class TestDataManager:
                             assert f"cov_{perturbation}_{cov}" in perturbation_data.keys(), msg
         
         # target data
-        target_data = data.target_perturbation_repr
+        target_data = data.target_reprs
         if load_target_covariates:
             msg = f""
             assert target_data is not None, msg
@@ -181,7 +181,7 @@ class TestDataManager:
         
         if load_target_covariates:
             msg = f""
-            assert "perturbation_target_repr" in treatment_data.keys(), msg
+            assert "target_data" in treatment_data.keys(), msg
         
         # controls
         if has_controls:
@@ -196,4 +196,4 @@ class TestDataManager:
             
             if load_target_covariates:
                 msg = f""
-                assert "perturbation_target_repr" in control_data.keys(), msg
+                assert "target_data" in control_data.keys(), msg
