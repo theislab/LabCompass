@@ -41,7 +41,7 @@ class AnnotatedPerturbationData(BaseDataStruct):
     control_key: str | None
     state_data: TensorLike
     perturbation_data: dict[str, TensorLike] | None
-    target_perturbation_repr: dict[str, TensorLike] | None = None
+    target_reprs: dict[str, TensorLike] | None = None
     perturbations_with_rep: dict[str, Sequence[str]] | None = None
     has_controls: bool = True
 
@@ -91,8 +91,8 @@ class AnnotatedPerturbationData(BaseDataStruct):
         # collect control annotations from perturbation data 
         if self.perturbation_data is not None:
             ctrl_perturbation_data = {key: val[ctrl_obs_idx] for key, val in self.perturbation_data.items()}
-        if self.target_perturbation_repr is not None:
-            ctrl_pert_repr = {key: val[ctrl_obs_idx] for key, val in self.target_perturbation_repr.items()}
+        if self.target_reprs is not None:
+            ctrl_pert_repr = {key: val[ctrl_obs_idx] for key, val in self.target_reprs.items()}
 
         # collect batch subset of the observations 
         if batch_size is not None:
@@ -102,15 +102,15 @@ class AnnotatedPerturbationData(BaseDataStruct):
 
             if self.perturbation_data is not None:
                 ctrl_perturbation_data = {key: val[batch_idxs] for key, val in ctrl_perturbation_data.items()}
-            if self.target_perturbation_repr is not None:
+            if self.target_reprs is not None:
                 ctrl_pert_repr = {key: val[batch_idxs] for key, val in ctrl_pert_repr.items()}
 
         # Dictionary of controls 
         output_dict = {DataFields.STATE_DATA: ctrl_state_data,}        
         if self.perturbation_data is not None:
             output_dict[DataFields.PERTURBATION_DATA] = ctrl_perturbation_data
-        if self.target_perturbation_repr is not None:
-            output_dict[DataFields.PERTURBATION_TARGET_REPR] = ctrl_pert_repr
+        if self.target_reprs is not None:
+            output_dict[DataFields.TARGET_DATA] = ctrl_pert_repr
         return output_dict
 
     def get_treatments(
@@ -144,8 +144,8 @@ class AnnotatedPerturbationData(BaseDataStruct):
         # collect treatment annotations from perturbation data 
         if self.perturbation_data is not None:
             trtm_perturbation_data = {key: val[trtm_obs_idx] for key, val in self.perturbation_data.items()}
-        if self.target_perturbation_repr is not None:
-            trtm_pert_repr = {key: val[trtm_obs_idx] for key, val in self.target_perturbation_repr.items()}
+        if self.target_reprs is not None:
+            trtm_pert_repr = {key: val[trtm_obs_idx] for key, val in self.target_reprs.items()}
         
         # collect batch subset of the observations 
         if batch_size is not None:
@@ -155,15 +155,15 @@ class AnnotatedPerturbationData(BaseDataStruct):
             
             if self.perturbation_data is not None:
                 trtm_perturbation_data = {key: val[batch_idxs] for key, val in trtm_perturbation_data.items()}
-            if self.target_perturbation_repr is not None:
+            if self.target_reprs is not None:
                 trtm_pert_repr = {key: val[batch_idxs] for key, val in trtm_pert_repr.items()}
 
         # dictionary of treatments 
         output_dict = {DataFields.STATE_DATA: trtm_state_data,}
         if self.perturbation_data is not None:
             output_dict[DataFields.PERTURBATION_DATA] = trtm_perturbation_data
-        if self.target_perturbation_repr is not None:
-            output_dict[DataFields.PERTURBATION_TARGET_REPR] = trtm_pert_repr
+        if self.target_reprs is not None:
+            output_dict[DataFields.TARGET_DATA] = trtm_pert_repr
         return output_dict
 
     def __getitem__(
@@ -178,15 +178,15 @@ class AnnotatedPerturbationData(BaseDataStruct):
         perturbation_data = None
         if self.perturbation_data is not None:
             perturbation_data = {perturbation: perturbation_data[idx] for perturbation, perturbation_data in self.perturbation_data.items()}
-        target_perturbation_repr = None
-        if self.target_perturbation_repr is not None:
-            target_perturbation_repr = {target: target_data[idx] for target, target_data in self.target_perturbation_repr.items()}
+        target_reprs = None
+        if self.target_reprs is not None:
+            target_reprs = {target: target_data[idx] for target, target_data in self.target_reprs.items()}
         return AnnotatedPerturbationData(
             adata,
             self.control_key,
             state_data,
             perturbation_data=perturbation_data,
-            target_perturbation_repr=target_perturbation_repr,
+            target_reprs=target_reprs,
             perturbations_with_rep=self.perturbations_with_rep,
         )
     

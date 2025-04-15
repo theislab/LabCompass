@@ -181,7 +181,7 @@ class TestDataManager:
         
         if load_target_covariates:
             msg = f""
-            assert "perturbation_target_repr" in treatment_data.keys(), msg
+            assert "target_data" in treatment_data.keys(), msg
         
         # controls
         if has_controls:

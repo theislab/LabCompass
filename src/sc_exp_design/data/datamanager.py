@@ -255,30 +255,29 @@ class DataManager:
         # dictionary storing representations for perturbation target covariates
         out_dict = {}
         
-        for condition_target_covariate, condition_target_covariate_rep in self.target_covariates.items():
+        for target_covariate, target_covariate_rep in self.target_covariates.items():
             # if covariate is stored in adata.obsm we retrieve its representation directly
-            if condition_target_covariate in self.target_covariates_in_obsm:
+            if target_covariate in self.target_covariates_in_obsm:
                 # sanity check
-                msg = f"{condition_target_covariate} not found in `adata.obsm.keys()`"
-                assert condition_target_covariate in adata.obsm.keys(), msg
-                condition_target_covariate_data = adata.obsm[condition_target_covariate]
-                out_dict[condition_target_covariate] = condition_target_covariate_data
+                msg = f"{target_covariate} not found in `adata.obsm.keys()`"
+                assert target_covariate in adata.obsm.keys(), msg
+                target_covariate_data = adata.obsm[target_covariate]
+                out_dict[target_covariate] = target_covariate_data
             else:
-                condition_target_covariate_kwargs = self.target_covariates_kwargs[condition_target_covariate]
                 # sanity check
-                msg = f"{condition_target_covariate} not found in `adata.obs.columns`"
-                assert condition_target_covariate in adata.obs.columns, msg
+                msg = f"{target_covariate} not found in `adata.obs.columns`"
+                assert target_covariate in adata.obs.columns, msg
 
-                covariate_target_rep = self.target_covariates[condition_target_covariate]
-                covariate_target_rep_kwargs = self.target_covariates_kwargs[condition_target_covariate]
+                # retrieving the keywargs argument to get the target representation
+                covariate_target_rep_kwargs = self.target_covariates_kwargs[target_covariate]
 
                 # Collect the condition target covariate from the adata.obs 
-                covariate_data = adata.obs[[condition_target_covariate]].values
+                covariate_data = adata.obs[[target_covariate]].values
 
-                if covariate_target_rep == "one_hot":
+                if target_covariate_rep == "one_hot":
                     covariate_rep_encoder = OneHotEncoder(**covariate_target_rep_kwargs)
                     covariate_target_rep_data = covariate_rep_encoder.fit_transform(covariate_data).toarray()
-                elif covariate_target_rep == "label":
+                elif target_covariate_rep == "label":
                     covariate_rep_encoder = LabelEncoder()
                     if DataFields.TARGET_CATEGORIES in covariate_target_rep_kwargs.keys():
                         target_categories = covariate_target_rep_kwargs[DataFields.TARGET_CATEGORIES]
@@ -286,14 +285,14 @@ class DataManager:
                         covariate_target_rep_data = covariate_rep_encoder.transform(covariate_data)
                     else:
                         covariate_target_rep_data = covariate_rep_encoder.fit_transform(covariate_data)
-                elif covariate_target_rep == "identity":
+                elif target_covariate_rep == "identity":
                     covariate_target_rep_data = covariate_data
                 else:
-                    msg = f"{covariate_target_rep=} not currently supported (avaiable options are `['one_hot', 'label', 'identity']`)"
+                    msg = f"{target_covariate_rep=} not currently supported (avaiable options are `['one_hot', 'label', 'identity']`)"
                     raise NotImplementedError(msg)
 
                 # Retrun dictionary 
-                out_dict[condition_target_covariate] = covariate_target_rep_data
+                out_dict[target_covariate] = covariate_target_rep_data
         return out_dict
 
     def get_data(
