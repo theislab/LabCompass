@@ -293,6 +293,6 @@ class ValidationDataLoader(BaseCoupledDataLoader):
             out_dict[treatment_id] = treatement_data
         return out_dict
 
-     
+
 class PredictionDataLoader(BaseDataLoader):
     """"""

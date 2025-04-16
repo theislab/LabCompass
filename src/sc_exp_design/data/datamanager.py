@@ -133,7 +133,7 @@ class DataManager:
         msg = f""
         assert self.adata is not None, msg
         # no perturbation found
-        if self.perturbations is None:
+        if self.perturbations is None or not (set(self.perturbations) - set(self.perturbations_in_obsm)):
             return None
         # no representation found
         if self.perturbation_reps is None:
@@ -164,8 +164,6 @@ class DataManager:
                         assert covariate_reps_keys == reference_keys, msg
                     # now we can append the dictionary that maps the current perturbation to its unique values.
                     perturbations_with_rep[perturbation] = reference_keys
-            else:
-                perturbations_with_rep = None
         return perturbations_with_rep
 
     def __get_state_data(
