@@ -186,7 +186,7 @@ class InverseModel(BaseModel):
         assert isinstance(train_data, AnnotatedPerturbationData), msg
 
         msg = f""
-        assert train_data.target_perturbation_repr is not None, msg
+        assert train_data.target_reprs is not None, msg
 
         # initializing data loader
         self.target_predictor_train_data = train_data
@@ -537,7 +537,7 @@ class InverseModel(BaseModel):
         assert isinstance(train_data, AnnotatedPerturbationData), msg
 
         msg = f""
-        assert train_data.target_perturbation_repr is not None, msg
+        assert train_data.target_reprs is not None, msg
 
         # initialize trainer
         self.inverse_model_trainer = InverseModelTrainer(
