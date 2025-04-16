@@ -52,7 +52,7 @@ def push_forward(
     assert isinstance(num_samples, int), msg
     if condition is not None:
         condition = {
-            condition_covariate: condition_data.repeat(num_samples, *(1 for _ in condition_data.shape)).squeeze()
+            condition_covariate: condition_data.repeat(num_samples, *(1 for _ in condition_data.shape)).squeeze(dim=0)
             for condition_covariate, condition_data in condition.items()
         }
     if source is not None:
