@@ -109,7 +109,7 @@ class BaseTrainer(abc.ABC):
 
         for grad_step in iterator:
             batch = None
-            if (train_dataloader is not None) and self._require_train_dataloader:
+            if train_dataloader is not None:
                 batch = train_dataloader.sample()
             log_dict = self.__train_step(grad_step, batch)
             self.__update_logs(log_dict)
