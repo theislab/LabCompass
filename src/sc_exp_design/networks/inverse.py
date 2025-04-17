@@ -174,10 +174,16 @@ class MAPConditionOptimizer(BaseConditionOptimizer):
             self,
             X_controls: torch.Tensor | None,
         ) -> torch.Tensor:
+        # prepare batch size for forward model
+        batch_size = self.forward_model.train_dataloader.batch_size
+        if self.forward_model.validation_dataloader is not None:
+            batch_size = self.forward_model.validation_dataloader.batch_size
+
         # prepare batch information cellFlow           
         batch_dict = {}
         if X_controls is not None:
             batch_dict[DataFields.SOURCE_STATE] = X_controls
+            batch_size = X_controls.shape[0]
             
         
         expanded_perturbation_data = {}
@@ -185,10 +191,10 @@ class MAPConditionOptimizer(BaseConditionOptimizer):
             if not self.is_discrete_dict[pert_key]:
                 non_linearity = self.perturbation_non_linearities[pert_key]
                 expanded_perturbation_data[pert_key] = non_linearity(
-                    self.optimized_perturbation_data[pert_key].expand(X_controls.shape[0], -1)
+                    self.optimized_perturbation_data[pert_key].expand(batch_size, -1)
                 ) 
             else:
-                expanded_perturbation_data[pert_key] = self.differentiable_categorical(self.optimized_perturbation_data[pert_key].expand(X_controls.shape[0], -1))
+                expanded_perturbation_data[pert_key] = self.differentiable_categorical(self.optimized_perturbation_data[pert_key].expand(batch_size, -1))
             
         batch_dict[DataFields.PERTURBATION_DATA] = expanded_perturbation_data
 
@@ -203,15 +209,19 @@ class MAPConditionOptimizer(BaseConditionOptimizer):
         
         # handling shape of optimal condition
         optimal_condition = {
-            covariate: covariate_data.repeat(X_controls.shape[0], 1).to(X_controls.device) for covariate, covariate_data in self.optimal_condition.items()
+            covariate: covariate_data.repeat(batch_size, 1).to(self.forward_model.device) for covariate, covariate_data in self.optimal_condition.items()
         }
 
         # compute loss 
         loss = self.compute_loss(class_pred, optimal_condition, self.optimized_perturbation_data)
 
+        # optionally detaching the control states if they are available
+        if X_controls is not None:
+            X_controls = X_controls.detach().cpu()
+
         # constructing step output dictionary
         out_dict = {
-            DataFields.SOURCE_STATE: X_controls.detach().cpu(),
+            DataFields.SOURCE_STATE: X_controls,
             DataFields.PERTURBATION_DATA: {
                 covariate: covariate_data.detach().cpu() for covariate, covariate_data in expanded_perturbation_data.items()
             },
@@ -302,26 +312,31 @@ class LangevinSampler(BaseConditionOptimizer):
             self,
             X_controls: torch.Tensor | None,
         ) -> torch.Tensor:
-        # Expand target  and controls
-        target = {
-            covariate: covariate_data.repeat(self.n_samples, X_controls.shape[0], 1).to(X_controls.device) for covariate, covariate_data in self.optimal_condition.items()
-        }
-        
-        # prepare batch information cellFlow
+        # prepare batch size for forward model
+        batch_size = self.forward_model.train_dataloader.batch_size
+        if self.forward_model.validation_dataloader is not None:
+            batch_size = self.forward_model.validation_dataloader.batch_size
+
+        # prepare batch information cellFlow           
         batch_dict = {}
         if X_controls is not None:
-            X_controls = X_controls.unsqueeze(0).expand(self.n_samples, -1, -1) 
             batch_dict[DataFields.SOURCE_STATE] = X_controls
-            
+            batch_size = X_controls.shape[0]
+
+        # Expand target  and controls
+        target = {
+            covariate: covariate_data.repeat(self.n_samples, batch_size, 1).to(self.forward_model.device) for covariate, covariate_data in self.optimal_condition.items()
+        }
+        
         expanded_perturbation_data = {}
         for pert_key in self.optimized_perturbation_data:
             if not self.is_discrete_dict[pert_key]:
                 non_linearity = self.perturbation_non_linearities[pert_key]
                 expanded_perturbation_data[pert_key] = non_linearity( 
-                    self.optimized_perturbation_data[pert_key].unsqueeze(1).expand(-1, X_controls.shape[1], -1) 
+                    self.optimized_perturbation_data[pert_key].unsqueeze(1).expand(-1, batch_size, -1) 
                 )
             else:
-                expanded_perturbation_data[pert_key] = self.differentiable_categorical(self.optimized_perturbation_data[pert_key].unsqueeze(1).expand(-1, X_controls.shape[1], -1))
+                expanded_perturbation_data[pert_key] = self.differentiable_categorical(self.optimized_perturbation_data[pert_key].unsqueeze(1).expand(-1, batch_size, -1))
                        
         batch_dict[DataFields.PERTURBATION_DATA] = expanded_perturbation_data
 
@@ -334,9 +349,13 @@ class LangevinSampler(BaseConditionOptimizer):
         class_pred = self.target_prediction_model(X_pert_pred)
         loss = self.compute_loss(class_pred, target, self.optimized_perturbation_data)
         
+        # optionally detaching the control states if they are available
+        if X_controls is not None:
+            X_controls = X_controls.detach().cpu()
+
         # constructing step output dictionary
         out_dict = {
-            DataFields.SOURCE_STATE: X_controls.detach().cpu(),
+            DataFields.SOURCE_STATE: X_controls,
             DataFields.PERTURBATION_DATA: {
                 covariate: covariate_data.detach().cpu() for covariate, covariate_data in expanded_perturbation_data.items()
             },
