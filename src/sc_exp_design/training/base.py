@@ -92,7 +92,7 @@ class BaseTrainer(abc.ABC):
         """"""
         if self._require_train_dataloader:
             msg = f"With {self._require_train_dataloader=} you need to pass a `BaseDataLoader` as `train_dataloader` argument, found `None`"
-            assert train_dataloader is not None
+            assert train_dataloader is not None, msg
 
         self.training_logs = {LossFields.LOSS: []}
 
