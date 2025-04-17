@@ -17,6 +17,7 @@ __all__ = ["TargetPredictionTrainer", "InverseModelTrainer", ]
 
 class TargetPredictionTrainer(BaseTrainer):
     """"""
+    _require_train_dataloader: bool = True
 
     def __init__(
         self,
@@ -88,6 +89,7 @@ class TargetPredictionTrainer(BaseTrainer):
 
 class InverseModelTrainer(BaseTrainer):
     """"""
+    _require_train_dataloader: bool = False
 
     def __init__(
         self,

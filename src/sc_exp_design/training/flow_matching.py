@@ -27,6 +27,7 @@ __all__ = [
 
 class CFMTrainer(BaseTrainer):
     """"""
+    _require_train_dataloader: bool = True
 
     def __init__(
         self,

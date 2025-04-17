@@ -16,6 +16,7 @@ from sc_exp_design.types import TensorLike
 
 class BaseTrainer(abc.ABC):
     """"""
+    _require_train_dataloader: bool
 
     @abc.abstractmethod
     def _train_step(
@@ -84,11 +85,14 @@ class BaseTrainer(abc.ABC):
     def fit(
         self,
         num_training_steps: int,
-        train_dataloader: BaseDataLoader,
+        train_dataloader: BaseDataLoader | None,
         validation_dataloader: BaseDataLoader | None = None,
         valid_freq: int | None = None,
     ) -> None:
         """"""
+        if self._require_train_dataloader:
+            msg = f"With {self._require_train_dataloader=} you need to pass a `BaseDataLoader` as `train_dataloader` argument, found `None`"
+            assert train_dataloader is not None
 
         self.training_logs = {LossFields.LOSS: []}
 
@@ -104,7 +108,9 @@ class BaseTrainer(abc.ABC):
             self.callbacks.run_on_train_begin()
 
         for grad_step in iterator:
-            batch = train_dataloader.sample()
+            batch = None
+            if (train_dataloader is not None) and self._require_train_dataloader:
+                batch = train_dataloader.sample()
             log_dict = self.__train_step(grad_step, batch)
             self.__update_logs(log_dict)
 

@@ -551,29 +551,38 @@ class InverseModel(BaseModel):
             grad_steps_log_interval=grad_steps_log_interval,
         )
 
-        # retrieving control indices
-        control_idxs = np.argwhere(train_data.adata.obs[train_data.control_key].values == True)[:, 0]
-        # initializing data loader with only control states
-        self.inverse_model_train_data = train_data[control_idxs]
-        self.inverse_model_train_dataloader = SequentialDataLoader(
-            self.inverse_model_train_data,
-            train_batch_size,
-            state_transforms=state_transforms,
-            device_id=self.device_id,
-        )
-
-        # optional validation data
-        self.inverse_model_validation_dataloader = None
-        if validation_data is not None:
-            control_idxs = np.argwhere(validation_data.adata.obs[validation_data.control_key].values == True)[:, 0]
-            self.inverse_model_validation_data = validation_data[control_idxs] 
-            self.inverse_model_validation_dataloader = SequentialDataLoader(
-                self.inverse_model_train_data,
-                validation_batch_size,
+        # retrieving control states if available
+        inverse_model_train_data = None
+        inverse_model_train_dataloader = None
+        if train_data.has_controls:
+            control_idxs = np.argwhere(train_data.adata.obs[train_data.control_key].values == True)[:, 0]
+            inverse_model_train_data = train_data[control_idxs]
+            # initializing data loader with only control states
+            inverse_model_train_dataloader = SequentialDataLoader(
+                inverse_model_train_data,
+                train_batch_size,
                 state_transforms=state_transforms,
                 device_id=self.device_id,
             )
-        
+        self.inverse_model_train_data = inverse_model_train_data
+        self.inverse_model_train_dataloader = inverse_model_train_dataloader
+
+        # optional validation data
+        inverse_model_validation_data = None
+        inverse_model_validation_dataloader = None
+        if validation_data is not None:
+            if validation_data.has_controls:
+                control_idxs = np.argwhere(validation_data.adata.obs[validation_data.control_key].values == True)[:, 0]
+                inverse_model_validation_data = validation_data[control_idxs] 
+                inverse_model_validation_dataloader = SequentialDataLoader(
+                    inverse_model_validation_data,
+                    validation_batch_size,
+                    state_transforms=state_transforms,
+                    device_id=self.device_id,
+                )
+        self.inverse_model_validation_data = inverse_model_validation_data
+        self.inverse_model_validation_dataloader = inverse_model_validation_dataloader
+
         # fitting the trainer
         self.inverse_model_trainer.fit(
             num_training_steps,
