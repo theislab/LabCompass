@@ -320,8 +320,9 @@ class LangevinSampler(BaseConditionOptimizer):
         # prepare batch information cellFlow           
         batch_dict = {}
         if X_controls is not None:
-            batch_dict[DataFields.SOURCE_STATE] = X_controls
             batch_size = X_controls.shape[0]
+            X_controls = X_controls.unsqueeze(0).expand(self.n_samples, -1, -1)
+            batch_dict[DataFields.SOURCE_STATE] = X_controls
 
         # Expand target  and controls
         target = {
