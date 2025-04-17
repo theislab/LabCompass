@@ -172,12 +172,13 @@ class MAPConditionOptimizer(BaseConditionOptimizer):
 
     def forward(
             self,
-            X_controls: torch.Tensor,
+            X_controls: torch.Tensor | None,
         ) -> torch.Tensor:
         # prepare batch information cellFlow           
-        batch_dict = {
-            DataFields.SOURCE_STATE: X_controls,
-        }
+        batch_dict = {}
+        if X_controls is not None:
+            batch_dict[DataFields.SOURCE_STATE] = X_controls
+            
         
         expanded_perturbation_data = {}
         for pert_key in self.optimized_perturbation_data:
@@ -299,18 +300,19 @@ class LangevinSampler(BaseConditionOptimizer):
 
     def forward(
             self,
-            X_controls: torch.Tensor,
+            X_controls: torch.Tensor | None,
         ) -> torch.Tensor:
         # Expand target  and controls
         target = {
             covariate: covariate_data.repeat(self.n_samples, X_controls.shape[0], 1).to(X_controls.device) for covariate, covariate_data in self.optimal_condition.items()
         }
-        X_controls = X_controls.unsqueeze(0).expand(self.n_samples, -1, -1) 
         
-        # prepare batch information cellFlow           
-        batch_dict = {
-            DataFields.SOURCE_STATE: X_controls,
-        }
+        # prepare batch information cellFlow
+        batch_dict = {}
+        if X_controls is not None:
+            X_controls = X_controls.unsqueeze(0).expand(self.n_samples, -1, -1) 
+            batch_dict[DataFields.SOURCE_STATE] = X_controls
+            
         expanded_perturbation_data = {}
         for pert_key in self.optimized_perturbation_data:
             if not self.is_discrete_dict[pert_key]:
