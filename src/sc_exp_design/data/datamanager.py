@@ -27,7 +27,7 @@ class DataManager:
         sample_rep: str | dict[str] | None = None,
         control_key: str | None = None,
         perturbations: str | Sequence[str] | None = None,
-        perturbations_in_obsm: dict[str, bool] | None = None, 
+        perturbations_in_obsm: Sequence[str] | None = None, 
         perturbation_covariates: dict[str, str | Sequence[str]] | None = None,
         perturbation_reps: dict[str, str | Sequence[str]] | None = None,
         load_target_covariates: bool = False,
@@ -63,6 +63,11 @@ class DataManager:
         self.sample_rep = sample_rep
         self.control_key = control_key
         self.has_controls = has_controls
+        
+        # sanity check perturbations_in_obsm is iterable  
+        if perturbations_in_obsm is not None:
+            if isinstance(perturbations_in_obsm, str):
+                perturbations_in_obsm = (perturbations_in_obsm,)
 
         # preparing the attributes
         if perturbations is not None:
@@ -75,6 +80,10 @@ class DataManager:
                 if perturbation_reps is not None:
                     if perturbation in perturbation_reps.keys():
                         rep = perturbation_reps[perturbation]
+                        if (perturbations_in_obsm is not None) and (perturbation in perturbations_in_obsm):
+                            msg = "When a perturbation is in .obsm, there should be only one representatio"
+                            assert isinstance(rep, str), msg
+                        # strings as an iterable
                         if isinstance(rep, str):
                             rep = (rep,)
                         perturbation_reps[perturbation] = rep
@@ -92,12 +101,7 @@ class DataManager:
                     else:
                         covariates = ()
                     perturbation_covariates[perturbation] = covariates
-                    
-        # sanity check perturbations_in_obsm is iterable  
-        if perturbations_in_obsm is not None:
-            if isinstance(perturbations_in_obsm, str):
-                perturbations_in_obsm = (perturbations_in_obsm,)
-                    
+                                        
         self.perturbations = perturbations
         self.perturbations_in_obsm = perturbations_in_obsm
         self.perturbation_covariates = perturbation_covariates
@@ -133,7 +137,7 @@ class DataManager:
         msg = f""
         assert self.adata is not None, msg
         # no perturbation found
-        if self.perturbations is None or not (set(self.perturbations) - set(self.perturbations_in_obsm)):
+        if self.perturbations is None:
             return None
         # no representation found
         if self.perturbation_reps is None:
@@ -142,7 +146,7 @@ class DataManager:
         perturbations_with_rep = {}
         # iterating over each perturbation covariate
         for perturbation in self.perturbations:
-            if (self.perturbation_covariates is not None) and (perturbation not in self.perturbations_in_obsm):
+            if perturbation not in self.perturbations_in_obsm:
                 # This will contain a list with all the representation modalities for the current perturbation. 
                 # It will be automatically constructed even when the perturbation does not have an associated representation
                 # (check `self.__init__`), in which case it will be a 0-elements sequence.
@@ -164,6 +168,10 @@ class DataManager:
                         assert covariate_reps_keys == reference_keys, msg
                     # now we can append the dictionary that maps the current perturbation to its unique values.
                     perturbations_with_rep[perturbation] = reference_keys
+            # If in obsm, add a string for perturbation rep
+            else:
+                # if in .obsm, key is perturbation and value is a str representing the associated representation 
+                perturbations_with_rep[perturbation] = self.perturbation_reps[perturbation]  
         return perturbations_with_rep
 
     def __get_state_data(
@@ -206,8 +214,6 @@ class DataManager:
         # iterating over each perturbation covariate
         for perturbation in self.perturbations:
             if (self.perturbations_in_obsm is not None) and (perturbation in self.perturbations_in_obsm):
-                msg = "Perturbations in .obsm must have only one representation"
-                assert len(self.perturbation_reps[perturbation])==1, msg
                 rep = self.perturbation_reps[perturbation][0]
                 perturbation_data[f"{DataFields.CONDITION_REP}_{perturbation}_{rep}"] = adata.obsm[rep]
             else:
@@ -344,4 +350,6 @@ class DataManager:
                                          perturbation_data,
                                          target_data,
                                          self.perturbations_with_rep, 
-                                         self.has_controls)
+                                         self.has_controls,
+                                         self.perturbations_in_obsm)
+        

@@ -44,15 +44,16 @@ class AnnotatedPerturbationData(BaseDataStruct):
     target_reprs: dict[str, TensorLike] | None = None
     perturbations_with_rep: dict[str, Sequence[str]] | None = None
     has_controls: bool = True
-
+    perturbations_in_obsm: Sequence[str] | None = None
+    
     @property
     def seen_combinatorial_perturbations(
         self,
     ) -> list[list[str]] | None:
         """"""
         # no perturbation data is passed to the AnnotatedPerturbationData object or no perturbation with associated representation
-        if (self.perturbation_data is None) or (self.perturbations_with_rep is None):
-            return None
+        if (self.perturbation_data is None) or (self.perturbations_with_rep is None) or (self.perturbations_in_obsm is not None):
+            return None 
         return self.adata.obs[[pert for pert in self.perturbations_with_rep.keys()]].drop_duplicates().values.tolist()
 
     @property
@@ -188,6 +189,7 @@ class AnnotatedPerturbationData(BaseDataStruct):
             perturbation_data=perturbation_data,
             target_reprs=target_reprs,
             perturbations_with_rep=self.perturbations_with_rep,
+            perturbations_in_obsm=self.perturbations_in_obsm
         )
     
     def __len__(
