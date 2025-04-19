@@ -116,7 +116,6 @@ class BaseTrainer(abc.ABC):
                 prog_bar.set_description(f"Loss: {log_dict[LossFields.LOSS]:.4f}")
             prog_bar.update()
         
-
             # validation step
             if do_validation:
                 if (grad_step + 1) % valid_freq == 0 and grad_step > 0:

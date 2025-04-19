@@ -287,6 +287,7 @@ class ValidationDataLoader(BaseCoupledDataLoader):
                 if self.data.perturbations_in_obsm==None:
                     treatment_id = "unconditional"
                 else:
+                    # concatenate perturbation names
                     treatment = [perturbation for perturbation in self.data.perturbations_with_rep]
                     treatment_id = "_".join(treatment)
             else:

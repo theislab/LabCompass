@@ -81,7 +81,7 @@ class DataManager:
                     if perturbation in perturbation_reps.keys():
                         rep = perturbation_reps[perturbation]
                         if (perturbations_in_obsm is not None) and (perturbation in perturbations_in_obsm):
-                            msg = "When a perturbation is in .obsm, there should be only one representatio"
+                            msg = "When a perturbation is in .obsm, there should be only one representation."
                             assert isinstance(rep, str), msg
                         # strings as an iterable
                         if isinstance(rep, str):
