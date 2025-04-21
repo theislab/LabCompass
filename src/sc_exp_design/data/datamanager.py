@@ -274,22 +274,33 @@ class DataManager:
                 # Collect the condition target covariate from the adata.obs 
                 covariate_data = adata.obs[[target_covariate]].values
 
+                # one hot encoded categories
                 if target_covariate_rep == "one_hot":
                     covariate_rep_encoder = OneHotEncoder(**covariate_target_rep_kwargs)
                     covariate_target_rep_data = covariate_rep_encoder.fit_transform(covariate_data).toarray()
+
+                # label encoding
                 elif target_covariate_rep == "label":
+                    # handling the shape of the covariate data to avoid warning from sklearn
+                    covariate_data = covariate_data.reshape(-1)
                     covariate_rep_encoder = LabelEncoder()
+                    # when we specify the target categories of interest
                     if DataFields.TARGET_CATEGORIES in covariate_target_rep_kwargs.keys():
                         target_categories = covariate_target_rep_kwargs[DataFields.TARGET_CATEGORIES]
                         covariate_rep_encoder.fit(target_categories)
                         covariate_target_rep_data = covariate_rep_encoder.transform(covariate_data)
+                    # inferring targte categories from data
                     else:
                         covariate_target_rep_data = covariate_rep_encoder.fit_transform(covariate_data)
+
+                # no encoding, taking as is (regression)
                 elif target_covariate_rep == "identity":
                     covariate_target_rep_data = covariate_data
+
+                # raise value error otherwise
                 else:
                     msg = f"{target_covariate_rep=} not currently supported (avaiable options are `['one_hot', 'label', 'identity']`)"
-                    raise NotImplementedError(msg)
+                    raise ValueError(msg)
 
                 # Retrun dictionary 
                 out_dict[target_covariate] = covariate_target_rep_data
