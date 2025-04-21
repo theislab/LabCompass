@@ -369,6 +369,8 @@ class FlowMatching(BaseModel):
         no_grad: bool = True,
         num_samples: int | None = None,
         batch_size: int | None = None,
+        num_time_steps: int | None = None,
+        solver_kwargs: dict[str, Any] | None = None,
     ) -> dict[str, Tensor]:
         """Generates the predictions by integrating the dynamics with the learnt velocity field for a given initial condition
 
@@ -412,6 +414,14 @@ class FlowMatching(BaseModel):
                 else:
                     batch_size = self.train_dataloader.batch_size
 
+        # handling discretization time steps
+        if num_time_steps is None:
+            num_time_steps = self.num_time_steps
+
+        # handling solver kwargs
+        if solver_kwargs is None:
+            solver_kwargs = self.solver_kwargs
+
         # pushing forward particles
         predictions = push_forward(
             self.velocity_field,
@@ -419,8 +429,8 @@ class FlowMatching(BaseModel):
             condition,
             self.generate_from_noise,
             self.noise_distribution,
-            self.num_time_steps,
-            self.solver_kwargs,
+            num_time_steps,
+            solver_kwargs,
             self.device_id,
             return_trajectory=return_trajectory,
             no_grad=no_grad,
