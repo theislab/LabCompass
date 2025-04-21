@@ -593,7 +593,7 @@ class InverseModel(BaseModel):
 
     def predict(
         self,
-        control_states: torch.Tensor,
+        control_states: torch.Tensor | None,
         return_loss: bool = False,
     ) -> dict[str, torch.Tensor] | tuple[torch.Tensor, dict[str, torch.Tensor]]:
         """"""
