@@ -190,7 +190,7 @@ class TrainDataLoader(BaseCoupledDataLoader):
         :rtype: int
         """
         # no perturbation data is passed to the AnnotatedPerturbationData object
-        if self.data.seen_combinatorial_perturbations is None:
+        if self.data.seen_combinatorial_perturbations is None:            
             return None
         # need to sample one perturbation from the set of unique perturbations
         return random.choice(self.data.seen_combinatorial_perturbations)
@@ -252,7 +252,7 @@ class ValidationDataLoader(BaseCoupledDataLoader):
         :rtype: int
         """
         # no perturbation data is passed to the AnnotatedPerturbationData object
-        if self.data.seen_combinatorial_perturbations is None:
+        if (self.data.seen_combinatorial_perturbations is None) or (self.data.perturbations_in_obsm is not None):
             return (None, )
         # retrieving the maximum number of treatements to load if specified
         if self.num_treatments_to_load is not None:
@@ -278,12 +278,18 @@ class ValidationDataLoader(BaseCoupledDataLoader):
 
         # iterating over the perturbations
         for treatment in treatments:
+
             # retrieving matched treatment data
             treatement_data = self._get_matched_data(treatment, control_states)
 
             # constructing perturbation identifier to store the results
             if treatment is None:
-                treatment_id = "unconditional"
+                if self.data.perturbations_in_obsm==None:
+                    treatment_id = "unconditional"
+                else:
+                    # concatenate perturbation names
+                    treatment = [perturbation for perturbation in self.data.perturbations_with_rep]
+                    treatment_id = "_".join(treatment)
             else:
                 msg = f""
                 assert isinstance(treatment, Sequence), msg
@@ -293,6 +299,6 @@ class ValidationDataLoader(BaseCoupledDataLoader):
             out_dict[treatment_id] = treatement_data
         return out_dict
 
-     
+
 class PredictionDataLoader(BaseDataLoader):
     """"""

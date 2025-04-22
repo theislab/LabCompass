@@ -27,6 +27,7 @@ class DataManager:
         sample_rep: str | dict[str] | None = None,
         control_key: str | None = None,
         perturbations: str | Sequence[str] | None = None,
+        perturbations_in_obsm: Sequence[str] | None = None, 
         perturbation_covariates: dict[str, str | Sequence[str]] | None = None,
         perturbation_reps: dict[str, str | Sequence[str]] | None = None,
         load_target_covariates: bool = False,
@@ -62,6 +63,11 @@ class DataManager:
         self.sample_rep = sample_rep
         self.control_key = control_key
         self.has_controls = has_controls
+        
+        # sanity check perturbations_in_obsm is iterable  
+        if perturbations_in_obsm is not None:
+            if isinstance(perturbations_in_obsm, str):
+                perturbations_in_obsm = (perturbations_in_obsm,)
 
         # preparing the attributes
         if perturbations is not None:
@@ -74,6 +80,10 @@ class DataManager:
                 if perturbation_reps is not None:
                     if perturbation in perturbation_reps.keys():
                         rep = perturbation_reps[perturbation]
+                        if (perturbations_in_obsm is not None) and (perturbation in perturbations_in_obsm):
+                            msg = "When a perturbation is in .obsm, there should be only one representation."
+                            assert isinstance(rep, str), msg
+                        # strings as an iterable
                         if isinstance(rep, str):
                             rep = (rep,)
                         perturbation_reps[perturbation] = rep
@@ -91,8 +101,9 @@ class DataManager:
                     else:
                         covariates = ()
                     perturbation_covariates[perturbation] = covariates
-                    
+                                        
         self.perturbations = perturbations
+        self.perturbations_in_obsm = perturbations_in_obsm
         self.perturbation_covariates = perturbation_covariates
         self.perturbation_reps = perturbation_reps
         self.load_target_covariates = load_target_covariates
@@ -135,27 +146,32 @@ class DataManager:
         perturbations_with_rep = {}
         # iterating over each perturbation covariate
         for perturbation in self.perturbations:
-            # This will contain a list with all the representation modalities for the current perturbation. 
-            # It will be automatically constructed even when the perturbation does not have an associated representation
-            # (check `self.__init__`), in which case it will be a 0-elements sequence.
-            # Hence, we can check the length of this list to verify whether the perturbation has an associated representation or not.
-            perturbation_covariate_rep = self.perturbation_reps[perturbation]
-            # when we have at least one element, it means that we have found an associated representation
-            # and we can append the perturbation label to the list of perturbations.
-            if len(perturbation_covariate_rep) > 0:
-                # now we iterate over the different representation and verify that 
-                # they share the same keys (i.e.: the unique values of the current perturbation)
-                # using the first representation as reference
-                reference_keys = list(self.adata.uns[perturbation_covariate_rep[0]].keys())
-                for rep in perturbation_covariate_rep:
-                    # retrieving the covariates and their representations
-                    covariate_reps_keys = list(self.adata.uns[rep].keys())
-                    # sanity check, we should have the same keys for each representation
-                    # associated to the current perturbation
-                    msg = "" # probably should do this check within the `self.__init__` method like the other ones
-                    assert covariate_reps_keys == reference_keys, msg
-                # now we can append the dictionary that maps the current perturbation to its unique values.
-                perturbations_with_rep[perturbation] = reference_keys
+            if perturbation not in self.perturbations_in_obsm:
+                # This will contain a list with all the representation modalities for the current perturbation. 
+                # It will be automatically constructed even when the perturbation does not have an associated representation
+                # (check `self.__init__`), in which case it will be a 0-elements sequence.
+                # Hence, we can check the length of this list to verify whether the perturbation has an associated representation or not.
+                perturbation_covariate_rep = self.perturbation_reps[perturbation]
+                # when we have at least one element, it means that we have found an associated representation
+                # and we can append the perturbation label to the list of perturbations.
+                if len(perturbation_covariate_rep) > 0:
+                    # now we iterate over the different representation and verify that 
+                    # they share the same keys (i.e.: the unique values of the current perturbation)
+                    # using the first representation as reference
+                    reference_keys = list(self.adata.uns[perturbation_covariate_rep[0]].keys())
+                    for rep in perturbation_covariate_rep:
+                        # retrieving the covariates and their representations
+                        covariate_reps_keys = list(self.adata.uns[rep].keys())
+                        # sanity check, we should have the same keys for each representation
+                        # associated to the current perturbation
+                        msg = "" # probably should do this check within the `self.__init__` method like the other ones
+                        assert covariate_reps_keys == reference_keys, msg
+                    # now we can append the dictionary that maps the current perturbation to its unique values.
+                    perturbations_with_rep[perturbation] = reference_keys
+            # If in obsm, add a string for perturbation rep
+            else:
+                # if in .obsm, key is perturbation and value is a str representing the associated representation 
+                perturbations_with_rep[perturbation] = self.perturbation_reps[perturbation]  
         return perturbations_with_rep
 
     def __get_state_data(
@@ -197,45 +213,49 @@ class DataManager:
         perturbation_data = {}
         # iterating over each perturbation covariate
         for perturbation in self.perturbations:
-            # sanity check on the input AnnData
-            if perturbation not in adata.obs.keys():
-                msg = f"{perturbation} not found in `adata.obs.keys()`"
-                raise ValueError(msg)
-            
-            # what perturbation was applied
-            covariate_data = adata.obs[perturbation].values
-            # optionally retrieving the representation of such covariate
-            if self.perturbation_reps is not None:
-                perturbation_covariate_rep = self.perturbation_reps[perturbation]
-                for rep in perturbation_covariate_rep:
-                    # sanity check on the input AnnData
-                    if rep not in adata.uns.keys():
-                        msg = f"{perturbation_covariate_rep} not found in `adata.uns.keys()`"
-                        raise ValueError(msg)
-                    # retrieving the covariates and their representations
-                    covariate_reps_dict = adata.uns[rep]
-                    # mapping each observation condition to their representation
-                    covariate_reps = [covariate_reps_dict[covariate] for covariate in covariate_data]
-                    covariate_reps = np.stack(covariate_reps, axis=0)
-                    # storing the results
-                    covariate_rep_key = f"{DataFields.CONDITION_REP}_{perturbation}_{rep}"
-                    perturbation_data[covariate_rep_key] = covariate_reps
-                    
-            # loading perturbation covariates that are individual for each cell
-            if self.perturbation_covariates is not None:
-                perturbation_covariates = self.perturbation_covariates[perturbation]
-                # iterating over each of such covariates associated to the current perturbation
-                # which should be stored in the corresponding obsm field of the AnnData object
-                for covariate in perturbation_covariates:
-                    # sanity check on the input AnnData
-                    if covariate not in adata.obsm.keys():
-                        msg = f"{covariate=} not found in `self.adata.obsm.keys()`"
-                        raise ValueError(msg)
-                    # retrieving the covariate data
-                    covariate_data = adata.obsm[covariate]
-                    # storing the results
-                    covariate_cov_key = f"{DataFields.CONDITION_COV}_{perturbation}_{covariate}"
-                    perturbation_data[covariate_cov_key] = covariate_data
+            if (self.perturbations_in_obsm is not None) and (perturbation in self.perturbations_in_obsm):
+                rep = self.perturbation_reps[perturbation][0]
+                perturbation_data[f"{DataFields.CONDITION_REP}_{perturbation}_{rep}"] = adata.obsm[rep]
+            else:
+                # sanity check on the input AnnData
+                if perturbation not in adata.obs.keys():
+                    msg = f"{perturbation} not found in `adata.obs.keys()`"
+                    raise ValueError(msg)
+                
+                # what perturbation was applied
+                covariate_data = adata.obs[perturbation].values
+                # optionally retrieving the representation of such covariate
+                if self.perturbation_reps is not None:
+                    perturbation_covariate_rep = self.perturbation_reps[perturbation]
+                    for rep in perturbation_covariate_rep:
+                        # sanity check on the input AnnData
+                        if rep not in adata.uns.keys():
+                            msg = f"{perturbation_covariate_rep} not found in `adata.uns.keys()`"
+                            raise ValueError(msg)
+                        # retrieving the covariates and their representations
+                        covariate_reps_dict = adata.uns[rep]
+                        # mapping each observation condition to their representation
+                        covariate_reps = [covariate_reps_dict[covariate] for covariate in covariate_data]
+                        covariate_reps = np.stack(covariate_reps, axis=0)
+                        # storing the results
+                        covariate_rep_key = f"{DataFields.CONDITION_REP}_{perturbation}_{rep}"
+                        perturbation_data[covariate_rep_key] = covariate_reps
+                        
+                # loading perturbation covariates that are individual for each cell
+                if self.perturbation_covariates is not None:
+                    perturbation_covariates = self.perturbation_covariates[perturbation]
+                    # iterating over each of such covariates associated to the current perturbation
+                    # which should be stored in the corresponding obsm field of the AnnData object
+                    for covariate in perturbation_covariates:
+                        # sanity check on the input AnnData
+                        if covariate not in adata.obsm.keys():
+                            msg = f"{covariate=} not found in `self.adata.obsm.keys()`"
+                            raise ValueError(msg)
+                        # retrieving the covariate data
+                        covariate_data = adata.obsm[covariate]
+                        # storing the results
+                        covariate_cov_key = f"{DataFields.CONDITION_COV}_{perturbation}_{covariate}"
+                        perturbation_data[covariate_cov_key] = covariate_data
         return perturbation_data
 
     def __get_target_data(
@@ -323,4 +343,13 @@ class DataManager:
         target_data = None
         if self.load_target_covariates:
             target_data = self.__get_target_data(adata)
-        return AnnotatedPerturbationData(adata, self.control_key, state_data, perturbation_data, target_data, self.perturbations_with_rep, self.has_controls)
+        
+        return AnnotatedPerturbationData(adata,
+                                         self.control_key, 
+                                         state_data,
+                                         perturbation_data,
+                                         target_data,
+                                         self.perturbations_with_rep, 
+                                         self.has_controls,
+                                         self.perturbations_in_obsm)
+        
