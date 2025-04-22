@@ -12,6 +12,7 @@ class DataFields:
     TARGET_STATE: str = "target"
     CONDITION_REP: str = "repr"
     CONDITION_COV: str = "cov"
+    CONDITION_FEATS: str = "cov" # TODO: change "cov" to "feats" once finished the viral notebooks
     TARGET_CATEGORIES: str = "target_categories"
 
 
