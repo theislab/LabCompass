@@ -276,6 +276,10 @@ class DataManager:
 
                 # one hot encoded categories
                 if target_covariate_rep == "one_hot":
+                    # sanity check
+                    msg = f"When using \"one_hot\" as target representation in `target_covariates`, you need to pass a 2-dimensional array, found {covariate_data.ndim=} for {target_covariate}"
+                    assert covariate_data.ndim == 2, msg
+                    # encoding the condition
                     covariate_rep_encoder = OneHotEncoder(**covariate_target_rep_kwargs)
                     covariate_target_rep_data = covariate_rep_encoder.fit_transform(covariate_data).toarray()
 
@@ -289,7 +293,7 @@ class DataManager:
                         target_categories = covariate_target_rep_kwargs[DataFields.TARGET_CATEGORIES]
                         covariate_rep_encoder.fit(target_categories)
                         covariate_target_rep_data = covariate_rep_encoder.transform(covariate_data)
-                    # inferring targte categories from data
+                    # inferring target categories from data
                     else:
                         covariate_target_rep_data = covariate_rep_encoder.fit_transform(covariate_data)
 
