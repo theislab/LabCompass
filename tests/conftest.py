@@ -16,11 +16,13 @@ def adata() -> anndata.AnnData:
     tot_perturbed_cells = num_perturbed_cells*num_unique_treatments
     num_cells = num_control_cells + tot_perturbed_cells
     num_genes = 200
+    num_perturbation_feats = 100
     states = np.ones((num_cells, num_genes))
 
     # defining treatment data
     treatment0_label = "treatment0"
     treatment1_label = "treatment1"
+    treatment2_label = "treatment2" # to be put in anndata.obsm
     control_key = "is_control"
 
     # defining label maps
@@ -54,12 +56,16 @@ def adata() -> anndata.AnnData:
         perturbation_labels = np.vectorize(id_to_label_map.get)(perturbation_ids)
         # (perturbation reps) retrieving perturbation group label
         group_labels = np.vectorize(pert_to_group_map.get)(perturbation_ids)
-        return dosages, times, perturbation_labels, group_labels
+        # sampling perturbation features
+        perturbation_features = np.random.randn(tot_perturbed_cells, num_perturbation_feats)
+        return dosages, times, perturbation_labels, group_labels, perturbation_features
 
     # retrieving data for treatment0
-    treatment0_dosages, treatment0_times, treatment0_perturbation_labels, treatment0_group_labels = get_treatment_data()
-    # retrieving data for treatment0
-    treatment1_dosages, treatment1_times, treatment1_perturbation_labels, treatment1_group_labels = get_treatment_data()
+    treatment0_dosages, treatment0_times, treatment0_perturbation_labels, treatment0_group_labels, _ = get_treatment_data()
+    # retrieving data for treatment1
+    treatment1_dosages, treatment1_times, treatment1_perturbation_labels, treatment1_group_labels, _ = get_treatment_data()
+    # retrieving data for treatment2
+    _, _, _, _, treatment2_features = get_treatment_data()
 
     # shuffling treatment0 data
     shuffled_indices = np.random.permutation(tot_perturbed_cells)
@@ -77,6 +83,7 @@ def adata() -> anndata.AnnData:
     control_dosages = np.zeros((num_control_cells, )) 
     control_times = np.zeros((num_control_cells, ))
     control_pertubation_labels = np.array(["control" for _ in range(num_control_cells)])
+    control_perturbation_features = np.zeros((num_control_cells, num_perturbation_feats))
     control_group_labels = np.array(["control" for _ in range(num_control_cells)])
 
     # concatenating control perturbation data with treatment0 data
@@ -90,6 +97,9 @@ def adata() -> anndata.AnnData:
     treatment1_times = np.concatenate((control_times, treatment1_times), axis=0)
     treatment1_perturbation_labels = np.concatenate((control_pertubation_labels, treatment1_perturbation_labels), axis=0)
     treatment1_group_labels = np.concatenate((control_group_labels, treatment1_group_labels), axis=0)
+
+    # concatenating control perturbation data with treatement2 data
+    treatment2_features = np.concatenate((control_perturbation_features, treatment2_features), axis=0)
 
     # defining flat for control cells
     is_control = np.concatenate(
@@ -149,6 +159,7 @@ def adata() -> anndata.AnnData:
         f"{treatment0_label}_time": treatment0_times,
         f"{treatment1_label}_dose": treatment1_dosages,
         f"{treatment1_label}_time": treatment1_times,
+        f"{treatment2_label}_features": treatment2_features,
     }
 
     return anndata.AnnData(

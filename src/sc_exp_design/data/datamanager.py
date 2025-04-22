@@ -110,6 +110,8 @@ class DataManager:
         for perturbation in perturbations_in_obsm:
             msg = f""
             assert isinstance(perturbation, str), msg
+            msg = f""
+            assert perturbation in perturbation_reps.keys(), msg
 
         self.perturbations = perturbations
         self.perturbations_in_obsm = perturbations_in_obsm
@@ -224,7 +226,7 @@ class DataManager:
         for perturbation in self.perturbations:
             if (self.perturbations_in_obsm is not None) and (perturbation in self.perturbations_in_obsm):
                 rep = self.perturbation_reps[perturbation][0]
-                perturbation_data[f"{DataFields.CONDITION_REP}_{perturbation}_{rep}"] = adata.obsm[rep]
+                perturbation_data[f"{DataFields.CONDITION_FEATS}_{perturbation}_{rep}"] = adata.obsm[rep]
             else:
                 # sanity check on the input AnnData
                 if perturbation not in adata.obs.keys():
@@ -368,12 +370,13 @@ class DataManager:
         if self.load_target_covariates:
             target_data = self.__get_target_data(adata)
         
-        return AnnotatedPerturbationData(adata,
-                                         self.control_key, 
-                                         state_data,
-                                         perturbation_data,
-                                         target_data,
-                                         self.perturbations_with_rep, 
-                                         self.has_controls,
-                                         self.perturbations_in_obsm)
-        
+        return AnnotatedPerturbationData(
+            adata,
+            self.control_key, 
+            state_data,
+            perturbation_data,
+            target_data,
+            self.perturbations_with_rep, 
+            self.has_controls,
+            self.perturbations_in_obsm,
+        )

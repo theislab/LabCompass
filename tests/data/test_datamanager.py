@@ -12,7 +12,8 @@ class TestDataManager:
     """"""
     @pytest.mark.parametrize("sample_rep", [None, "states"])
     @pytest.mark.parametrize("control_key", [None, "is_control"])
-    @pytest.mark.parametrize("perturbations", [None, "treatment0", ("treatment0", "treatment1")])
+    @pytest.mark.parametrize("perturbations", [None, "treatment0", ("treatment0", "treatment1"), ("treatment0", "treatment1", "treatment2"), ])
+    @pytest.mark.parametrize("perturbations_in_obsm", [None, "treatment2"])
     @pytest.mark.parametrize(
         "perturbation_covariates",
         [
@@ -63,6 +64,7 @@ class TestDataManager:
         sample_rep: None | str,
         control_key: None | str,
         perturbations: None | str | Sequence[str],
+        perturbations_in_obsm: Sequence[str] | None, 
         perturbation_covariates: dict[str, str | Sequence[str]] | None,
         perturbation_reps: dict[str, str | Sequence[str]] | None,
         load_target_covariates: bool,
@@ -86,12 +88,23 @@ class TestDataManager:
         if control_key is None:
             has_controls = False
 
+        # when we are using perturbations in obsm, we need to ensure that
+        # it appears in `perturbations`
+        # also, we need to add the modeled features to the perturbation_reps dictionary
+        if perturbations is None or ("treatment2" not in perturbations):
+            perturbations_in_obsm = None
+        if perturbations_in_obsm is not None:
+            if perturbation_reps is None:
+                perturbation_reps = {}
+            perturbation_reps["treatment2"] = "feats_treatment2_features"
+
         # initializing data manager
         data_manager = sc_exp_design.data.DataManager(
             adata,
             sample_rep=sample_rep,
             control_key=control_key,
             perturbations=perturbations,
+            perturbations_in_obsm=perturbations_in_obsm,
             perturbation_covariates=perturbation_covariates,
             perturbation_reps=perturbation_reps,
             load_target_covariates=load_target_covariates,
