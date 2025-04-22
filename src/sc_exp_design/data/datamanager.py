@@ -101,7 +101,16 @@ class DataManager:
                     else:
                         covariates = ()
                     perturbation_covariates[perturbation] = covariates
-                                        
+
+        # sanity check perturbations_in_obsm
+        if perturbations_in_obsm is None:
+            perturbations_in_obsm = ()
+        if isinstance(perturbations_in_obsm, str):
+            perturbations_in_obsm = (perturbations_in_obsm, )
+        for perturbation in perturbations_in_obsm:
+            msg = f""
+            assert isinstance(perturbation, str), msg
+
         self.perturbations = perturbations
         self.perturbations_in_obsm = perturbations_in_obsm
         self.perturbation_covariates = perturbation_covariates
