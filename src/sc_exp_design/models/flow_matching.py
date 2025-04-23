@@ -11,7 +11,6 @@ from sc_exp_design.constants import DataFields
 from sc_exp_design.config.velocity_field import NeuralVelocityFieldConfig
 from sc_exp_design.couplings import (
     IndependentCoupling,
-    FixedCoupling,
     OTCoupling,
 )
 from sc_exp_design.data import DataManager, TrainDataLoader, ValidationDataLoader
@@ -44,7 +43,7 @@ class FlowMatching(BaseModel):
     :type flow_kwargs: class:`dict[str, Any] | None`
 
     :param coupling_type: The coupling used to sample source and terminal states from the dataset, defaults to `"ot"`
-    :type coupling_type: class:`Literal["fixed", "independent", "ot"]`
+    :type coupling_type: class:`Literal["independent", "ot"]`
 
     :param coupling_kwargs: Dictionary containing the keyword arguments passed to the coupling for its initialization.
         Refer to the :module:`sc_exp_design.couplings` page for the available couplings and their respective keyword arguments.
@@ -69,7 +68,7 @@ class FlowMatching(BaseModel):
         self,
         flow_type: Literal["constant_noise", "encoding_decoding", "rectified", "variance_preserving"] = "rectified",
         flow_kwargs: dict[str, Any] | None = None,
-        coupling_type: Literal["fixed", "independent", "ot"] = "ot",
+        coupling_type: Literal["independent", "ot"] = "ot",
         coupling_kwargs: dict[str, Any] | None = None,
         time_sampler: Callable[[Sequence[int], Any], Tensor] = torch.rand,
         device_id: Literal["cuda", "cpu"] = "cuda",
@@ -94,9 +93,7 @@ class FlowMatching(BaseModel):
         self.flow = flow_class(**flow_kwargs)
 
         # initialize the coupling logic 
-        if coupling_type == "fixed":
-            coupling_class = FixedCoupling
-        elif coupling_type == "independent":
+        if coupling_type == "independent":
             coupling_class = IndependentCoupling
         elif coupling_type == "ot":
             coupling_class = OTCoupling

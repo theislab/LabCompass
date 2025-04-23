@@ -12,7 +12,7 @@ from sc_exp_design.types import TensorLike
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["Coupling", "FixedCoupling", "OTCoupling", "IndependentCoupling"]
+__all__ = ["Coupling", "OTCoupling", "IndependentCoupling"]
 
 
 class Coupling(abc.ABC):
@@ -29,49 +29,6 @@ class Coupling(abc.ABC):
     ) -> Any:
         """"""
         raise NotImplementedError
-
-
-class FixedCoupling(Coupling):
-    """
-    Fixed coupling for already paired data.
-    """
-
-    def __init__(
-        self,
-        *args,
-        shuffle: bool = False,
-        **kwargs,
-    ) -> None:
-        """
-        Initializes the :class: `OTCoupling` class.
-
-        :param shuffle: Whether to shuffle the batch before returning the data, defaults to `False`
-        :type shuffle: class:`bool`
-        """
-        self.shuffle = shuffle
-
-    def match_groups(
-        self,
-        source: TensorLike,
-        target: TensorLike,
-    ) -> tuple[TensorLike, TensorLike]:
-        """
-        Matches the :param:`source` and :param:`target` groups and returns the respective indices.
-
-        :param source: A tensor or array of values containing the data coming from the source distribution.
-        :type source: class:`TensorLike`
-
-        :param target: A tensor or array of values containing the data coming from the target distribution.
-        :type target: class:`TensorLike`
-        """
-        msg = f"The source and the target batches are expected to share the have the same batch size, found {source.shape[0]=} and {target.shape[0]=}"
-        assert source.shape[0] == target.shape[0], msg
-        if self.shuffle:
-            random_perm_idx = torch.randperm(source.shape[0])
-            return random_perm_idx, random_perm_idx
-        else:
-            idxs = torch.arange(source.shape[0])
-            return idxs, idxs
 
 
 class OTCoupling(Coupling):
