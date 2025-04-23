@@ -16,7 +16,9 @@ __all__ = ["Coupling", "FixedCoupling", "OTCoupling", "IndependentCoupling"]
 
 
 class Coupling(abc.ABC):
-    """Base class for objects implementing coupling strategies"""
+    """
+    Base class for objects implementing coupling strategies
+    """
 
     @abc.abstractmethod
     def match_groups(
@@ -30,10 +32,8 @@ class Coupling(abc.ABC):
 
 
 class FixedCoupling(Coupling):
-    """Fixed coupling for already paired data.
-
-    :param shuffle: Whether to shuffle the batch before returning the data, defaults to `False`
-    :type shuffle: class:`bool`
+    """
+    Fixed coupling for already paired data.
     """
 
     def __init__(
@@ -42,6 +42,12 @@ class FixedCoupling(Coupling):
         shuffle: bool = False,
         **kwargs,
     ) -> None:
+        """
+        Initializes the :class: `OTCoupling` class.
+
+        :param shuffle: Whether to shuffle the batch before returning the data, defaults to `False`
+        :type shuffle: class:`bool`
+        """
         self.shuffle = shuffle
 
     def match_groups(
@@ -49,7 +55,8 @@ class FixedCoupling(Coupling):
         source: TensorLike,
         target: TensorLike,
     ) -> tuple[TensorLike, TensorLike]:
-        """Matches the :param:`source` and :param:`target` groups and returns the respective indices.
+        """
+        Matches the :param:`source` and :param:`target` groups and returns the respective indices.
 
         :param source: A tensor or array of values containing the data coming from the source distribution.
         :type source: class:`TensorLike`
@@ -68,19 +75,8 @@ class FixedCoupling(Coupling):
 
 
 class OTCoupling(Coupling):
-    """Optimal transport (OT) coupling for unpaired data.
-
-    :param method: The method used to solve the Optimal Transport problem.
-    :type method: class:`Literal["exact", "sinkhorn", "unbalandced", "partial"]`
-
-    :param cost_fn: Function used to compute the matrix for the displacement cost from :param:`source` to :param:`target`
-    :type cost_fn: class:`Callable[[TensorLike, TensorLike], TensorLike]`
-
-    :param reg: Regularization strength used in the `"sinkhorn"`, `"unbalanced"` and `"partial"` method.
-    :type reg: class:`float | None`
-
-    :param reg: Regularization strength used in the `"unbalanced"` method.
-    :type reg: class:`float | None`
+    """
+    Optimal transport (OT) coupling for unpaired data.
     """
 
     def __init__(
@@ -93,6 +89,32 @@ class OTCoupling(Coupling):
         normalize_cost: bool = False,
         replace: bool = True,
     ) -> None:
+        """
+        Initializes the :class: `OTCoupling` class.
+
+        :param method: The method used to solve the Optimal Transport problem.
+        :type method: class:`Literal["exact", "sinkhorn", "unbalandced", "partial"]`
+
+        :param solver_kwargs: Optional keyword arguments used to initialize the solver. If not
+            provided, it will be automatically set to an empty dictionary, deafults to `None`.
+        :type solver_kwargs: class: `dict[str, Any] | None`
+
+        :param cost_fn: Function used to compute the matrix for the displacement cost from :param:`source` to :param:`target`.
+            If not specified, it will be automatically set to the squared euclidean cost, defaults to `None`.
+        :type cost_fn: class:`Callable[[TensorLike, TensorLike], TensorLike] | None`
+
+        :param reg: Regularization strength used in the `"sinkhorn"`, `"unbalanced"` and `"partial"` method, defaults to `5e-1`.
+        :type reg: class:`float`
+
+        :param reg_m: Regularization strength used in the `"unbalanced"` method, defaults to `1e-0`.
+        :type reg_m: class:`float`
+
+        :param normalize_cost: Whether to normalize the costa function before solving the Optimal Transport Problem, defaults to `True`.
+        :type normalize_cost: class: `bool`
+
+        :param replace: Whether to use replacement when sampling the indices according to the transport plan, defaults to `True`
+        :type replace: class: `bool`
+        """
         # empty dictionary if no solver kwargs provided
         if solver_kwargs is None:
             solver_kwargs = {}
@@ -134,7 +156,8 @@ class OTCoupling(Coupling):
         source: TensorLike,
         target: TensorLike,
     ) -> tuple[TensorLike, TensorLike]:
-        """Matches the :param:`source` and :param:`target` groups and returns the respective indices.
+        """
+        Matches the :param:`source` and :param:`target` groups and returns the respective indices.
 
         :param source: A tensor or array of values containing the data coming from the source distribution.
         :type source: class:`TensorLike`
@@ -190,7 +213,9 @@ class OTCoupling(Coupling):
 
 
 class IndependentCoupling(Coupling):
-    """Samples independently from source and target distributions"""
+    """
+    Samples independently from source and target distributions.
+    """
 
     def __init__(
         self,
@@ -204,7 +229,8 @@ class IndependentCoupling(Coupling):
         source: TensorLike,
         target: TensorLike,
     ) -> tuple[TensorLike, TensorLike]:
-        """Matches the :param:`source` and :param:`target` groups and returns the respective indices.
+        """
+        Matches the :param:`source` and :param:`target` groups and returns the respective indices.
 
         :param source: A tensor or array of values containing the data coming from the source distribution.
         :type source: class:`TensorLike`

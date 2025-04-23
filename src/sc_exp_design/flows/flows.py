@@ -17,9 +17,6 @@ __all__ = [
 class BaseFlow(abc.ABC, nn.Module):
     """
     Abstract base class for modeling flow-based transformations in a probabilistic setting.
-
-    :param random_seed: Random seed for reproducibility.
-    :type random_seed: int
     """
 
     def __init__(
@@ -30,7 +27,7 @@ class BaseFlow(abc.ABC, nn.Module):
         Initializes the BaseFlow class.
 
         :param random_seed: Random seed for reproducibility.
-        :type random_seed: int
+        :type random_seed: class: `int`
         """
         super().__init__()
         self.random_seed = random_seed
@@ -46,13 +43,16 @@ class BaseFlow(abc.ABC, nn.Module):
         Computes the mean function \( \mu_t \) for the flow transformation at time `t`.
 
         :param t: Time variable tensor.
-        :type t: Tensor
+        :type t: class: `torch.Tensor`
+
         :param source: Source distribution tensor.
-        :type source: Tensor
+        :type source: class: `torch.Tensor`
+
         :param target: Target distribution tensor.
-        :type target: Tensor
+        :type target: class: `torch.Tensor`
+
         :return: Computed mean function at time `t`.
-        :rtype: Tensor
+        :rtype: class: `torch.Tensor`
         """
         raise NotImplementedError
 
@@ -62,12 +62,13 @@ class BaseFlow(abc.ABC, nn.Module):
         t: Tensor,
     ) -> Tensor:
         """
-        Computes the variance function \( \sigma_t \) at time `t`.
+        Computes the standard deviation function \( \sigma_t \) at time `t`.
 
         :param t: Time variable tensor.
-        :type t: Tensor
-        :return: Computed variance function at time `t`.
-        :rtype: Tensor
+        :type t: class: `torch.Tensor`
+
+        :return: Computed standard deviation function at time `t`.
+        :rtype: class: `torch.Tensor`
         """
         raise NotImplementedError
 
@@ -81,13 +82,16 @@ class BaseFlow(abc.ABC, nn.Module):
         Computes the latent representation \( x_t \) at time `t`.
 
         :param t: Time variable tensor.
-        :type t: Tensor
+        :type t: class: `torch.Tensor`
+
         :param source: Source distribution tensor.
-        :type source: Tensor
+        :type source: class: `torch.Tensor`
+
         :param target: Target distribution tensor.
-        :type target: Tensor
+        :type target: class: `torch.Tensor`
+
         :return: Computed latent representation at time `t`.
-        :rtype: Tensor
+        :rtype: class: `torch.Tensor`
         """
         # handling shapes
         msg = f"`source` and `target` are supposed to have the same shape, found  {source.shape=} and {target.shape=}"
@@ -110,15 +114,19 @@ class BaseFlow(abc.ABC, nn.Module):
         Computes the score function \( \nabla log p(x_t) \) at time `t`.
 
         :param t: Time variable tensor.
-        :type t: Tensor
+        :type t: class: `torch.Tensor`
+
         :param source: Source distribution tensor.
-        :type source: Tensor
+        :type source: class: `torch.Tensor`
+
         :param target: Target distribution tensor.
-        :type target: Tensor
+        :type target: class: `torch.Tensor`
+
         :param xt: Latent representation tensor at time `t`.
-        :type xt: Tensor
+        :type xt: class: `torch.Tensor`
+
         :return: Computed score function at time `t`.
-        :rtype: Tensor
+        :rtype: class: `torch.Tensor`
         """
         # handling shapes
         msg = f"`source` and `target` are supposed to have the same shape, found  {source.shape=} and {target.shape=}"
@@ -142,15 +150,19 @@ class BaseFlow(abc.ABC, nn.Module):
         Computes the drift function \( u_t \) at time `t`.
 
         :param t: Time variable tensor.
-        :type t: Tensor
+        :type t: class: `torch.Tensor`
+
         :param source: Source distribution tensor.
-        :type source: Tensor
+        :type source: class: `torch.Tensor`
+
         :param target: Target distribution tensor.
-        :type target: Tensor
+        :type target: class: `torch.Tensor`
+
         :param xt: Optional latent representation tensor at time `t`.
-        :type xt: Tensor, optional
+        :type xt: class: `torch.Tensor | None`
+
         :return: Computed drift function at time `t`.
-        :rtype: Tensor
+        :rtype: class: `torch.Tensor`
         """
         raise NotImplementedError
 
@@ -163,13 +175,14 @@ class ConstantNoiseFlow(BaseFlow):
     def __init__(
         self,
         sigma: float = 1.0,
-        random_seed: float | None = 42,
+        random_seed: int | None = 42,
     ) -> None:
         """
-        :param sigma: Standard deviation of the noise.
-        :type sigma: float
-        :param random_seed: Random seed for reproducibility.
-        :type random_seed: float | None
+        :param sigma: Standard deviation of the noise, defaults to `1.0`.
+        :type sigma: class: `float`
+
+        :param random_seed: Random seed for reproducibility, defaults to `42`.
+        :type random_seed: class: `int | None`
         """
         super().__init__(random_seed=random_seed)
         self.sigma = sigma
@@ -184,13 +197,16 @@ class ConstantNoiseFlow(BaseFlow):
         Computes the mean trajectory between source and target.
 
         :param t: Time step tensor.
-        :type t: Tensor
+        :type t: class: `torch.Tensor`
+
         :param source: Source tensor.
-        :type source: Tensor
+        :type source: class: `torch.Tensor`
+
         :param target: Target tensor.
-        :type target: Tensor
+        :type target: class: `torch.Tensor`
+
         :return: Computed mean trajectory.
-        :rtype: Tensor
+        :rtype: class: `torch.Tensor`
         """
         return t * target + (1 - t) * source
 
@@ -202,9 +218,10 @@ class ConstantNoiseFlow(BaseFlow):
         Computes the constant noise level.
 
         :param t: Time step tensor.
-        :type t: Tensor
+        :type t: class: `torch.Tensor`
+
         :return: Noise level tensor.
-        :rtype: Tensor
+        :rtype: class: `torch.Tensor`
         """
         return torch.ones_like(t) * self.sigma
 
@@ -219,15 +236,19 @@ class ConstantNoiseFlow(BaseFlow):
         Computes the velocity field.
 
         :param t: Time step tensor.
-        :type t: Tensor
+        :type t: class: `torch.Tensor`
+
         :param source: Source tensor.
-        :type source: Tensor
+        :type source: class: `torch.Tensor`
+
         :param target: Target tensor.
-        :type target: Tensor
-        :param xt: Optional input tensor at time t.
-        :type xt: Tensor | None
+        :type target: class: `torch.Tensor`
+
+        :param xt: Optional input tensor at time t (not used, here only for compatibility).
+        :type xt: class: `torch.Tensor | None`
+
         :return: Computed velocity field.
-        :rtype: Tensor
+        :rtype: class: `torch.Tensor`
         """
         return target - source
 
@@ -235,6 +256,9 @@ class ConstantNoiseFlow(BaseFlow):
 class RectifiedFlow(ConstantNoiseFlow):
     """
     A rectified flow model with zero noise.
+
+    Inherits from :class: `ConstantNoiseFlow` and sets automatically the :attr:`ConstantNoiseFlow.sigma` attribute to `0`
+    for deterministic interpolation.
     """
 
     def __init__(
@@ -242,8 +266,8 @@ class RectifiedFlow(ConstantNoiseFlow):
         random_seed: float | None = 42,
     ) -> None:
         """
-        :param random_seed: Random seed for reproducibility.
-        :type random_seed: float | None
+        :param random_seed: Random seed for reproducibility, defaults to `42`.
+        :type random_seed: class: `int | None`
         """
         super().__init__(sigma=0.0, random_seed=random_seed)
 
@@ -259,10 +283,11 @@ class VariancePreservingFlow(BaseFlow):
         random_seed: float | None = 42,
     ) -> None:
         """
-        :param sigma: Variance scaling factor.
-        :type sigma: float
-        :param random_seed: Random seed for reproducibility.
-        :type random_seed: float | None
+        :param sigma: Standard deviation of the noise, defaults to `0.0`.
+        :type sigma: class: `float`
+
+        :param random_seed: Random seed for reproducibility, defaults to `42`.
+        :type random_seed: class: `int | None`
         """
         super().__init__(random_seed=random_seed)
         self.sigma = sigma
@@ -277,13 +302,16 @@ class VariancePreservingFlow(BaseFlow):
         Computes the mean trajectory using a sinusoidal function.
 
         :param t: Time step tensor.
-        :type t: Tensor
+        :type t: class: `torch.Tensor`
+
         :param source: Source tensor.
-        :type source: Tensor
+        :type source: class: `torch.Tensor`
+
         :param target: Target tensor.
-        :type target: Tensor
+        :type target: class: `torch.Tensor`
+
         :return: Computed mean trajectory.
-        :rtype: Tensor
+        :rtype: class: `torch.Tensor`
         """
         return torch.cos(0.5 * np.pi * t) * source + torch.sin(0.5 * np.pi * t) * target
 
@@ -295,9 +323,10 @@ class VariancePreservingFlow(BaseFlow):
         Computes the time-dependent noise level.
 
         :param t: Time step tensor.
-        :type t: Tensor
+        :type t: class: `torch.Tensor`
+
         :return: Noise level tensor.
-        :rtype: Tensor
+        :rtype: class: `torch.Tensor`
         """
         return torch.sqrt(self.sigma * t * (1 - t))
 
@@ -310,6 +339,21 @@ class VariancePreservingFlow(BaseFlow):
     ) -> Tensor:
         """
         Computes the velocity field.
+
+        :param t: Time step tensor.
+        :type t: class: `torch.Tensor`
+
+        :param source: Source tensor.
+        :type source: class: `torch.Tensor`
+
+        :param target: Target tensor.
+        :type target: class: `torch.Tensor`
+
+        :param xt: Optional input tensor at time t, defaults to `None`.
+        :type xt: class: `torch.Tensor | None`
+
+        :return: Computed velocity field.
+        :rtype: class: `torch.Tensor`
         """
         # handling shapes
         msg = f"`source` and `target` are supposed to have the same shape, found  {source.shape=} and {target.shape=}"
@@ -336,10 +380,11 @@ class EncodingDecodingFlow(BaseFlow):
         random_seed: float | None = 42,
     ) -> None:
         """
-        :param sigma: Scaling factor for the noise.
-        :type sigma: float
-        :param random_seed: Random seed for reproducibility.
-        :type random_seed: float | None
+        :param sigma: Standard deviation of the noise, defaults to `0.0`.
+        :type sigma: class: `float`
+
+        :param random_seed: Random seed for reproducibility, defaults to `42`.
+        :type random_seed: class: `int | None`
         """
         super().__init__(random_seed=random_seed)
         self.sigma = sigma
@@ -352,6 +397,18 @@ class EncodingDecodingFlow(BaseFlow):
     ) -> Tensor:
         """
         Computes the mean trajectory with an encoding-decoding scheme.
+
+        :param t: Time step tensor.
+        :type t: class: `torch.Tensor`
+
+        :param source: Source tensor.
+        :type source: class: `torch.Tensor`
+
+        :param target: Target tensor.
+        :type target: class: `torch.Tensor`
+
+        :return: Computed mean trajectory.
+        :rtype: class: `torch.Tensor`
         """
         alpha = torch.cos(np.pi * t) ** 2
         beta = torch.sin(np.pi * t) ** 2
@@ -364,6 +421,12 @@ class EncodingDecodingFlow(BaseFlow):
     ) -> Tensor:
         """
         Computes the noise level with a sinusoidal pattern.
+
+        :param t: Time step tensor.
+        :type t: class: `torch.Tensor`
+
+        :return: Noise level tensor.
+        :rtype: class: `torch.Tensor`
         """
         return self.sigma * torch.sin(np.pi * t) ** 2
 
@@ -376,6 +439,21 @@ class EncodingDecodingFlow(BaseFlow):
     ) -> Tensor:
         """
         Computes the velocity field for encoding-decoding dynamics.
+
+        :param t: Time step tensor.
+        :type t: class: `torch.Tensor`
+
+        :param source: Source tensor.
+        :type source: class: `torch.Tensor`
+
+        :param target: Target tensor.
+        :type target: class: `torch.Tensor`
+
+        :param xt: Optional input tensor at time t, defaults to `None`.
+        :type xt: class: `torch.Tensor | None`
+
+        :return: Computed velocity field.
+        :rtype: class: `torch.Tensor`
         """
         # handling shapes
         msg = f"`source` and `target` are supposed to have the same shape, found  {source.shape=} and {target.shape=}"

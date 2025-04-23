@@ -35,26 +35,18 @@ __all__ = ["FlowMatching"]
 class FlowMatching(BaseModel):
     """Initializes the :class:`FlowMatching` model.
 
-    :param flow_type: The flow used to define the target dynamics. Should be a reference to
-        a class derived from :class:`sc_exp_design.flows.BaseFlow` and not an instance.
-        Such class has to provide the methods :method:`flow_type.compute_x_t`, :method:`flow_type.compute_u_t` and
-        (optionally), :method:`flow_type.compute_score_t`, when we also want to lean the score
-        (i.e.: :attr:`NeuralVelocityFieldConfig.learn_score_fiels` is `True`).
-        Defaults to :class:`sc_exp_design.flows.ConstantNoiseFlow`.
-    :type flow_type: class:`BaseFlow | None`
+    :param flow_type: String identifier for the flow used to define the target dynamics, defaults to `"rectified"`.
+    :type flow_type: class:`Literal["constant_noise", "encoding_decoding", "rectified", "variance_preserving"]`
 
-    :param flow_kwargs: Dictionary containing the keyword arguments to pass to :param:`flow_type` for its initialization.
+    :param flow_kwargs: Dictionary containing the keyword arguments passed to the flow for its initialization.
         Refer to the :module:`sc_exp_design.flows` page for the available flows and their respective keyword arguments.
         Defaults to `None`.
     :type flow_kwargs: class:`dict[str, Any] | None`
 
-    :param coupling_type: The coupling used to sample source and terminal states from the dataset. Should be a
-        reference to a class derived from :class:`sc_exp_design.couplings.BaseCoupling` and not an instance.
-        Such class has to provide the :method:`coupling_type.match_groups` that will be used by the dataloader
-        to define the pairings during sampling. Defaults to  :class:`sc_exp_design.couplings.IndependentCoupling`
-    :type coupling_type: class:`dict[str, Any] | Any`
+    :param coupling_type: The coupling used to sample source and terminal states from the dataset, defaults to `"ot"`
+    :type coupling_type: class:`Literal["fixed", "independent", "ot"]`
 
-    :param coupling_kwargs: Dictionary containing the keyword arguments to pass to :param:`coupling_type` for its initialization.
+    :param coupling_kwargs: Dictionary containing the keyword arguments passed to the coupling for its initialization.
         Refer to the :module:`sc_exp_design.couplings` page for the available couplings and their respective keyword arguments.
         Defaults to `None`.
     :type coupling_kwargs: class:`dict[str, Any] | None`
@@ -67,6 +59,10 @@ class FlowMatching(BaseModel):
     
     :param generate_from_noise: Controls if the source samples are Gaussian (True) or control cells (False).
     :type num_training_steps: class:`bool`
+
+    :param noise_distribution: Function used to sample initial states when generating from noise.
+        Only used when :param: `generate_from_noise` is set to `True`. Defaults to `torch.randn` (i.e.: Standard Gaussian).
+    :type noise_distribution: class:`Callable[[Sequence[int], Any], Tensor]`
     """
 
     def __init__(
@@ -142,45 +138,12 @@ class FlowMatching(BaseModel):
         target_covariates_kwargs: dict[str, Any] | None = None,
     ) -> None:
         """
-        :param train_adata: An instance of :class:`anndata.AnnData` containing the training data.
-        :type train_adata: class:`anndata.AnnData`
+        Prepares the training data using the :class: `DataManager` object.
 
-        :param sample_rep: A :class:`str` identifier indicating what key in :attr:`train_adata.layers` to look for the
-            data representation. If `None`, it will use :attr:`train_adata.X`, defaults to `None`.
-        :type sample_rep: class:`str | None`
-
-        :param control_key: A :class:`str` identifier indicating what column in :attr:`train_adata.obs` to look for the
-            binary variable representing whether an observation belongs to the control group or not, defaults to `None`.
-        :type control_key: class:`str | None`
-
-        :param perturbations: Either a :class:`str` or a :class:`Sequence[str]` indicating what column(s) in :attr:`train_adata.obs` to look
-            for each modeled perturbation. Each perturbation should then have a key in either :param:`perturbation_covariates` or :param:`perturbation_reps`
-            to be actually included in the data, otherwise a warning message is displayed and the passed perturbation is ignored, defaults to `None`.
-        :type perturbations: class:`str | Sequence[str] | None`
-
-        :param perturbation_covariates: A dictionary whose keys are :class:`str` identifiers for the modeled perturbations (i.e.: elements of :param:`perturbations`)
-            and keys being either :class:`str` or :class:`Sequence[str]` indicating which keys in :param:`train_adata.obsm` where to look for the covariates
-            associated to each perturbation. Such covariate will encode features of each perturbation that vary across the samples and thus might differ also
-            across observation stimulated with the same perturbation, defaults to `None`.
-        :param perturbation_covariates: class:`dict[str, str | Sequence[str]] | None`
-
-        :param perturbation_reps: A dictionary whose keys are :class:`str` identifiers for the modeled perturbations (i.e.: elements of :param:`perturbations`)
-            and keys being either :class:`str` or :class:`Sequence[str]` indicating which keys in :param:`train_adata.uns` where to look for the representation
-            associated to each perturbation. Such representation will encode features of each perturbation that are constant across the samples (but do vary across
-            the perturbations), defaults to `None`.
-        :type perturbation_reps: class:`dict[str, str | Sequence[str]] | None`
-
-        :param load_target_covariates: Whether to use some target representation for the perturbations which to perform inference on, defaults t o `False`
-        :type load_target_covariates: class:`bool`
-
-        :param target_covariates:
-        :type target_covariates_in_obsm: class:`dict[str, bool] | None`
-
-        :param target_covariates_in_obsm:
-        :type target_covariates_in_obsm: class:`dict[str, bool] | None`
-
-        :param target_covariates_kwargs:
-        :type target_covariates_kwargs: class `dict[str, Any] | None`
+        Refer to the :class: `DataManager` documentations for an explaination of each argument.
+        It inferes automatically the presence of control cells from :param: `control_key`.
+        Once initialized the :class: `DataManager` class, it calls the :method: `DataManager.get_data` method to
+        retrieve a structured representation of the analyzed dataset.
         """
         has_controls = (control_key is not None)
         
@@ -215,8 +178,9 @@ class FlowMatching(BaseModel):
     ) -> None:
         """Prepares the data for validation and initializs the :attr:`FlowMatching.validation_data` attribute of the model.
 
-        :param validation_adata: An instance of :class:`anndata.AnnData` containing the validation data.
-        :type validation_adata: class:`anndata.AnnData`
+        :param validation_adata: An instance of :class:`AnnData` containing the validation data.
+            It should satisfy the same requirements as the one used to construct the training data.
+        :type validation_adata: class:`AnnData`
         """
         validation_data = self.data_manager.get_data(validation_adata)
         self.validation_data = validation_data
@@ -233,9 +197,6 @@ class FlowMatching(BaseModel):
         solver_kwargs: dict[str, Any] | None = None,
     ) -> None:
         """Initializes the model.
-
-        :param flow_dim: The dimensionality of the flow.
-        :type flow_dim: class:`int`
 
         :param cvf_config: Instance of :class:`sc_exp_design.networks.NeuralVelocityFieldConfig` used to initialize the
             :class:`sc_exp_design.networks.NeuralVelocityFIeld` object, then set as :attr:`FlowMatching.velocity_field` attribute.
@@ -338,22 +299,13 @@ class FlowMatching(BaseModel):
         :param grad_step_interval_log: The number of gradient steps after which to update the progress bar, defaults to `100`.
         :type grad_step_interval_log: class:`int`
 
-        :param posterior_on_cond_vars_update_step: The number of gradient steps after which to update the weights of
-            the neural approximate posterior on the conditioning variables (endpoints), defaults to `None` (updating weights after each gradient step).
-        :type posterior_on_cond_vars_update_step: class:`int | None`
+        :param num_treatments_to_load: Specifies the maximum number of unique treatments to be loaded in a single batch.
+            Defaults to `None`, in which case all unique treatments are loaded.
+        :type num_treatments_to_load: class: `int | None`
 
-        :param posterior_on_perts_update_step: The number of gradient steps after which to update the weights of
-            the neural approximate posterior on the perturbation covariates, defaults to `None` (updating weights after each gradient step).
-        :type posterior_on_perts_update_step: class:`int | None`
-
-        :param posterior_on_latent_perts_update_step: The number of gradient steps after which to update the weights of
-            the neural approximate posterior on the latent perturbation representation, defaults to `None` (updating weights after each gradient step).
-        :type posterior_on_latent_perts_update_step: class:`int | None`
-
-        :param gamma_fn: (Optional) function used to compute the diffusion coefficient in case we want to integrate the dynamics using an SDE and
-            a drift adjusted by the score. In case :attr:`self.velocity_field.config.lean_score_field` is `False` it will be ignores, falling back to ODE sampling by
-            default as from the original fromulation, defaults to `None`.
-        :type gamma_fn: class:`Callable[[Tensor, Tensor], Tensor] | None`
+        :param num_samples_per_validation_step: Specifies the number of samples for each observation to be generated during the validation step.
+            Only used when :attr: `self.generate_from_noise` is set to `True`, defaults to `None` in which case only one sample will be generated.
+        :type num_samples_per_validation_step: class: `int | None`
         """
         # sanity checks
         msg = "Data not initialized, run `prepare_data` before training the model"
@@ -426,10 +378,15 @@ class FlowMatching(BaseModel):
         :param return_trajectory: Whether to return the whole trajectory at the given discretization points
         :type return_trajectory: class: `bool`
 
-        :param gamma_fn: (Optional) function used to compute the diffusion coefficient in case we want to integrate the dynamics using an SDE and
-            a drift adjusted by the score. In case :attr:`self.velocity_field.config.lean_score_field` is `False` it will be ignores, falling back to ODE sampling by
-            default as from the original fromulation, defaults to `None`.
-        :type gamma_fn: class:`Callable[[Tensor, Tensor], Tensor] | None`
+        :param num_samples: Specifies the number of samples for each observation to be generated.
+            Only used when :attr: `self.generate_from_noise` is set to `True`, defaults to `None` in which case only one sample will be generated.
+        :type num_samples : class: `int | None`
+
+        :param batch_size: Specifies the number of observations to sample. Only used when :attr: `self.generate_from_noise` is `True` and neither
+            source states nor conditions are passed in the :param: `batch`. In such cases, when :param: `batch_size` is not provided,
+            it will be inferred from :attr: `self.validation_dataloader.batch_size` if present, otherwise from :attr: `self.training_dataloader.batch_size`
+            Only used when :attr: `self.generate_from_noise` is set to `True`, defaults to `None` in which case only one sample will be generated.
+        :type batch_size : class: `int | None`
 
         :return: Tensor of shape `(batch_size, self.flow_dim)` if :param:`return_trajectory` is `False`, otherwise Tensor of shape `(batch_size, self.num_time_steps, self.flow_dim)`
         :rtype: class:`torch.Tensor`

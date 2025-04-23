@@ -34,7 +34,46 @@ class BaseDataStruct(abc.ABC):
 @dataclass
 class AnnotatedPerturbationData(BaseDataStruct):
     """
-    Data structure for training data containing control and perturbation information.
+    Data structure for annotated perturbation data.
+    
+    :param adata: The underlying annotated data object which to enforce the data model on.
+        Should always be provided
+    :type adata: class: `AnnData`
+
+    :param control_key: Optional key in the :attr:`AnnData.obs` attribute of :param: `adata` where to retrieve
+        the boolean flag indicating whether a given cells belongs to the control group or not. Should only be used
+        when there exists some notion of control states, otherwise it would be preferable to simply generate from noise
+        samples (check the :attr: `FlowMatching.generate_from_noise` attribute).
+    :type control_key: class: `str | None`
+
+    :param state_data: A tensor or an array containig the state data. Should always be provided
+    :type state_data: class: `TensorLike`
+
+    :param perturbation_data: Optional dictionary mapping each perturbation covariate to the corresponding data. In case
+        of unconditional generation it will be `None`. Each key of such dictionary will represent an individual perturbation,
+        while each value will be given by their numerical realization. A condition is then defined as a combination of values
+        of such covariates for a given observation/cell.
+    :type perturbation_data: class: `dict[str, TensorLike] | None`
+
+    :param target_reprs: Optional dictionary mapping target covariates to be loaded in the case of inverse modeling
+        to their representation. This will represent the quantities that we want to optimize for by choosing the perturbations, defaults to `None`.
+    :type target_reprs:
+
+    :param perturbations_with_reps: Optional dictionary mapping each perturbation covariate to its uniqua values. This is needed in the
+        case of Optimal Transport couplings as we want to be able to sample a unique perturbation for each batch of target data, defaults to `None`.
+        In the cases when :param: `perturbation_data` is `None`, it should be set to `None`. Similarly, it should be `None` in the case where it is not
+        possible to use OT coupling, like for example when the perturbations are given by dense and continuous vectors of features (i.e.: when :param: `perturbations_in_obsm` is not `None`).
+        Defaults to `None`.
+    :type perturbations_with_reps: class: `dict[str, Sequence[str]] | None`
+
+    :param has_controls: Flag indicating whether a notion of control states applies to the current data.
+        When this is the case, the :param: `control_key` needs to be properly set. Defaults to `True`.
+    :type has_controls: class: `bool`
+
+    :param perturbations_in_obsm: Optional sequence of modeled perturbation whose representation is to be retrieved from the :attr: `osbm` attribte of the :param: `adata`.
+        These should be perturbations representated by some continuous and dense feature vector. When this is not `None`, it is not possible to use Optimal Transport Couplings
+        Defaulst to `None`.
+    :type perturbations_in_obsm: class: `Sequence[str] | None`
     """
     
     adata: anndata.AnnData
@@ -49,21 +88,24 @@ class AnnotatedPerturbationData(BaseDataStruct):
     @property
     def seen_combinatorial_perturbations(
         self,
-    ) -> list[list[str]] | None:
-        """"""
+    ) -> Sequence[Sequence[str]] | None:
+        """
+        Returns the list of unique perturbations present in the dataset.
+
+        These will be computed by using the keys of :attr:`AnnotatedPerturbationData.perturbations_with_rep` to retrieve the unique combinations
+        from the :attr: `obs` attribute of the :attr: `AnnotatedPerturbationData.adata` object. This is needed to sample unique conditions in the case of
+        Optimal Transport couplings.
+        It returns `None` in the following three cases:
+            * No perturbation data is provided.
+            * No perturbation representation is provided.
+            * There is at least one perturbation passed in :attr:`AnnotatedPerturbationData.perturbations_in_obsm`, in which case no OT coupling can be done.
+
+        :rtype: class: `Sequence[Sequence[str]] | None`
+        """
         # no perturbation data is passed to the AnnotatedPerturbationData object or no perturbation with associated representation
         if (self.perturbation_data is None) or (self.perturbations_with_rep is None) or (self.perturbations_in_obsm is not None):
             return None 
         return self.adata.obs[[pert for pert in self.perturbations_with_rep.keys()]].drop_duplicates().values.tolist()
-
-    @property
-    def num_seen_combinatorial_perturbations(
-        self,
-    ) -> int | None:
-        """"""
-        if self.seen_combinatorial_perturbations is None:
-            return None
-        return len(self.seen_combinatorial_perturbations)
 
     def get_controls(
         self,
@@ -71,9 +113,13 @@ class AnnotatedPerturbationData(BaseDataStruct):
     ) -> dict[str, TensorLike]:
         """
         Retrieve control group data.
+        
+        Can only be called when :attr: `AnnotatedPerturbationData.has_controls` is `True` and :attr: `AnnotatedPerturbationData.control_key`
+        is specified.
 
-        :param batch_size: Number of samples to return. If None, all controls are returned.
-        :type batch_size: int | None
+        :param batch_size: Number of samples to return. If `None`, all controls are returned, defaults to `None`.
+        :type batch_size: class: `int | None`
+
         :return: Dictionary containing control state and perturbation data (if available).
         :rtype: Dict[str, TensorLike]
         """
@@ -122,10 +168,10 @@ class AnnotatedPerturbationData(BaseDataStruct):
         """
         Retrieve treatment group data.
 
-        :param batch_size: Number of samples to return. If None, all treatments are returned.
+        :param batch_size: Number of samples to return. If None, all treatments are returned. Deafults to `None`.
         :type batch_size: int | None
 
-        :param treatment_ids: The identifier for the treatment to be sampled in the current batch.
+        :param treatments: The identifier for the treatments to be sampled in the current batch.
             Defaults to `None`, in which case all individual treatments could be sampled.
         :type treatment_ids: int | None
 
@@ -170,8 +216,12 @@ class AnnotatedPerturbationData(BaseDataStruct):
     def __getitem__(
         self,
         idx: int,
-    ) -> dict[str, Any]:
-        """"""
+    ) -> "AnnotatedPerturbationData":
+        """
+        Durden method needed to slice the :class: `AnnotatedPerturbationData` object.
+
+        Retrieves all the data from the original instance and returns a new instance of :class: `AnnotatedPerturbationData`.
+        """
         # retrieving adata and states
         adata = self.adata[idx]
         state_data = self.state_data[idx]
@@ -195,5 +245,9 @@ class AnnotatedPerturbationData(BaseDataStruct):
     def __len__(
         self,
     ) -> int:
-        """"""
+        """
+        Returns the number of observations present in the data.
+
+        :rtype: class: `int`
+        """
         return self.adata.shape[0]
