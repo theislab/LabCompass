@@ -23,7 +23,11 @@ __all__ = [
 
 
 class BaseDataLoader(abc.ABC):
-    """"""
+    """
+    Abstract class for data loading objects.
+
+    Childer classes need to define the :method: `sample` method in order to be instantiated/.
+    """
 
     @abc.abstractmethod
     def sample(
@@ -34,14 +38,33 @@ class BaseDataLoader(abc.ABC):
 
 
 class BaseCoupledDataLoader(BaseDataLoader):
-    """"""
+    """
+    Base class for coupled datasets. Derived from :class: `BaseDataLoader`.
+
+    Defines the :method: `_get_matched_data` method, needed to construct the coupling
+    between source and target distributions when control states are passed.
+    """
 
     def _get_matched_data(
         self,
         treatments: Sequence[str] | None,
         control_states: TensorLike | None,
     ) -> dict[str, TensorLike | dict[str, TensorLike]]:
-        """"""
+        """
+        Matches the control and to samples from the distributions perturbed with the treatments
+        passed in :param: `treatements`.
+
+        :param treatments: Sequence of string identifiers of the treatment to be loaded in the current batch.
+            When `None`, all treatments will be retrieved. This argument is used to call the :method:`AnnotatedPerturbationData.get_treatments` method.
+        :type treatments: class: `Sequence[str] | None`
+
+        :param control_states: Tensor or array holding the state data for control observations. Calling this with :param: `control_states` as `None` will
+            raise an :error: `AssertionError` when the :attr: `AnnotatedPerturbationData.has_controls` attribute is set to `True`.
+        :type control_states: class: `TensorLike | None`
+
+        :return: Returns the data of the batch in a dictionary.
+        :rtype: class: `dict[str, TensorLike | dict[str, TensorLike]]`
+        """
         # sanity check
         if self.has_controls:
             msg = f""
@@ -91,7 +114,9 @@ class BaseCoupledDataLoader(BaseDataLoader):
 
 
 class SequentialDataLoader(BaseDataLoader):
-    """"""
+    """
+    Class defining unpaired sequential data loading
+    """
     def __init__(
         self,
         data: AnnotatedPerturbationData,
@@ -99,7 +124,21 @@ class SequentialDataLoader(BaseDataLoader):
         state_transforms: Transform | None = None,
         device_id: Literal["cuda", "cpu"] = "cuda"
     ) -> None:
-        """"""
+        """
+        Initialize the :class: `SequentialDataLoader` object.
+
+        :param data: Annotated data to be loaded.
+        :type data: class: `AnnotatedPerturbationData`
+
+        :param batch_size: The number of observations to be loaded in each batch.
+        :type batch_size: class: `int`
+
+        :param state_transforms: Optional transformations to be applied to the states when loading the batch, defaults to `None`.
+        :type state_transforms: class: `Transform | None`
+
+        :param device_id: String identifier indicating the device to load the data on, defaults to `"cuda"`.
+        :type device_id: class: `Literal["cpu", "cuda"]`
+        """
         self.data = data
         self.batch_size = batch_size
         self.state_transforms = state_transforms
@@ -108,8 +147,13 @@ class SequentialDataLoader(BaseDataLoader):
     
     def sample(
         self,
-    ) -> dict[str, TensorLike]:
-        """"""
+    ) -> dict[str, TensorLike | dict[str, TensorLike]]:
+        """
+        Samples a batch of data.
+
+        :return: The data of the batch in a dictionary
+        :rtype: class: `dict[str, TensorLike | dict[str, TensorLike]]`
+        """
         # sampling batch indices
         batch_idxs = np.random.choice(self.data.state_data.shape[0], size=self.batch_size)
         # slicing the state data
@@ -145,6 +189,8 @@ class SequentialDataLoader(BaseDataLoader):
 class TrainDataLoader(BaseCoupledDataLoader):
     """
     Data loader for training that samples matched control and perturbed cell states.
+
+    Children class of :class: `BaseCoupledDataLoader`, from which it inherits the :method: `BaseClassDataLoader._match_groups` method.
     """
 
     def __init__(
@@ -159,17 +205,24 @@ class TrainDataLoader(BaseCoupledDataLoader):
         """
         Initializes the training data loader.
 
-        :param data: Training dataset containing control and perturbed cell states.
-        :type data: class:`AnnotatedPerturbationData`
-        :param coupling: Coupling strategy used to match control and perturbed states.
+        :param data: Annotated data to be loaded.
+        :type data: class: `AnnotatedPerturbationData`
+
+        :param coupling: Coupling strategy used to match control and perturbed states, should be a class providing the :method:`coupling.match_groups`.
+            Should be an instance of a class derived from :class: `Coupling`.
         :type coupling: class:`Coupling`
-        :param batch_size: Number of samples per batch.
-        :type batch_size: class:`int`
-        :param state_transforms: Optional transformations applied to the states, defaults to `None`.
-        :type state_transforms: class:`Transform`, optional
-        :param device_id: Device to use for tensor operations (`cuda` or `cpu`), defaults to `cuda`.
-        :type device_id: class:`Literal[\"cuda\", \"cpu\"]`, optional
-        :param noise_source: Controls if the source samples are Gaussian (True) or control cells (False).
+
+        :param batch_size: The number of observations to be loaded in each batch.
+        :type batch_size: class: `int`
+
+        :param state_transforms: Optional transformations to be applied to the states when loading the batch, defaults to `None`.
+        :type state_transforms: class: `Transform | None`
+
+        :param device_id: String identifier indicating the device to load the data on, defaults to `"cuda"`.
+        :type device_id: class: `Literal["cpu", "cuda"]`
+
+        :param has_controls: Flag indicating whether source states are present in :param: `data`, defaults to `True`.
+        :type has_controls: class: `bool`
         """
         self.data = data
         self.coupling = coupling
@@ -181,16 +234,17 @@ class TrainDataLoader(BaseCoupledDataLoader):
 
     def __sample_perturbation_id(
         self,
-    ) -> Sequence[str]:
+    ) -> Sequence[str] | None:
         """
         Samples the treatment for the current batch when using Optimal Transport couplings.
         This is needed as the OT problem should be solved individually for each perturbation.
         
-        :return: Integer containing the index for the perturbation used in the current batch of data.
-        :rtype: int
+        :return: String identifier for the perturbation used in the current batch of data.
+            When :attr: `self.data.seen_combinatorial_perturbations` is `None`, it returns `None`.
+        :rtype: class: `Sequence[str] | None`
         """
         # no perturbation data is passed to the AnnotatedPerturbationData object
-        if self.data.seen_combinatorial_perturbations is None:            
+        if (self.data.seen_combinatorial_perturbations is None) or (self.data.perturbations_in_obsm is not None):
             return None
         # need to sample one perturbation from the set of unique perturbations
         return random.choice(self.data.seen_combinatorial_perturbations)
@@ -200,7 +254,7 @@ class TrainDataLoader(BaseCoupledDataLoader):
         Samples a batch of matched control and perturbed cell states.
 
         :return: Dictionary containing source (control) states, target (perturbed) states,
-                 and optional perturbation representations.
+                and optional perturbation representations.
         :rtype: dict[str, TensorLike]
         """
         # sampling treatments for current batch needed for OT couplings when we sample only one condition per batch
@@ -219,7 +273,12 @@ class TrainDataLoader(BaseCoupledDataLoader):
 
 
 class ValidationDataLoader(BaseCoupledDataLoader):
-    """"""
+    """
+    Data loader for validation that samples matched control and perturbed cell states.
+
+    Children class of :class: `BaseCoupledDataLoader`, from which it inherits the :method: `BaseClassDataLoader._match_groups` method.
+    It groups batches of data by each individual condition that is being loaded, effectively returning as many batches as loaded condition.
+    """
 
     def __init__(
         self,
@@ -231,7 +290,32 @@ class ValidationDataLoader(BaseCoupledDataLoader):
         has_controls: bool = True,
         num_treatments_to_load: int | None = None
     ) -> None:
-        """"""
+        """
+        Initializes the training data loader.
+
+        :param data: Annotated data to be loaded.
+        :type data: class: `AnnotatedPerturbationData`
+
+        :param coupling: Coupling strategy used to match control and perturbed states, should be a class providing the :method:`coupling.match_groups`.
+            Should be an instance of a class derived from :class: `Coupling`.
+        :type coupling: class:`Coupling`
+
+        :param batch_size: The number of observations to be loaded in each batch.
+        :type batch_size: class: `int`
+
+        :param state_transforms: Optional transformations to be applied to the states when loading the batch, defaults to `None`.
+        :type state_transforms: class: `Transform | None`
+
+        :param device_id: String identifier indicating the device to load the data on, defaults to `"cuda"`.
+        :type device_id: class: `Literal["cpu", "cuda"]`
+
+        :param has_controls: Flag indicating whether source states are present in :param: `data`, defaults to `True`.
+        :type has_controls: class: `bool`
+
+        :param num_treatments_to_load: Specifies the maximum number of unique treatments to be loaded in a single batch.
+            Defaults to `None`, in which case all unique treatments are loaded.
+        :type num_treatments_to_load: class: `int | None`
+        """
         self.data = data
         self.coupling = coupling
         self.batch_size = batch_size
@@ -248,8 +332,10 @@ class ValidationDataLoader(BaseCoupledDataLoader):
         Samples the treatment for the current batch when using Optimal Transport couplings.
         This is needed as the OT problem should be solved individually for each perturbation.
         
-        :return: Integer containing the index for the perturbation used in the current batch of data.
-        :rtype: int
+        :return: String identifier for the perturbations to be loaded in the current batch of data.
+            When :attr: `self.data.seen_combinatorial_perturbations` is `None`, it returns `(None, )`.
+            This is also the case when there are perturbations present in :attr: `self.data.perturbations_in_obsm`.
+        :rtype: class: `Sequence[str | None]`
         """
         # no perturbation data is passed to the AnnotatedPerturbationData object
         if (self.data.seen_combinatorial_perturbations is None) or (self.data.perturbations_in_obsm is not None):
@@ -263,7 +349,13 @@ class ValidationDataLoader(BaseCoupledDataLoader):
     def sample(
         self,
     ) -> dict[str, TensorLike | dict[str, TensorLike]]:
-        """"""
+        """
+        Samples a batch of matched control and perturbed cell states for each perturbation to be loaded in the current iteration.
+
+        :return: Dictionary mapping each perturbation to be loaded to a dictionary containing source (control) states, target (perturbed) states,
+                and optional perturbation representations.
+        :rtype: dict[str, TensorLike]
+        """
         # retrieving the perturbations to validate on for the current batch
         treatments = self.__sample_perturbation_id()
 

@@ -24,39 +24,87 @@ class DataManager:
     def __init__(
         self,
         adata: anndata.AnnData | None = None,
-        sample_rep: str | dict[str] | None = None,
+        sample_rep: str | None = None,
         control_key: str | None = None,
         perturbations: str | Sequence[str] | None = None,
-        perturbations_in_obsm: Sequence[str] | None = None, 
+        perturbations_in_obsm: str | Sequence[str] | None = None, 
         perturbation_covariates: dict[str, str | Sequence[str]] | None = None,
         perturbation_reps: dict[str, str | Sequence[str]] | None = None,
         load_target_covariates: bool = False,
-        target_covariates: dict[str, Literal["one_hot", "label", "identity"] | None] | None = None,
-        target_covariates_in_obsm: dict[str, bool] | None = None,
+        target_covariates: dict[str, Literal["one_hot", "label", "identity"]] | None = None,
+        target_covariates_in_obsm: Sequence[str] | None = None,
         target_covariates_kwargs: dict[str, Any] | None = None,
         has_controls: bool = True
 
     ) -> None:
         """
-        `self.perturbations`:
-            the individual perturbations modeled. need to be a key in `adata.obs`
+        Initializes the :class: `DataManager` object
 
-        `self.perturbation_reps`:
-            the representation in self.perturbation_covariate_reps
-            are the same over cell with the same perturbation
-            basically the resulting data will have one
-            entry for each unique perturbation considered
-            for example, for a given drug this could be given
-            by their chemical representation or any other feature that
-            is constant across cells for any perturbation
+        :param adata: The annotated data object which to retrieve the data to enforce the data model on.
+        :type adata: class: `AnnData`
 
-        `self.perturbation_covariates`:
-            these will be the covariates associated to a given perturbation
-            on a cell level basis and that can vary over the cells for the
-            same perturbations. The resulting data will have one entry for each cell.
-            for example, for a given drug this could be given
-            by the dosage or the time of the treatment or any other feature
-            associated to the current perturbation that can vary across cells
+        :param sample_rep: Optional string identifier indicating the key in the :attr: `obsm` attribute of
+            :param: `adata` where the state representation is held. If `None`, it will directly retrieve it from
+            the :attr: `X` attribute of :param: `adata`, defaults to `None`.
+        :type sample_rep: class: `str`
+
+        :param control_key: Optional key in the :attr:`AnnData.obs` attribute of :param: `adata` where to retrieve
+            the boolean flag indicating whether a given cells belongs to the control group or not. Should only be used
+            when there exists some notion of control states, otherwise it would be preferable to simply generate from noise
+            samples (check the :attr: `FlowMatching.generate_from_noise` attribute).
+        :type control_key: class: `str | None`
+
+        :param perturbations: Optional string identifiers for the perturbations whose effect we want to model.
+            Each element of :param: `perturbations` should be present as a key inside `perturbation_reps`, otherwise it is
+            simply ignored by the :class: `DataManager`. Defaults to `None`.
+        :type perturbations: class: `str | Sequence[str] | None`
+
+        :param perturbations_in_obsm: Optional sequence of modeled perturbation whose representation is to be retrieved from the :attr: `osbm` attribte of the :param: `adata`.
+            These should be perturbations representated by some continuous and dense feature vector. When this is not `None`, it is not possible to use Optimal Transport Couplings
+            Defaulst to `None`.
+        :type perturbations_in_obsm: class: `str | Sequence[str] | None`
+
+        :param perturbation_covariates: DIctionary mapping each perturbation in :param: `perturbations` to the set of its perturbation covariates.
+            The perturbation covariates in :param: `perturbation_covariates` are associated to each perturbation on a cell level basis
+            and are supposed to vary over the cells for a given perturbation. Such covariates are to be found in :attr: `adata.obsm`. 
+            For example, for a given drug this could be given by the dosage or the time of the treatment application on a given cell.
+            More generally, this can be given by any other feature associated to the current perturbation that can vary across cells.
+            Defaults to `None`. 
+        :type perturbation_covariates:
+
+        :param perturbation_reps: Maps each perturbation in :param: `perturbations` to its target representation.
+            The representations in :param:`perturbation_covariate_reps` are the same over cell with the same perturbation.
+            For example, for a given drug this could be given by their chemical representation or any other feature that
+            is constant across observations treated with the same perturbation.
+            For all perturbations in :param: `perturbations` not appearing in :param: `perturbations_in_obsm`, 
+            the values specified in :param: `perturbation_reps` should map to keys in :attr: `adata.uns` where to retrieve 
+            the representations for their unique values. For the perturbations that instead appear in :param: `perturbations_in_obsm`,
+            it should map to the corresponding representations to be found in :attr: `adata.obsm`. Defaults to `None`.
+        :type perturbation_reps: class: `dict[str, str | Sequence[str]]`
+ 
+        :param load_target_covariates: Flag indicating whether to load target covariates during the dataloading.
+            This will represent the quantities that we want to optimize for by choosing the perturbations, defaults to `False`.
+        :type load_target_covariates:
+        
+        :param target_covariates: Dictionary mapping each string identifier for the target covariates to be loaded to their
+            target representation: This can be either `"label"` for loading labels, `"one_hot"` for loading one hot encoded
+            vectors or `"identity"` to keep the retrieved representation as is.
+            These covariates are to be found as keys of the :attr: `obs` attribute of :param: `adata`, unless appearing
+            in :param: `target_covariates_in_obsm`, in which case their representation is to be retrieved from :attr: `obsm`.
+            Defaults to `None`.
+        :type target_covariates: class: `dict[str, Literal["one_hot", "label", "identity"]] | None`
+        
+        :param target_covariates_in_obsm: Optional sequence of string identifiers indicating the target covariates to be retrieved from
+            the :attr: `obsm` attribute of :param: `adata`, defaults to `None`.
+        :type target_covariates_in_obsm: class: `Sequence[str] | None`.
+
+        :param target_covariates_kwargs: Optional keyword arguments used to retrieve the desired representation for the target covariates.
+            Defaults to `None`.
+        :type target_covariates_kwargs: class: `dict[str, Any]`
+        
+        :param has_controls: Flag indicating whether a notion of control states applies to the current data.
+            When this is the case, the :param: `control_key` needs to be properly set. Defaults to `True`.
+        :type has_controls: class: `bool`
 
         """
         self.adata = adata
@@ -140,9 +188,14 @@ class DataManager:
         self,
     ) -> dict[str, Sequence[str]] | None:
         """
+        Retrieves a dictionary mapping each perturbation to its unique values.
+
         Returns a dictionary with keys given by the modeled perturbation and values being the list
         of unique values that each perturbation can assume. This is needed to get a complete list
         of perturbations from which we can sample unique perturbation when using OT couplings.
+        When either :attr: `self.perturbations` or :attr: `self.perturbation_reps` are `None`, it returns `None`.
+
+        :rtype: class: `dict[str, Sequence[str]] | None`
         """
         # sanity check as we need to have initialized `self.adata` attribute
         msg = f""
@@ -190,13 +243,13 @@ class DataManager:
         adata: anndata.AnnData,
     ) -> TensorLike:
         """
-        :param adata: AnnData object containing single-cell data.
-        :type adata: anndata.AnnData
+        :param adata: Annotated data object containing single-cell data.
+        :type adata: class: `AnnData`
 
         :return: The primary state representation of cells.
-        :rtype: TensorLike
+        :rtype: class: `TensorLike`
 
-        :raises ValueError: If `sample_rep` is specified but not found in `adata.obsm`.
+        :raises ValueError: If :attr: `self.sample_rep` is specified but not found in :attr: `adata.obsm`.
         """
         if self.sample_rep is None:
             state_data = adata.X
@@ -212,11 +265,11 @@ class DataManager:
         adata: anndata.AnnData,
     ) -> dict[str, TensorLike]:
         """
-        :param adata: AnnData object containing single-cell data.
-        :type adata: anndata.AnnData
+        :param adata: Annotated data object containing single-cell data.
+        :type adata: class: `AnnData`
 
         :return: Dictionary mapping perturbation features to tensor representations.
-        :rtype: dict[str, TensorLike]
+        :rtype: class: `dict[str, TensorLike]`
 
         :raises ValueError: If a specified perturbation or its representation is not found in `adata`.
         """
@@ -274,14 +327,14 @@ class DataManager:
         adata: anndata.AnnData,
     ) -> dict[str, TensorLike]:
         """
-        :param adata: AnnData object containing single-cell data.
-        :type adata: anndata.AnnData
+        :param adata: Annotated data object containing single-cell data.
+        :type adata: class: `AnnData`
 
-        :return: Dictionary mapping perturbation target covariates to encoded representations.
-        :rtype: dict[str, TensorLike]
+        :return: Dictionary mapping target covariates to encoded representations.
+        :rtype: class: `dict[str, TensorLike]`
 
         :raises AssertionError: If a required perturbation target covariate is missing in `adata.obs` or `adata.obsm`.
-        :raises NotImplementedError: If an unsupported encoding type is requested.
+        :raises ValueError: If an unsupported encoding type is requested.
         """
         # dictionary storing representations for perturbation target covariates
         out_dict = {}
@@ -346,11 +399,11 @@ class DataManager:
         adata: anndata.AnnData | None = None,
     ) -> AnnotatedPerturbationData:
         """
-        :param adata: AnnData object containing single-cell data. If `None`, uses `self.adata`.
-        :type adata: anndata.AnnData | None
+        :param adata: Annotated data object containing single-cell data.
+        :type adata: class: `AnnData`
 
         :return: A structured object containing all necessary training inputs.
-        :rtype: AnnotatedPerturbationData
+        :rtype: class: `AnnotatedPerturbationData`
 
         :raises ValueError: If both `adata` and `self.adata` are `None`.
         """
