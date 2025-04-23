@@ -98,7 +98,7 @@ class NeuralVelocityFieldConfig:
     :type perturbation_pooling_kwargs: class:`dict[str, Any] | None`
 
     :param perturbation_layers_after_pooling: Configuration for the condition decoder, used to initialize the :attr:`ConditionEncoder.after_pooling` attribute of
-        :attr:`NeuralVelocityField.condition_encoder`. Should be a :class:`dict. If provided, it needs to specify the requirements defined by the :class: `MLPConfigFields` of :module: `sc_exp_design.types`.
+        :attr:`NeuralVelocityField.condition_encoder`. Should be a :class:`dict`. If provided, it needs to specify the requirements defined by the :class: `MLPConfigFields` of :module: `sc_exp_design.types`.
         It should NOT contain neither the `"input_dim"` nor the `"output_dim"` keys, as these will be respectively taken
         from :attr: `NeuralVelocityFieldConfig.perturbation_layers_after_pooling_input_dim` and :param: `perturbation_latent_dim`.
         Defaults to `None`.
