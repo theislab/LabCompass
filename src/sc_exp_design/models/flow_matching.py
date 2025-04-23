@@ -369,6 +369,8 @@ class FlowMatching(BaseModel):
         no_grad: bool = True,
         num_samples: int | None = None,
         batch_size: int | None = None,
+        num_time_steps: int | None = None,
+        solver_kwargs: dict[str, Any] | None = None,
     ) -> dict[str, Tensor]:
         """Generates the predictions by integrating the dynamics with the learnt velocity field for a given initial condition
 
@@ -387,6 +389,14 @@ class FlowMatching(BaseModel):
             it will be inferred from :attr: `self.validation_dataloader.batch_size` if present, otherwise from :attr: `self.training_dataloader.batch_size`
             Only used when :attr: `self.generate_from_noise` is set to `True`, defaults to `None` in which case only one sample will be generated.
         :type batch_size : class: `int | None`
+
+        :param num_time_steps: Number of time steps which to integrate the dynamics over during inference.
+            If provided, it will be used instead of :attr: `self.num_time_steps` . Defaults to `None`.
+        :type num_time_steps: class:`int | None`
+
+        :param solver_kwargs: Dictionary containining the keyword arguments used to initialize the :param:`solver_class`.
+            If provided, it will be used instead of :attr: `self.solver_kwargs` . Defaults to `None`.
+        :type solver_kwargs: class:`dict[str, Any] | None`
 
         :return: Tensor of shape `(batch_size, self.flow_dim)` if :param:`return_trajectory` is `False`, otherwise Tensor of shape `(batch_size, self.num_time_steps, self.flow_dim)`
         :rtype: class:`torch.Tensor`
@@ -412,6 +422,14 @@ class FlowMatching(BaseModel):
                 else:
                     batch_size = self.train_dataloader.batch_size
 
+        # handling discretization time steps
+        if num_time_steps is None:
+            num_time_steps = self.num_time_steps
+
+        # handling solver kwargs
+        if solver_kwargs is None:
+            solver_kwargs = self.solver_kwargs
+
         # pushing forward particles
         predictions = push_forward(
             self.velocity_field,
@@ -419,8 +437,8 @@ class FlowMatching(BaseModel):
             condition,
             self.generate_from_noise,
             self.noise_distribution,
-            self.num_time_steps,
-            self.solver_kwargs,
+            num_time_steps,
+            solver_kwargs,
             self.device_id,
             return_trajectory=return_trajectory,
             no_grad=no_grad,
