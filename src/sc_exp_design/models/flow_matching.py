@@ -414,6 +414,29 @@ class FlowMatching(BaseModel):
         # handling batch size
         if self.generate_from_noise:
             # inferring the batch size
+            # first we will try from the data passed in the batch
+            # when we have both source and condition we need to verify that
+            # their first dimension coincides
+            if (source is not None) and (condition is not None):
+                # sanity check
+                for condition_covariate, condition_data in condition.items():
+                    msg = f""
+                    assert condition_data.shape[0] == source.shape[0], msg
+                batch_size = source.shape[0]
+            # when we only have the source states (unconditional generation)
+            # simply take its first dimension
+            elif (source is not None):
+                batch_size = source.shape[0]
+            # when we only have the condition (no notion of control states)
+            # we need to check that they all share the same batch size
+            elif (condition is not None):
+                ref_batch_size = list(condition.values())[0].shape[0]
+                # sanity check
+                for condition_covariate, condition_data in condition.items():
+                    msg = f""
+                    assert condition_data.shape[0] == ref_batch_size, msg
+                batch_size = ref_batch_size
+            # otherwise we retrieve it from the dataloaders
             if batch_size is None:
                 # if it exists, infer it from validation dataloader
                 # otherwise uses the train dataloader.
