@@ -7,6 +7,7 @@ import numpy as np
 import ot as pot
 from sklearn.metrics import pairwise_distances, r2_score
 from sklearn.metrics.pairwise import rbf_kernel
+from sklearn.neighbors import kneighbors_graph
 import torch
 
 from sc_exp_design.types import TensorLike
@@ -145,3 +146,29 @@ def compute_wasserstein_distance(
     if cost_fn is None:
         ot_cost = math.pow(ot_cost, 1/power)
     return ot_cost
+
+
+def compute_min_max_mse(
+    pred: TensorLike,
+    target: TensorLike
+) -> float:
+    """Compute min and max pointwise MSE between generated and observed cells"""
+    mses = np.array([torch.nn.functional.mse_loss(torch.from_numpy(pred[i, :, :]), target, reduction="none").mean(dim=1) for i in range(pred.shape[0])])
+    return np.nanmin(mses, axis=1), np.nanmax(mses, axis=1)
+
+
+def compute_cell_props(
+    pred: TensorLike,
+    target: TensorLike,
+    k: int = 20,
+    n_iter: int = 50
+) -> TensorLike:
+    """Compute proportion of generated cells in knn neighbourhood of n observed cells"""
+    graph = kneighbors_graph(torch.vstack([target, pred]).numpy(), n_neighbors=k, mode='connectivity')
+    props = []
+    for _ in range(n_iter):
+        target_sampled_idx = np.random.choice(np.arange(0, target.shape[0]), size=1, replace=False)
+        pred_in_idx_neigh = np.where(graph[target_sampled_idx, 1024:].toarray().flatten() != 0)[0]
+        target_in_idx_neigh = np.where(graph[target_sampled_idx, :1024].toarray().flatten() != 0)[0]
+        props.append(len(pred_in_idx_neigh) / (len(target_in_idx_neigh) + len(pred_in_idx_neigh)))
+    return np.array(props)

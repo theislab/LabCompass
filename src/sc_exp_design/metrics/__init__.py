@@ -9,6 +9,8 @@ from sc_exp_design.metrics.metrics import (
     compute_r_squared,
     compute_mmd,
     compute_wasserstein_distance,
+    compute_min_max_mse,
+    compute_cell_props
 )
 from sc_exp_design.types import TensorLike
 
