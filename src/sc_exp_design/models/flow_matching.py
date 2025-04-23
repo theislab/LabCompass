@@ -390,6 +390,14 @@ class FlowMatching(BaseModel):
             Only used when :attr: `self.generate_from_noise` is set to `True`, defaults to `None` in which case only one sample will be generated.
         :type batch_size : class: `int | None`
 
+        :param num_time_steps: Number of time steps which to integrate the dynamics over during inference.
+            If provided, it will be used instead of :attr: `self.num_time_steps` . Defaults to `None`.
+        :type num_time_steps: class:`int | None`
+
+        :param solver_kwargs: Dictionary containining the keyword arguments used to initialize the :param:`solver_class`.
+            If provided, it will be used instead of :attr: `self.solver_kwargs` . Defaults to `None`.
+        :type solver_kwargs: class:`dict[str, Any] | None`
+
         :return: Tensor of shape `(batch_size, self.flow_dim)` if :param:`return_trajectory` is `False`, otherwise Tensor of shape `(batch_size, self.num_time_steps, self.flow_dim)`
         :rtype: class:`torch.Tensor`
         """
