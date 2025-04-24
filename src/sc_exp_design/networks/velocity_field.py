@@ -282,6 +282,7 @@ class NeuralVelocityField(BaseModule):
         self,
         cond: dict[str, Tensor] | None = None,
         source: Tensor | None = None,
+        cfg_guidance_strength: float = 1.0,
     ) -> Callable[[Tensor, Tensor], Tensor]:
         """
         Returns a velocity field function.
@@ -303,6 +304,17 @@ class NeuralVelocityField(BaseModule):
             xt: Tensor,
         ) -> Tensor:
             """"""
+            # when using cfg
+            if self.config.use_classifier_free_guidance:
+                # get null condition token
+                null_condition_token = self.get_null_condition_token(cond)
+                # computing unguided and guided velocity fields
+                vf_unguided = self.vf(t, xt, cond=null_condition_token, source=source)
+                vf_guided = self.vf(t, xt, cond=cond, source=source)
+                # computing the final velocity field
+                vf = vf_unguided + cfg_guidance_strength * (vf_guided - vf_unguided)
+                return vf
+            # when not using cfg
             return self.vf(t, xt, cond=cond, source=source)
 
         return vf_fn
@@ -328,3 +340,12 @@ class NeuralVelocityField(BaseModule):
         # forward pass on condition encoder
         condition_latent = self.condition_encoder(cond)
         return condition_latent
+
+    def get_null_condition_token(
+        self,
+        cond: dict[str, Tensor] | None,
+    ) -> Tensor:
+        """"""
+        if cond is None:
+            return None
+        raise NotImplementedError

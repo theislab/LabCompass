@@ -45,7 +45,9 @@ class CFMTrainer(BaseTrainer):
         noise_distribution: Callable[[Sequence[int]], Tensor] = torch.randn,
         grad_steps_log_interval: bool | None = None,
         device_id: Literal["cuda", "cpu"] = "cuda",
-        num_samples_per_validation_step: int | None = None
+        num_samples_per_validation_step: int | None = None,
+        cfg_prob_unconditional: float = 0.1,
+        validation_cfg_guidance_strength: float = 1.0,
     ) -> None:
         """"""
         self.velocity_field = velocity_field
@@ -64,6 +66,8 @@ class CFMTrainer(BaseTrainer):
         self.grad_steps_log_interval = grad_steps_log_interval
         self.device_id = device_id
         self.num_samples_per_validation_step = num_samples_per_validation_step
+        self.cfg_prob_unconditional = cfg_prob_unconditional
+        self.validation_cfg_guidance_strength = validation_cfg_guidance_strength
 
     @property
     def model(
@@ -90,19 +94,28 @@ class CFMTrainer(BaseTrainer):
             msg = f""
             assert self.generate_from_noise, msg
             latent = self.noise_distribution(target.shape).to(target.device)
+
         # optional condition key
         condition = None
         if DataFields.PERTURBATION_DATA in batch.keys():
             condition = batch[DataFields.PERTURBATION_DATA]
+        # handling the case of unconditional generation
+        if self.velocity_field.config.use_classifier_free_guidance:
+            if torch.rand(1).item() < self.cfg_prob_unconditional:
+                condition = self.velocity_field.get_null_condition_token(condition)
+
         # retrieving batch size and ode time
         batch_size = target.shape[0]
         t = self.time_sampler((batch_size,), device=target.device)
+
         # computing flow and target velocity field
         xt = self.flow.compute_x_t(t, latent, target)
         ut = self.flow.compute_u_t(t, latent, target, xt)
+
         # forward pass on the neural vf
         vt_step = self.velocity_field(t, xt, condition, source=source)
         vt = vt_step[VFStepFields.VF]
+
         # computing losses
         loss = torch.nn.functional.mse_loss(vt, ut)
         return loss, {LossFields.LOSS: loss.detach().cpu().item()}
@@ -136,6 +149,7 @@ class CFMTrainer(BaseTrainer):
             no_grad=True,
             num_samples=self.num_samples_per_validation_step,
             batch_size=target.shape[0],
+            cfg_guidance_strength=self.validation_cfg_guidance_strength,
         )
         if self.num_samples_per_validation_step is None:
             return predictions, target
