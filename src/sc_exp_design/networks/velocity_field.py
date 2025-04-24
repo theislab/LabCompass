@@ -346,6 +346,12 @@ class NeuralVelocityField(BaseModule):
         cond: dict[str, Tensor] | None,
     ) -> Tensor:
         """"""
+        # when condition is None we simply return None
         if cond is None:
             return None
-        raise NotImplementedError
+        # otherwise we need to replace each value 
+        # of the dictionary with a null condition token
+        cond_copy = {}
+        for key, val in cond.items():
+            cond_copy[key] = torch.zeros_like(val)
+        return cond_copy
