@@ -6,7 +6,7 @@ import torch
 from torch import Tensor, nn
 
 from sc_exp_design.constants import VFStepFields
-from sc_exp_design.networks.blocks import BaseModule, ConditionEncoder, MLPBlock, ResnetBlock
+from sc_exp_design.networks.blocks import BaseModule, ConditionEncoder, MLPBlock, ResnetBlock, FiLMBlock
 from sc_exp_design.config.velocity_field import NeuralVelocityFieldConfig
 from sc_exp_design.utils import sinusoidal_time_features
 
@@ -158,14 +158,26 @@ class NeuralVelocityField(BaseModule):
                         normalization=self.config.resnet_normalization
                     )
                 ) 
-            self.resnet_blocks = nn.ModuleList(resnet_blocks)          
+            self.resnet_blocks = nn.ModuleList(resnet_blocks)   
+        #FiLM
+        if self.config.use_film_block:
+            self.film_block = FiLMBlock(
+                in_dim=(self.config.state_encoder_output_dim + self.config.time_encoder_output_dim),
+                cond_dim=(self.config.perturbation_latent_dim + self.config.source_latent_dim))
         # Decoder 
+        if not self.config.use_resnet_blocks and not self.config.use_film_block:
+            decoder_input_dim = self.config.decoder_input_dim
+        elif self.config.use_resnet_blocks:
+            decoder_input_dim = self.config.state_encoder_output_dim
+        elif self.config.use_film_block:
+            decoder_input_dim = self.config.state_encoder_output_dim + self.config.time_encoder_output_dim
+        
         self.decoder = MLPBlock(
-            self.config.decoder_input_dim if not self.config.use_resnet_blocks else self.config.state_encoder_output_dim,
+            decoder_input_dim,
             self.config.flow_dim,
             **self.config.decoder_mlp_kwargs
         )
-
+        
     def forward(
         self,
         t: Tensor,
@@ -218,7 +230,7 @@ class NeuralVelocityField(BaseModule):
             xt_latent = self.x_encoder(xt)
 
         # concatenating original and latent representations
-        if not self.config.use_resnet_blocks:
+        if not self.config.use_resnet_blocks and not self.config.use_film_block:
             if self.config.use_guidance:
                 # sanity check (condition should be not None)
                 msg = f""
@@ -226,13 +238,18 @@ class NeuralVelocityField(BaseModule):
                 latent_concat = torch.cat([t_latent, xt_latent, condition_latent], dim=-1)
             else:
                 latent_concat = torch.cat([t_latent, xt_latent], dim=-1)
-        else:
+        elif self.config.use_resnet_blocks:
             latent_concat = xt_latent
             if self.config.use_guidance:
                 condition_concat = torch.cat([t_latent, condition_latent], dim=-1)  
             else:
                 condition_concat = t_latent
-                
+        elif self.config.use_film_block:
+            msg = f"FiLM is only possible with guidance"
+            assert self.config.use_guidance, msg
+            condition_concat = condition_latent 
+            latent_concat = torch.cat([t_latent, xt_latent], dim=-1)
+     
         # encoding source
         if self.config.use_source_as_condition:
             msg = f""
@@ -240,7 +257,7 @@ class NeuralVelocityField(BaseModule):
             source_latent = source
             if self.config.encode_source:
                 source_latent = self.source_encoder(source)
-            if not self.config.use_resnet_blocks:
+            if not self.config.use_resnet_blocks and not self.config.use_film_block:
                 # concatenating to the input for the decoder
                 latent_concat = torch.cat([latent_concat, source_latent], dim=-1)
             else:
@@ -250,6 +267,10 @@ class NeuralVelocityField(BaseModule):
         if self.config.use_resnet_blocks:
             for block in self.resnet_blocks:
                 latent_concat = block(latent_concat, condition_concat)
+
+        # FiLM
+        if self.config.use_film_block:
+            latent_concat = self.film_block(latent_concat, condition_concat)
             
         # forward pass on neural velocity field
         vf = self.decoder(latent_concat)

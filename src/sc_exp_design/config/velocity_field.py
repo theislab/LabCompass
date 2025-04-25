@@ -135,7 +135,7 @@ class NeuralVelocityFieldConfig:
     :type source_encoder_mlp_kwargs: class: `dict[str, Any]`
 
     :param use_resnet_blocks: Whether to use :class: `ResnetBlock` as residual bottleneck before performing the concatenation.
-        Used only when :param: `encode_state` id `True`, defaults to `False`.
+        Used only when :param: `encode_state` is `True`, defaults to `False`.
     :type use_resnet_blocks: class: `bool`
 
     :param n_resnet_blocks: The number of residual network blocks to be instanciated.
@@ -149,6 +149,11 @@ class NeuralVelocityFieldConfig:
     :param resnet_normalization: The normalization used by the residual network.
         Only used when :param: `use_resnet_blocks` is `True`, defaults to `None`.
     :type resnet_normalization: class: `Literal["layer", "batch"] | None`
+
+    :param use_film_block: Whether to use :class: `FiLMBlock` as conditioning approach.
+        Used only when :param: `encode_state` is `True` and `use_guidance` is `True`, defaults to `False`.
+    :type use_resnet_blocks: class: `bool`
+    
     """
 
     flow_dim: int
@@ -178,6 +183,7 @@ class NeuralVelocityFieldConfig:
     n_resnet_blocks: int = 3
     resnet_dropout_prob: float = 0.0
     resnet_normalization: Literal["layer", "batch"] | None = None
+    use_film_block: bool = False 
     
     def __post_init__(self) -> None:
         """
@@ -207,6 +213,11 @@ class NeuralVelocityFieldConfig:
             msg = f"You must encode the state when using the ResNet"
             assert self.encode_state, msg
 
+        # sanity check resnet block
+        if self.use_film_block:
+            msg = f"You must encode the state and use guidance when using the FiLM"
+            assert self.encode_state and self.use_guidance, msg
+
         # sanity check on condition encoder
         if self.use_guidance:
             msg = f"With {self.use_guidance=} you need to pass a dictionary in the proper format as the `self.perturbation_layers_before_pooling` attribute, found `None`"
@@ -221,6 +232,7 @@ class NeuralVelocityFieldConfig:
                 assert self.perturbation_layers_after_pooling is not None, msg
                 msg = f"`self.perturbation_layers_after_pooling` is expected to be an instance of `dict`, found {type(self.perturbation_layers_after_pooling)}"
                 assert isinstance(self.perturbation_layers_after_pooling, dict), msg
+                print(self.perturbation_layers_after_pooling)
                 mlp_kwargs_verifier(self.perturbation_layers_after_pooling)
                 self.perturbation_layers_after_pooling["input_dim"] = self.perturbation_layers_after_pooling_input_dim
                 self.perturbation_layers_after_pooling["output_dim"] = self.perturbation_latent_dim

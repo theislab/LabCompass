@@ -791,3 +791,47 @@ class ResnetBlock(BaseModule):
 
         assert h.shape == x_proj.shape, f"Shape mismatch: {h.shape} vs {x_proj.shape}"
         return x_proj + h
+
+
+class FiLMBlock(BaseModule):
+    """
+    A feature-wise Linear Modulation (FiLM) layer proposed by Perez et al. 2017 (https://arxiv.org/pdf/1709.07871).
+
+    Args:
+        in_dim (int): Input feature dimension.
+        cond_dim (int): Condition feature dimention.
+        out_dim (int, optional): Output feature dimension. Defaults to in_dim.
+    """
+    def __init__(
+        self,
+        in_dim: int,
+        cond_dim: int,
+        out_dim: int | None = None,
+        ):
+        super().__init__()
+
+        self.in_dim = in_dim
+        self.cond_dim = cond_dim
+        
+        self._init_modules()
+        self.act_fn = nn.SiLU()
+
+    def _init_modules(self):
+        # Film generator
+        self.film_generator = nn.Linear(self.cond_dim, self.in_dim * 2)
+
+    def forward(self, x: torch.Tensor, cond: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass through the FiLM block.
+
+        Args:
+            x (torch.Tensor): Input tensor of shape (B, in_dim).
+            cond (torch.Tensor): Conditional tensor of shape (B, embedding_dim).
+
+        Returns:
+            torch.Tensor: Output tensor of shape (B, out_dim).
+        """
+        gamma_beta = self.film_generator(cond)
+        gamma, beta = torch.split(gamma_beta, self.in_dim, dim=-1)  # each shape: (batch, input_dim)
+        assert gamma.shape == x.shape, f"Shape mismatch: {gamma.shape} vs {x.shape}"
+        return self.act_fn(gamma * x + beta)
