@@ -152,6 +152,9 @@ class NeuralVelocityFieldConfig:
 
     :param use_classifier_free_guidance: Whether to use classifier-free guidance, defaults to ´False´.
     :type use_classifier_free_guidance: class: `bool`
+
+    :param cfg_null_condition_token: The value used to mask the condition token with when using classifier-free guidance, defaults to -1.0.
+    :type cfg_null_condition_token: class: `float`
     """
 
     flow_dim: int
@@ -182,6 +185,7 @@ class NeuralVelocityFieldConfig:
     resnet_dropout_prob: float = 0.0
     resnet_normalization: Literal["layer", "batch"] | None = None
     use_classifier_free_guidance: bool = False
+    cfg_null_condition_token: float = -1.0
     
     def __post_init__(self) -> None:
         """
