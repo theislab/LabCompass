@@ -319,6 +319,9 @@ class FlowMatching(BaseModel):
         assert self.train_data is not None, msg
         msg = "Model not initialized, run `prepare_model` before training the model"
         assert self.velocity_field is not None, msg
+        if self.cvf_config.use_classifier_free_guidance:
+            msg = "The probability of sampling the null condition token must be less than 1 for classifier-free guidance"
+            assert cfg_prob_unconditional < 1, msg
 
         # storing state transforms as attribute
         self.state_transforms = state_transforms
