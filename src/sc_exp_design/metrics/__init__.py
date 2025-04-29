@@ -9,6 +9,8 @@ from sc_exp_design.metrics.metrics import (
     compute_r_squared,
     compute_mmd,
     compute_wasserstein_distance,
+    compute_min_max_mse,
+    compute_cell_props
 )
 from sc_exp_design.types import TensorLike
 
@@ -24,3 +26,5 @@ class Metrics:
     maximum_mean_discrepancy: Callable[[TensorLike, TensorLike], float] = compute_mmd
     wasserstein_distance: Callable[[TensorLike, TensorLike], float] = compute_wasserstein_distance
     sinkhorn_divergence: Callable[[TensorLike, TensorLike], float] = partial(compute_wasserstein_distance, method="sinkhorn")
+    min_max_mse: Callable[[TensorLike, TensorLike], float] = compute_min_max_mse
+    cell_props: Callable[[TensorLike, TensorLike], float] = compute_cell_props
