@@ -99,6 +99,11 @@ class BaseTrainer(abc.ABC):
         if do_validation and valid_freq is None:
             valid_freq = num_training_steps
 
+        # retrieving the training step log interval
+        grad_steps_log_interval = self.grad_steps_log_interval
+        if self.grad_steps_log_interval is None:
+            grad_steps_log_interval = 100
+
         # running callbacks
         if self.callbacks is not None:
             self.callbacks.run_on_train_begin()
@@ -108,12 +113,13 @@ class BaseTrainer(abc.ABC):
             log_dict = self.__train_step(grad_step, batch)
             self.__update_logs(log_dict)
 
-            # updating progress bar
-            grad_steps_log_interval = self.grad_steps_log_interval
-            if self.grad_steps_log_interval is None:
-                grad_steps_log_interval = 100
+            # updating progress bar and log
             if (grad_step + 1) % grad_steps_log_interval == 0 and grad_step > 0:
                 prog_bar.set_description(f"Loss: {log_dict[LossFields.LOSS]:.4f}")
+                self.callbacks.run_on_train_step(
+                    grad_step=grad_step,
+                    logs=log_dict,
+                )
             prog_bar.update()
         
             # validation step
