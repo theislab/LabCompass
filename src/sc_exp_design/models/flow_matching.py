@@ -186,7 +186,7 @@ class FlowMatching(BaseModel):
         self,
         cvf_config: NeuralVelocityFieldConfig,
         optimizer_class: torch.optim.Optimizer = torch.optim.AdamW,
-        optimizer_kwargs: Mapping[str, Any] = {"lr": 0.001},
+        optimizer_kwargs: Mapping[str, Any] = {"lr": 0.0001},
         lr_scheduler_class: torch.optim.lr_scheduler.LRScheduler | None = None,
         lr_scheduler_kwargs: Mapping[str, Any] | None = None,
         lr_scheduler_step: Literal["grad_step", "epoch"] = "grad_step",
