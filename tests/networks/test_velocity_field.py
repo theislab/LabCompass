@@ -104,6 +104,7 @@ class TestNeuralVelocityField:
     @pytest.mark.parametrize("source_encoder_mlp_kwargs", [linear_config, mlp_config])
     @pytest.mark.parametrize("use_resnet_blocks", [False, True])
     @pytest.mark.parametrize("resnet_normalization", ["layer", "batch", None])
+    @pytest.mark.parametrize("use_classifier_free_guidance", [True, False])
     def test_conditional_velocity_field(
         self,
         encode_state: bool,
@@ -121,6 +122,7 @@ class TestNeuralVelocityField:
         source_encoder_mlp_kwargs: dict[str, Any],
         use_resnet_blocks: bool,
         resnet_normalization: Literal["layer", "batch"] | None,
+        use_classifier_free_guidance: bool,
     ):
 
         # retrieving current settings
@@ -131,6 +133,10 @@ class TestNeuralVelocityField:
         # we can only use resnet when encoding states
         if not encode_state:
             use_resnet_blocks = False
+
+        # we can only use cfg when using guidance
+        if not use_guidance:
+            use_classifier_free_guidance = False
 
         # initializing configurations
         config = sc_exp_design.config.NeuralVelocityFieldConfig(
@@ -154,6 +160,9 @@ class TestNeuralVelocityField:
             encode_source=encode_source,
             source_latent_dim=state_latent_dim,
             source_encoder_mlp_kwargs=source_encoder_mlp_kwargs(),
+            use_resnet_blocks=use_resnet_blocks,
+            resnet_normalization=resnet_normalization,
+            use_classifier_free_guidance=use_classifier_free_guidance,
         )
 
         # forward pass on velocity field

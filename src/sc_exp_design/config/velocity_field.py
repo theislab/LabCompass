@@ -154,6 +154,11 @@ class NeuralVelocityFieldConfig:
         Used only when :param: `encode_state` is `True` and `use_guidance` is `True`, defaults to `False`.
     :type use_resnet_blocks: class: `bool`
     
+    :param use_classifier_free_guidance: Whether to use classifier-free guidance, defaults to ´False´.
+    :type use_classifier_free_guidance: class: `bool`
+
+    :param cfg_null_condition_token: The value used to mask the condition token with when using classifier-free guidance, defaults to -1.0.
+    :type cfg_null_condition_token: class: `float`
     """
 
     flow_dim: int
@@ -184,6 +189,8 @@ class NeuralVelocityFieldConfig:
     resnet_dropout_prob: float = 0.0
     resnet_normalization: Literal["layer", "batch"] | None = None
     use_film_block: bool = False 
+    use_classifier_free_guidance: bool = False
+    cfg_null_condition_token: float = -1.0
     
     def __post_init__(self) -> None:
         """
@@ -247,6 +254,11 @@ class NeuralVelocityFieldConfig:
         else:
             msg = f"With {self.use_guidance=} an unguided flow model will be initialized, thus the settings for the condition encoder will be ignored."
             logger.warning(msg)
+        
+        # sanity check on use classifier free guidance
+        if self.use_classifier_free_guidance:
+            msg = f"With {self.use_classifier_free_guidance=} you need to instantiate a guided flow, but found {self.use_guidance=}."
+            assert self.use_guidance, msg
 
     @property
     def time_encoder_input_dim(

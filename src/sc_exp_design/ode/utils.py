@@ -26,6 +26,7 @@ def push_forward(
     no_grad: bool = True,
     num_samples: int | None = None,
     batch_size: int | None = None,
+    cfg_guidance_strength: float = 1.0,
 ) -> TensorLike:
     """"""
     # initializing device
@@ -66,7 +67,7 @@ def push_forward(
     assert initial_state is not None, msg
 
     # defining velocity function
-    vf = velocity_field.get_vf_fn(condition, source=source)
+    vf = velocity_field.get_vf_fn(condition, source=source, cfg_guidance_strength=cfg_guidance_strength)
     # initializing the sampler clss
     ode_solver = ODESolver(
         vf,
