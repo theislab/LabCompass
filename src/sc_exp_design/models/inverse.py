@@ -368,6 +368,18 @@ class InverseModel(BaseModel):
             logger.warning(msg)
             perturbation_encoder_mlp_kwargs = {}
 
+        # when we pass the prior on the perturbations        
+        if prior is not None:
+            if prior_weight is None:
+                msg = f"`prior` was passed, but no `prior_weight` was given. Setting to 1.0 by default."
+                logger.warning(msg)
+                prior_weight = 1.0
+
+            if isinstance(prior, torch.distributions.Distribution):
+                msg = f""
+                assert len(perturbation_covariates) == 1, msg
+                prior = {perturbation_covariates[0]: prior}
+
         # check types
         msg = f"`perturbation_covariates` nees to be a sequence of perturbation covatiate identifiers, found {type(perturbation_covariates)}"
         assert isinstance(perturbation_covariates, Sequence), msg
@@ -389,6 +401,10 @@ class InverseModel(BaseModel):
 
         msg = f""
         assert isinstance(perturbation_covariates_predictor_kwargs, dict), msg
+
+        if prior is not None:
+            msg = f""
+            assert isinstance(prior, dict), msg
 
         # we want all these dictionaries to share the same keys (i.e.: covariate ids) found in perturbation_covariates
         for perturbation_key in perturbation_covariates:
@@ -420,13 +436,14 @@ class InverseModel(BaseModel):
             if perturbation_covariates_predictor_kwargs[perturbation_key] is None:
                 perturbation_covariates_predictor_kwargs[perturbation_key] = {}
 
-        # when we pass the prior on the perturbations        
-        if prior is not None:
-            if prior_weight is None:
-                msg = f"`prior` was passed, but no `prior_weight` was given. Setting to 1.0 by default."
-                logger.warning(msg)
-                prior_weight = 1.0
-        
+            # when using prior we need to have the log_prob method
+            if prior is not None:
+                msg = f""
+                assert perturbation_key in prior.keys(), msg
+                if not hasattr(prior[perturbation_key], "log_prob"):
+                    msg = f"Prior for {perturbation_key} does not have a `log_prob` method."
+                    raise ValueError(msg)
+
         # when we use langevin we need to pass the number of samples
         if n_samples is None and self.inverse_method == "langevin":
             msg = f""
