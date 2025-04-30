@@ -321,7 +321,7 @@ class LangevinSampler(BaseConditionOptimizer):
         batch_dict = {}
         if X_controls is not None:
             batch_size = X_controls.shape[0]
-            X_controls = X_controls.unsqueeze(0).expand(self.n_samples, -1, -1)
+            X_controls = X_controls.unsqueeze(0).expand(self.n_samples, batch_size, -1)
             batch_dict[DataFields.SOURCE_STATE] = X_controls
 
         # Expand target  and controls
@@ -395,6 +395,7 @@ class NeuralInverseModel(BaseConditionOptimizer):
         perturbation_covariates_use_shared_representation: bool = False,
         perturbation_covariates_latent_dim: int = 1024,
         perturbation_encoder_mlp_kwargs: dict[str, Any] | None = None,
+        use_source: bool = True,
         device_id: Literal["cpu", "cuda"] = "cuda",
         **kwargs,
     ) -> None:
@@ -423,6 +424,7 @@ class NeuralInverseModel(BaseConditionOptimizer):
         self.perturbation_covariates_use_shared_representation = perturbation_covariates_use_shared_representation
         self.perturbation_covariates_latent_dim = perturbation_covariates_latent_dim
         self.perturbation_encoder_mlp_kwargs = perturbation_encoder_mlp_kwargs
+        self.use_source = use_source
 
         # initializing modules
         self._init_modules()
@@ -432,7 +434,9 @@ class NeuralInverseModel(BaseConditionOptimizer):
         self,
     ) -> int:
         """"""
-        input_dim = self.state_dim
+        input_dim = 0
+        if self.use_source:
+            input_dim = self.state_dim
         for optimal_covariate in self.optimal_condition.values():
             input_dim = input_dim + optimal_covariate.shape[0] 
         return input_dim
@@ -514,16 +518,35 @@ class NeuralInverseModel(BaseConditionOptimizer):
 
     def forward(
         self,
-        control_states: torch.Tensor,
+        X_controls: torch.Tensor | None,
     ) -> torch.Tensor:
         """"""
+        # sanity check
+        if self.use_source:
+            msg = f"X_controls should be provided when use_source is set to True"
+            assert X_controls is not None, msg
+
+        # prepare batch size for forward model
+        batch_size = self.forward_model.train_dataloader.batch_size
+        if self.forward_model.validation_dataloader is not None:
+            batch_size = self.forward_model.validation_dataloader.batch_size
+
+        # prepare batch information cellFlow           
+        batch_dict = {}
+        if X_controls is not None:
+            batch_dict[DataFields.SOURCE_STATE] = X_controls
+            batch_size = X_controls.shape[0]
+
         # handling the shape of the optimal condition
         target = {
-            covariate: covariate_data.repeat(control_states.shape[0], 1).to(control_states.device)
+            covariate: covariate_data.repeat(batch_size, 1).to(X_controls.device)
             for covariate, covariate_data in self.optimal_condition.items()
         }
         # predicting the optimal perturbation
-        input_tensor = torch.concatenate((control_states, *target.values()), dim=1)
+        input_values = tuple(target.values())
+        if X_controls is not None:
+            input_values = (X_controls, *target.values())
+        input_tensor = torch.concatenate(input_values, dim=1)
         pert_params = self.perturbation_prediction_model(input_tensor)
 
         # preparing perturbation params
@@ -531,7 +554,7 @@ class NeuralInverseModel(BaseConditionOptimizer):
 
         # prepare batch information cellFlow           
         batch_dict = {
-            DataFields.SOURCE_STATE: control_states,
+            DataFields.SOURCE_STATE: X_controls,
             DataFields.PERTURBATION_DATA: pert_data,
         }
 
@@ -544,10 +567,14 @@ class NeuralInverseModel(BaseConditionOptimizer):
         # predicting target response
         class_pred = self.target_prediction_model(x1_hat)
         loss = self.compute_loss(class_pred, target, pert_data)
+ 
+        # optionally detaching the control states if they are available
+        if X_controls is not None:
+            X_controls = X_controls.detach().cpu()
 
         # constructing step output dictionary
         out_dict = {
-            DataFields.SOURCE_STATE: control_states.detach().cpu(),
+            DataFields.SOURCE_STATE: X_controls.detach().cpu(),
             DataFields.PERTURBATION_DATA: {
                 covariate: covariate_data.detach().cpu() for covariate, covariate_data in pert_data.items()
             },

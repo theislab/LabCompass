@@ -2,7 +2,61 @@ import pytest
 
 import anndata
 import numpy as np
+import torch
 
+
+
+@pytest.fixture
+def device() -> int:
+    """Fixture for device id."""
+    device_id = "cuda:0" if torch.cuda.is_available() else "cpu"
+    return torch.device(device_id)
+
+
+@pytest.fixture
+def batch_size() -> int:
+    """Fixture for batch size."""
+    return 4
+
+
+@pytest.fixture
+def forward_model(
+    batch_size: int,
+    device: int,
+) -> object:
+    """Fixture for a forward model."""
+
+    class DummyTrainDataLoader(object):
+        def __init__(self, batch_size: int):
+            super().__init__()
+            self.batch_size = batch_size
+
+    class DummyForwardModel(object):
+        def __init__(self, device: torch.device):
+            super().__init__()
+            self.train_data_loader = DummyTrainDataLoader(batch_size)
+            self.device = device
+
+        def forward(self, x):
+            return x
+
+    return DummyForwardModel(device=device)    
+
+
+@pytest.fixture
+def target_prediction_model() -> object:
+    """Fixture for a target prediction model."""
+
+    class DummyTargetPredictionModel(object):
+        def __init__(self):
+            super().__init__()
+            self.state_dim = 10
+            self.target_dim = 5
+
+        def forward(self, x):
+            return x
+
+    return DummyTargetPredictionModel()
 
 @pytest.fixture
 def adata() -> anndata.AnnData:
