@@ -57,12 +57,12 @@ def push_forward(
             for condition_covariate, condition_data in condition.items()
         }
     if source is not None:
-        source = source.repeat(num_samples, *(1 for _ in source.shape)).squeeze()
+        source = source.repeat(num_samples, *(1 for _ in source.shape)).squeeze(dim=0)
 
     # handling latent state
     initial_state = source
     if generate_from_noise:
-        initial_state = noise_distribution((num_samples, *batch_size, velocity_field.config.flow_dim)).squeeze().to(device)
+        initial_state = noise_distribution((num_samples, *batch_size, velocity_field.config.flow_dim)).squeeze(dim=0).to(device)
     msg = f""
     assert initial_state is not None, msg
 

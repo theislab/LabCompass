@@ -246,11 +246,16 @@ class NeuralVelocityField(BaseModule):
             else:
                 condition_concat = torch.cat([condition_concat, source_latent], dim=-1)  # concatenate
             
-        # ResNet 
+        # ResNet
+        # handling the shape for the batch of data
+        latent_initial_shape = latent_concat.shape
+        condition_initial_shape = condition_concat.shape
+        latent_concat = latent_concat.reshape(-1, latent_initial_shape[-1])
+        condition_concat = condition_concat.reshape(-1, condition_initial_shape[-1])
         if self.config.use_resnet_blocks:
             for block in self.resnet_blocks:
                 latent_concat = block(latent_concat, condition_concat)
-            
+        latent_concat = latent_concat.reshape(*latent_initial_shape)
         # forward pass on neural velocity field
         vf = self.decoder(latent_concat)
         # creating output dictionary

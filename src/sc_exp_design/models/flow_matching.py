@@ -442,20 +442,20 @@ class FlowMatching(BaseModel):
                 # sanity check
                 for condition_covariate, condition_data in condition.items():
                     msg = f""
-                    assert condition_data.shape[0] == source.shape[0], msg
-                batch_size = source.shape[0]
+                    assert condition_data.shape[:-1] == source.shape[:-1], msg
+                batch_size = source.shape[:-1]
             # when we only have the source states (unconditional generation)
             # simply take its first dimension
             elif (source is not None):
-                batch_size = source.shape[0]
+                batch_size = source.shape[:-1]
             # when we only have the condition (no notion of control states)
             # we need to check that they all share the same batch size
             elif (condition is not None):
-                ref_batch_size = list(condition.values())[0].shape[0]
+                ref_batch_size = list(condition.values())[0].shape[:-1]
                 # sanity check
                 for condition_covariate, condition_data in condition.items():
                     msg = f""
-                    assert condition_data.shape[0] == ref_batch_size, msg
+                    assert condition_data.shape[:-1] == ref_batch_size, msg
                 batch_size = ref_batch_size
             # otherwise we retrieve it from the dataloaders
             if batch_size is None:
