@@ -28,6 +28,14 @@ class BaseCallBack:
         """"""
         pass
 
+    def run_on_train_step(
+        self,
+        *args,
+        **kwargs,
+    ) -> None:
+        """"""
+        pass
+
     def run_on_valid_step(
         self,
         prediction_dict: dict[str, dict[str, TensorLike]],
@@ -150,6 +158,20 @@ class WandBLogger(LoggingCallBack):
         # storing run name as an attribute
         self.run_name = wandb.run.name
 
+    def run_on_train_step(
+        self,
+        grad_step: int,
+        logs: dict[str, Any],
+    ) -> None:
+        """"""
+        # logging the training step
+        wandb.log(
+            {
+                "train_step": grad_step,
+                **logs,
+            }
+        )
+
     def run_on_valid_step(
         self,
         log_dict: dict[str, Any],
@@ -194,6 +216,16 @@ class TrainingCallBacks(BaseCallBack):
         """"""
         for callback in self.callbacks:
             callback.run_on_train_begin()
+    
+    def run_on_train_step(
+        self,
+        grad_step: int,
+        logs: dict[str, Any],
+    ) -> None:
+        """"""
+        # then log the results
+        for callback in self.logging_callbacks:
+            callback.run_on_train_step(grad_step, logs)
 
     def run_on_valid_step(
         self,
