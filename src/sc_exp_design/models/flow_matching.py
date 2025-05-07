@@ -108,8 +108,9 @@ class FlowMatching(BaseModel):
         self.time_sampler = time_sampler
 
         if generate_from_noise:
-            msg = f""
-            assert flow_type == "rectified", msg
+            if flow_type != "rectified":
+                msg = f"When generating from noise, using the {flow_type} probability paths breaks the marginal preserving property of the generative model."
+                logger.warning(msg)
         self.generate_from_noise = generate_from_noise
         self.noise_distribution = noise_distribution
 
