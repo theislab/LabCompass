@@ -116,10 +116,11 @@ class BaseTrainer(abc.ABC):
             # updating progress bar and log
             if (grad_step + 1) % grad_steps_log_interval == 0 and grad_step > 0:
                 prog_bar.set_description(f"Loss: {log_dict[LossFields.LOSS]:.4f}")
-                self.callbacks.run_on_train_step(
-                    grad_step=grad_step,
-                    logs=log_dict,
-                )
+                if self.callbacks is not None:
+                    self.callbacks.run_on_train_step(
+                        grad_step=grad_step,
+                        logs=log_dict,
+                    )
             prog_bar.update()
         
             # validation step
