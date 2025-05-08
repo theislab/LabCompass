@@ -175,12 +175,14 @@ class TestNeuralVelocityField:
         expected_latent_state_dim = flow_dim
         if encode_state:
             expected_latent_state_dim = state_latent_dim
+
         # retrieve target latent time dim
         expected_latent_time_dim = 1
         if use_sinusoidal_time_features:
             expected_latent_time_dim = time_features_num_freqs
         if encode_time:
             expected_latent_time_dim = time_latent_dim
+
         # retrieve target latent condition dim
         expected_latent_condition_dim = 0
         if use_guidance:
@@ -191,13 +193,18 @@ class TestNeuralVelocityField:
             )
             if encode_conditions:
                 expected_latent_condition_dim = perturbation_latent_dim
+
         # retrieve target latent source dim
         expected_latent_source_dim = 0
         if use_source_as_condition:
             expected_latent_source_dim = flow_dim
             if encode_source:
                 expected_latent_source_dim = state_latent_dim
+
+        # retrieving the expected joint latent dim
         expected_joint_latent_dim = expected_latent_state_dim + expected_latent_time_dim + expected_latent_condition_dim + expected_latent_source_dim
+        if use_resnet_blocks:
+            expected_joint_latent_dim = expected_latent_state_dim
 
         # sanity check on velocity field output
         msg = f"The velocity field has the wrong shape. Got {vf_out[VFStepFields.VF].shape}, expected {(batch_size, flow_dim)}."
