@@ -140,17 +140,19 @@ class CFMTrainer(BaseTrainer):
         if self.num_samples_per_validation_step is None:
             return predictions, target
         # handling number of samples
-        if num_samples is not None:
+        if self.num_samples_per_validation_step is not None:
             if not self.generate_from_noise:
                 msg = f""
                 logger.warning(msg)
                 num_samples = 1
+            else:
+                num_samples = self.num_samples_per_validation_step
         else:
             num_samples = 1
         msg = f""
         assert isinstance(num_samples, int), msg
         # handling the shape of the target when we sample multiple predictions
-        target = torch.repeat(num_samples, *(1 for _ in predictions.shape[1:]))
+        target = target.repeat(num_samples, *(1 for _ in predictions.shape[1:]))
         return predictions, target
 
     def _validation_step(
