@@ -70,10 +70,12 @@ class MetricsCallBack(ComputationalCallBack):
         self,
         metric_ids: Sequence[str],
         state_transforms: Transform | None = None,
+        weights: TensorLike = None
     ) -> None:
         """"""
         self.metric_ids = metric_ids
         self.state_transforms = state_transforms
+        self.weights = weights
 
     def _run_on_valid_step(
             self,
@@ -87,7 +89,7 @@ class MetricsCallBack(ComputationalCallBack):
             preds = self.state_transforms(preds, np.array([condition] * preds.shape[0]))
             target = self.state_transforms(target, np.array([condition] * preds.shape[0]))
         for metric_id in self.metric_ids:
-            metric = vars(Metrics())[metric_id]
+            metric = vars(Metrics(self.weights))[metric_id]
             metrics[metric_id] = metric(preds, target)
         return metrics
     
