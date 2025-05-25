@@ -31,7 +31,7 @@ class BaseDataStruct(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def get_treatment(
+    def get_treatments(
         self,
         *args,
         **kwargs,
