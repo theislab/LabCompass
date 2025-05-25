@@ -30,6 +30,15 @@ class BaseDataStruct(abc.ABC):
         """"""
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def get_treatment(
+        self,
+        *args,
+        **kwargs,
+    ) -> Any:
+        """"""
+        raise NotImplementedError
+
 
 @dataclass
 class AnnotatedPerturbationData(BaseDataStruct):
@@ -151,7 +160,7 @@ class AnnotatedPerturbationData(BaseDataStruct):
             self.treatment_idxs = np.argwhere(self.adata.obs[self.control_key] == False)[:, 0]
         else:
             self.treatment_idxs = np.arange(len(self.adata))
-        if self.seen_combinatorial_perturbation is None:
+        if self.seen_combinatorial_perturbations is None:
             self.treatment_idxs_per_condition = {DataFields.CONDITION_VALUES: self.treatment_idxs}
         else:
             self.treatment_idxs_per_condition = {
@@ -176,7 +185,7 @@ class AnnotatedPerturbationData(BaseDataStruct):
             }
 
         # register target data
-        if self.target_reps is not None:
+        if self.target_reprs is not None:
             self.treatment_target_repr = {
                 treatment: {
                     key: val[treatment_idxs] for key, val in self.target_reprs.items()
