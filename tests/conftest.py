@@ -5,20 +5,81 @@ import numpy as np
 
 
 @pytest.fixture
-def adata() -> anndata.AnnData:
+def num_unique_treatments() -> int:
     """"""
+    return 5
 
-    # defining state data
-    num_unique_treatments = 5
-    num_unique_groups = 3
-    num_control_cells = 100
-    num_perturbed_cells = 150
-    tot_perturbed_cells = num_perturbed_cells*num_unique_treatments
-    num_cells = num_control_cells + tot_perturbed_cells
-    num_genes = 200
-    num_perturbation_feats = 100
-    states = np.ones((num_cells, num_genes))
 
+@pytest.fixture
+def num_unique_groups() -> int:
+    """"""
+    return 3
+
+
+@pytest.fixture
+def num_control_cells() -> int:
+    """"""
+    return 100
+
+
+@pytest.fixture
+def num_perturbed_cells() -> int:
+    """"""
+    return 150
+
+
+@pytest.fixture
+def num_genes() -> int:
+    """"""
+    return 200
+
+
+@pytest.fixture
+def num_perturbation_feats() -> int:
+    """"""
+    return 100
+
+
+@pytest.fixture
+def tot_perturbed_cells(
+    num_unique_treatments: int,
+    num_perturbed_cells: int,
+) -> int:
+    """"""
+    return num_perturbed_cells*num_unique_treatments
+
+
+@pytest.fixture
+def num_cells(
+    num_control_cells: int,
+    tot_perturbed_cells: int,
+) -> int:
+    """"""
+    return num_control_cells + tot_perturbed_cells
+
+
+@pytest.fixture
+def states(
+    num_cells: int,
+    num_genes: int,
+) -> np.ndarray:
+    """"""
+    return np.ones((num_cells, num_genes))
+
+
+@pytest.fixture
+def adata(
+    num_unique_treatments: int,
+    num_unique_groups: int,
+    num_control_cells: int,
+    num_perturbed_cells: int,
+    num_genes: int,
+    num_perturbation_feats: int,
+    tot_perturbed_cells: int,
+    num_cells: int,
+    states: np.ndarray,
+) -> anndata.AnnData:
+    """"""
     # defining treatment data
     treatment0_label = "treatment0"
     treatment1_label = "treatment1"

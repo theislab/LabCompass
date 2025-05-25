@@ -8,6 +8,8 @@ import torch
 import sc_exp_design
 
 
+batch_size = 64
+
 class TestDataManager:
     """"""
     @pytest.mark.parametrize("sample_rep", [None, "states"])
@@ -58,9 +60,16 @@ class TestDataManager:
         ]
     )
     @pytest.mark.parametrize("has_controls", [True, False])
+    @pytest.mark.parametrize("batch_size", [None, batch_size])
+    @pytest.mark.parametrize("treatments", [None, ]) # TODO: Add othe option to test
     def test_data_manager(
         self,
         adata: anndata.AnnData,
+        num_genes: int,
+        num_control_cells: int,
+        num_perturbed_cells: int,
+        tot_perturbed_cells: int,
+        num_perturbation_feats: int,
         sample_rep: None | str,
         control_key: None | str,
         perturbations: None | str | Sequence[str],
@@ -70,6 +79,8 @@ class TestDataManager:
         load_target_covariates: bool,
         target_covariates: dict[str, Literal["one_hot", "label", "identity"] | None] | None,
         has_controls: bool,
+        batch_size: None | int,
+        treatments: None,
     ) -> None:
         """"""
 
@@ -149,7 +160,6 @@ class TestDataManager:
                 expected = {
                     "treatment0": ["control", "drug1", "drug2", "drug3", "drug4", "drug5"],
                     "treatment1": ["control", "drug1", "drug2", "drug3", "drug4", "drug5"],
-                    "treatment2": "feats_treatment2_treatment2_features",
                     "treatment2": "cov_treatment2_treatment2_features" # TODO: change "cov" to "feats" once finished the viral notebooks
                 }
                 msg = f"Value Mismatch: Expected {expected} got {perturbations_with_rep}"
@@ -195,30 +205,116 @@ class TestDataManager:
                 assert target in target_data.keys(), msg
         
         # treatments
-        treatment_data = data.get_treatments()
+        treatment_data = data.get_treatments(batch_size=batch_size)
         
+        # state data
         msg = f""
         assert "state_data" in treatment_data.keys()
 
+        # collect expected number of treatment cells
+        expected_num_cells = batch_size
+        if batch_size is None:
+            expected_num_cells = num_perturbed_cells
+            if treatments is None:
+                expected_num_cells = tot_perturbed_cells
+            if not has_controls:
+                expected_num_cells = expected_num_cells + num_control_cells
+
+        # define expected shape for treatment states
+        expected_shape = (expected_num_cells, num_genes)
+
+        # check shapes
+        msg = f""
+        assert treatment_data["state_data"].shape == expected_shape, msg
+
+        # perturbation data
         if perturbations is not None:
             msg = f""
             assert "condition" in treatment_data.keys()
+            
+            # check shapes
+            for condition, condition_data in treatment_data["condition"].items():
+                # check whether the data is a representation or covariates
+                is_repr = "repr" in condition
+                if not is_repr:
+                    msg = f""
+                    assert "cov" in condition, msg
+
+                # collect expected number of perturbation features
+                if is_repr:
+                    expected_num_perturbation_features = 1
+                else:
+                    # check whether the current condition is in obsm
+                    expected_num_perturbation_features = None
+                    if perturbations_in_obsm is not None:
+                        expected_num_perturbation_features = num_perturbation_feats
+
+                # define expected shape for treatment perturbation data
+                expected_shape = (expected_num_cells, expected_num_perturbation_features)
+                if expected_num_perturbation_features is None:
+                    expected_shape = (expected_num_cells, )
+
+                # check shapes
+                msg = f"Test failed on {condition=}. Expected shape {expected_shape}, found {condition_data.shape}."
+                assert condition_data.shape == expected_shape, msg
         
+        # target data
         if load_target_covariates:
             msg = f""
             assert "target_data" in treatment_data.keys(), msg
         
         # controls
         if has_controls:
-            control_data = data.get_controls()
+            control_data = data.get_controls(batch_size=batch_size)
 
+            # state data
             msg = f""
             assert "state_data" in control_data.keys()
 
+            # collect expected number of treatment cells
+            expected_num_cells = batch_size
+            if batch_size is None:
+                expected_num_cells = num_control_cells
+            
+            # define expected shape for control states           
+            expected_shape = (expected_num_cells, num_genes)
+
+            # check shapes
+            msg = f""
+            assert control_data["state_data"].shape == expected_shape, msg
+
+            # perturbation data
             if perturbations is not None:
                 msg = f""
                 assert "condition" in control_data.keys()
-            
+
+                # check shapes
+                for condition, condition_data in control_data["condition"].items():
+                    # check whether the data is a representation or covariates
+                    is_repr = "repr" in condition
+                    if not is_repr:
+                        msg = f""
+                        assert "cov" in condition, msg
+
+                    # collect expected number of perturbation features
+                    if is_repr:
+                        expected_num_perturbation_features = 1
+                    else:
+                        # check whether the current condition is in obsm
+                        expected_num_perturbation_features = None
+                        if perturbations_in_obsm is not None:
+                            expected_num_perturbation_features = num_perturbation_feats
+
+                    # define expected shape for treatment perturbation data
+                    expected_shape = (expected_num_cells, expected_num_perturbation_features)
+                    if expected_num_perturbation_features is None:
+                        expected_shape = (expected_num_cells, )
+
+                # check shapes
+                    msg = f"Test failed on {condition=}. Expected shape {expected_shape}, found {condition_data.shape}."
+                    assert condition_data.shape == expected_shape, msg
+
+            # target data
             if load_target_covariates:
                 msg = f""
                 assert "target_data" in control_data.keys(), msg
