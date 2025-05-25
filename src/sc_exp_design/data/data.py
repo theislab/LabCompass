@@ -84,7 +84,54 @@ class AnnotatedPerturbationData(BaseDataStruct):
     perturbations_with_rep: dict[str, Sequence[str]] | None = None
     has_controls: bool = True
     perturbations_in_obsm: Sequence[str] | None = None
-    
+
+    def __post_init__(
+        self,
+    ) -> None:
+        """
+        Registers the indices of control and treatment data for more efficient dataloading.
+        """
+        # register control indices
+        self.__register_control_data()
+
+        # register treatment idxs
+        self.__register_treatment_data()
+
+
+    def __register_control_data(
+        self,
+    ) -> None:
+        """
+        Registers the control data.
+        """
+        self.control_idxs = None
+        self.control_state_data = None
+        self.control_perturbation_data = None
+        self.control_target_repr = None
+
+        if self.has_controls:
+            # sanity check
+            msg = f""
+            assert self.control_key is not None, msg
+
+            # register indices
+            self.control_idxs = np.argwhere(self.adata.obs[self.control_key] == True)[:, 0]
+            
+            # register state data
+            self.control_state_data = self.state_data[self.control_idxs]
+
+            # register perturbation data
+            if self.perturbation_data is not None:
+                self.control_perturbation_data = {
+                    key: val[self.control_idxs] for key, val in self.perturbation_data.items()
+                }
+            
+            # register target data
+            if self.target_reprs is not None:
+                self.control_target_repr = {
+                    key: val[self.control_idxs] for key, val in self.target_reprs.items()
+                }
+
     @property
     def seen_combinatorial_perturbations(
         self,
@@ -132,18 +179,17 @@ class AnnotatedPerturbationData(BaseDataStruct):
             raise ValueError(msg)
         
         # collect control ids and features
-        ctrl_obs_idx = np.argwhere(self.adata.obs[self.control_key] == True)[:, 0]
-        ctrl_state_data = self.state_data[ctrl_obs_idx]
+        ctrl_state_data = self.control_state_data
 
         # collect control annotations from perturbation data 
         if self.perturbation_data is not None:
-            ctrl_perturbation_data = {key: val[ctrl_obs_idx] for key, val in self.perturbation_data.items()}
+            ctrl_perturbation_data = self.control_perturbation_data
         if self.target_reprs is not None:
-            ctrl_pert_repr = {key: val[ctrl_obs_idx] for key, val in self.target_reprs.items()}
+            ctrl_pert_repr = self.control_target_repr
 
         # collect batch subset of the observations 
         if batch_size is not None:
-            batch_idxs = np.random.choice(ctrl_obs_idx.shape[0], size=batch_size)
+            batch_idxs = np.random.choice(self.control_idxs.shape[0], size=batch_size)
 
             ctrl_state_data = ctrl_state_data[batch_idxs]
 
@@ -239,6 +285,7 @@ class AnnotatedPerturbationData(BaseDataStruct):
             perturbation_data=perturbation_data,
             target_reprs=target_reprs,
             perturbations_with_rep=self.perturbations_with_rep,
+            has_controls=self.has_controls,
             perturbations_in_obsm=self.perturbations_in_obsm
         )
     
