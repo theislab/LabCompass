@@ -104,6 +104,7 @@ class AnnotatedPerturbationData(BaseDataStruct):
         """
         Registers the control data.
         """
+        # pre-allocating variables
         self.control_idxs = None
         self.control_state_data = None
         self.control_perturbation_data = None
@@ -131,6 +132,56 @@ class AnnotatedPerturbationData(BaseDataStruct):
                 self.control_target_repr = {
                     key: val[self.control_idxs] for key, val in self.target_reprs.items()
                 }
+
+    def __register_treatment_data(
+        self,
+    ) -> None:
+        """
+        Registers the perturbation data.
+        """
+        # pre-allocating variables
+        self.treatment_idxs = None
+        self.treatment_idxs_per_condition = None
+        self.treatment_state_data = None
+        self.treatment_perturbation_data = None
+        self.treatment_target_repr = None
+
+        # register indices
+        if self.has_controls:
+            self.treatment_idxs = np.argwhere(self.adata.obs[self.control_key] == False)[:, 0]
+        else:
+            self.treatment_idxs = np.arange(len(self.adata))
+        if self.seen_combinatorial_perturbation is None:
+            self.treatment_idxs_per_condition = {DataFields.CONDITION_VALUES: self.treatment_idxs}
+        else:
+            self.treatment_idxs_per_condition = {
+                DataFields.CONDITION_VALUES: self.treatment_idxs,
+                **{
+                    treatment: np.argwhere(self.adata.obs[[pert for pert in self.perturbations_with_rep.keys()]] == treatment)[:, 0] 
+                        for treatment in self.seen_combinatorial_perturbations
+                }
+            }
+        
+        # register state data
+        self.treatment_state_data = {
+            treatment: self.state_data[treatment_idxs] for treatment, treatment_idxs in self.treatment_idxs_per_condition.items()
+        }
+
+        # register perturbation data
+        if self.perturbation_data is not None:
+            self.treatment_perturbation_data = {
+                treatment: {
+                    key: val[treatment_idxs] for key, val in self.perturbation_data.items()
+                } for treatment, treatment_idxs in self.treatment_idxs_per_condition.items()
+            }
+
+        # register target data
+        if self.target_reps is not None:
+            self.treatment_target_repr = {
+                treatment: {
+                    key: val[treatment_idxs] for key, val in self.target_reprs.items()
+                } for treatment, treatment_idxs in self.treatment_idxs_per_condition.items()
+            }
 
     @property
     def seen_combinatorial_perturbations(
@@ -224,21 +275,32 @@ class AnnotatedPerturbationData(BaseDataStruct):
         :return: Dictionary containing treatment state and perturbation data (if available).
         :rtype: Dict[str, TensorLike]
         """
-        # collect treatment ids and features
-        if self.has_controls:
-            trtm_obs_idx = np.argwhere(self.adata.obs[self.control_key] == False)[:, 0]
+        # case 0: Seen combinatorial perturbation is None. No specific treatment is to be retrieved.
+        if self.seen_combinatorial_perturbations is None:
+            # sanity check: we should not pass the treatments
+            msg = f""
+            assert treatments is None, msg
+            treatments = DataFields.CONDITION_VALUES
+        # case 0: Seen combinatorial perturbation is not None.
+        # treatment should be either None or be appering inside self.seen_combinatorial_perturbations
         else:
-            trtm_obs_idx = np.arange(len(self.adata))
-        # optionally selecting only the current treatment (used in case of OT couplings) 
-        if treatments is not None:
-            trtm_obs_idx = np.argwhere(self.adata.obs[[pert for pert in self.perturbations_with_rep.keys()]] == treatments)[:, 0]
-        trtm_state_data = self.state_data[trtm_obs_idx]
+            if treatments is not None:
+                msg = f""
+                assert treatments in self.seen_combinatorial_perturbations, msg
+            else:
+                treatments = DataFields.CONDITION_VALUES
+
+        # retrieve indices
+        trtm_obs_idx = self.treatment_idxs_per_condition[treatments]
+        
+        # retrieve state data
+        trtm_state_data = self.treatment_state_data[treatments]
 
         # collect treatment annotations from perturbation data 
         if self.perturbation_data is not None:
-            trtm_perturbation_data = {key: val[trtm_obs_idx] for key, val in self.perturbation_data.items()}
+            trtm_perturbation_data = self.treatment_perturbation_data[treatments]
         if self.target_reprs is not None:
-            trtm_pert_repr = {key: val[trtm_obs_idx] for key, val in self.target_reprs.items()}
+            trtm_pert_repr = self.treatment_target_repr[treatments]
         
         # collect batch subset of the observations 
         if batch_size is not None:
