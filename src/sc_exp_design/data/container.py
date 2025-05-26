@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 import numpy as np
@@ -197,3 +197,20 @@ class DataContainer:
             target_data,
         )
 
+    @property
+    def perturbation_covariates(
+        self,
+    ) -> Sequence[str] | None:
+        """Returns the sequence of modeled perturbation covariates"""
+        if self.perturbation_data is None:
+            return None
+        return list(self.perturbation_data.keys())
+
+    @property
+    def target_covariates(
+        self,
+    ) -> Sequence[str] | None:
+        """Returns the sequence of modeled target covariates"""
+        if self.target_data is None:
+            return None
+        return list(self.target_data.keys())

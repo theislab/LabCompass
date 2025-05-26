@@ -195,7 +195,7 @@ class TestDataManager:
                             assert f"cov_{perturbation}_{cov}" in perturbation_data.keys(), msg
         
         # target data
-        target_data = data.target_reprs
+        target_data = data.target_data
         if load_target_covariates:
             msg = f""
             assert target_data is not None, msg
@@ -208,7 +208,7 @@ class TestDataManager:
         
         # state data
         msg = f""
-        assert "state_data" in treatment_data.keys()
+        assert hasattr(treatment_data, "state_data"), msg
 
         # collect expected number of treatment cells
         expected_num_cells = batch_size
@@ -224,15 +224,15 @@ class TestDataManager:
 
         # check shapes
         msg = f""
-        assert treatment_data["state_data"].shape == expected_shape, msg
+        assert treatment_data.state_data.shape == expected_shape, msg
 
         # perturbation data
         if perturbations is not None:
             msg = f""
-            assert "condition" in treatment_data.keys()
+            assert hasattr(treatment_data, "perturbation_data"), msg
             
             # check shapes
-            for condition, condition_data in treatment_data["condition"].items():
+            for condition, condition_data in treatment_data.perturbation_data.items():
                 # check whether the data is a representation or covariates
                 is_repr = "repr" in condition
                 if not is_repr:
@@ -260,7 +260,7 @@ class TestDataManager:
         # target data
         if load_target_covariates:
             msg = f""
-            assert "target_data" in treatment_data.keys(), msg
+            assert hasattr(treatment_data, "target_data"), msg
         
         # controls
         if has_controls:
@@ -268,7 +268,7 @@ class TestDataManager:
 
             # state data
             msg = f""
-            assert "state_data" in control_data.keys()
+            assert hasattr(control_data, "state_data"), msg
 
             # collect expected number of treatment cells
             expected_num_cells = num_control_cells
@@ -280,15 +280,15 @@ class TestDataManager:
 
             # check shapes
             msg = f""
-            assert control_data["state_data"].shape == expected_shape, msg
+            assert control_data.state_data.shape == expected_shape, msg
 
             # perturbation data
             if perturbations is not None:
                 msg = f""
-                assert "condition" in control_data.keys()
+                assert hasattr(control_data, "perturbation_data"), msg
 
                 # check shapes
-                for condition, condition_data in control_data["condition"].items():
+                for condition, condition_data in control_data.perturbation_data.items():
                     # check whether the data is a representation or covariates
                     is_repr = "repr" in condition
                     if not is_repr:
@@ -316,4 +316,4 @@ class TestDataManager:
             # target data
             if load_target_covariates:
                 msg = f""
-                assert "target_data" in control_data.keys(), msg
+                assert hasattr(control_data, "target_data"), msg

@@ -40,9 +40,9 @@ class AnnotatedPerturbationData:
         of such covariates for a given observation/cell.
     :type perturbation_data: class: `dict[str, TensorLike] | None`
 
-    :param target_reprs: Optional dictionary mapping target covariates to be loaded in the case of inverse modeling
+    :param target_data: Optional dictionary mapping target covariates to be loaded in the case of inverse modeling
         to their representation. This will represent the quantities that we want to optimize for by choosing the perturbations, defaults to `None`.
-    :type target_reprs:
+    :type target_data:
 
     :param perturbations_with_reps: Optional dictionary mapping each perturbation covariate to its uniqua values. This is needed in the
         case of Optimal Transport couplings as we want to be able to sample a unique perturbation for each batch of target data, defaults to `None`.
@@ -65,7 +65,7 @@ class AnnotatedPerturbationData:
     control_key: str | None
     state_data: TensorLike
     perturbation_data: dict[str, TensorLike] | None
-    target_reprs: dict[str, TensorLike] | None = None
+    target_data: dict[str, TensorLike] | None = None
     perturbations_with_rep: dict[str, Sequence[str]] | None = None
     has_controls: bool = True
     perturbations_in_obsm: Sequence[str] | None = None
@@ -92,7 +92,7 @@ class AnnotatedPerturbationData:
         self.data = DataContainer(
             self.state_data,
             self.perturbation_data,
-            self.target_reprs,
+            self.target_data,
         )
 
         # storing control data
@@ -150,7 +150,7 @@ class AnnotatedPerturbationData:
     def get_controls(
         self,
         batch_size: int | None = None,
-    ) -> dict[str, TensorLike]:
+    ) -> DataContainer:
         """
         Retrieve control group data.
         
@@ -180,19 +180,13 @@ class AnnotatedPerturbationData:
 
             ctrl_data = ctrl_data[batch_idxs]
 
-        # Dictionary of controls 
-        output_dict = {DataFields.STATE_DATA: ctrl_data.state_data,}        
-        if self.perturbation_data is not None:
-            output_dict[DataFields.PERTURBATION_DATA] = ctrl_data.perturbation_data
-        if self.target_reprs is not None:
-            output_dict[DataFields.TARGET_DATA] = ctrl_data.target_data
-        return output_dict
+        return ctrl_data
 
     def get_treatments(
         self,
         batch_size: int | None = None,
         treatments: Sequence[str] | None = None,
-    ) -> tuple[TensorLike, TensorLike]:
+    ) -> DataContainer:
         """
         Retrieve treatment group data.
 
@@ -230,13 +224,7 @@ class AnnotatedPerturbationData:
 
             trtm_data = trtm_data[batch_idxs]
 
-        # dictionary of treatments 
-        output_dict = {DataFields.STATE_DATA: trtm_data.state_data,}
-        if self.perturbation_data is not None:
-            output_dict[DataFields.PERTURBATION_DATA] = trtm_data.perturbation_data
-        if self.target_reprs is not None:
-            output_dict[DataFields.TARGET_DATA] = trtm_data.target_data
-        return output_dict
+        return trtm_data
 
     def __getitem__(
         self,
@@ -254,15 +242,15 @@ class AnnotatedPerturbationData:
         perturbation_data = None
         if self.perturbation_data is not None:
             perturbation_data = {perturbation: perturbation_covariate[idx] for perturbation, perturbation_covariate in self.perturbation_data.items()}
-        target_reprs = None
-        if self.target_reprs is not None:
-            target_reprs = {target: target_covariate[idx] for target, target_covariate in self.target_reprs.items()}
+        target_data = None
+        if self.target_data is not None:
+            target_data = {target: target_covariate[idx] for target, target_covariate in self.target_data.items()}
         return AnnotatedPerturbationData(
             adata,
             self.control_key,
             state_data,
             perturbation_data=perturbation_data,
-            target_reprs=target_reprs,
+            target_data=target_data,
             perturbations_with_rep=self.perturbations_with_rep,
             has_controls=self.has_controls,
             perturbations_in_obsm=self.perturbations_in_obsm

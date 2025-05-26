@@ -72,7 +72,7 @@ class BaseCoupledDataLoader(BaseDataLoader):
 
         # treatment states
         trtm_data = self.data.get_treatments(self.batch_size, treatments)
-        trtm_states = trtm_data[DataFields.STATE_DATA]
+        trtm_states = trtm_data.state_data
 
         # control states
         target_idx = np.arange(self.batch_size)
@@ -99,13 +99,13 @@ class BaseCoupledDataLoader(BaseDataLoader):
 
         # handling perturbation data
         if self.data.perturbation_data is not None:
-            trtm_perts = trtm_data[DataFields.PERTURBATION_DATA]
+            trtm_perts = trtm_data.perturbation_data
             condition = {cond: torch.from_numpy(cond_data[target_idx]).to(self.device).float()
                          for cond, cond_data in trtm_perts.items()}
             out_dict[DataFields.PERTURBATION_DATA] = condition
             
         if self.data.target_reprs is not None:
-            trtm_perts_target_rep = trtm_data[DataFields.TARGET_DATA]
+            trtm_perts_target_rep = trtm_data.target_data
             trtm_perts_target_rep = {key: torch.from_numpy(val[target_idx]).to(self.device).float()
                                      for key, val in trtm_perts_target_rep.items()}
             out_dict[DataFields.TARGET_DATA] = trtm_perts_target_rep
@@ -266,7 +266,7 @@ class TrainDataLoader(BaseCoupledDataLoader):
         control_states = None
         if self.has_controls:
             control_data = self.data.get_controls(self.batch_size)
-            control_states = control_data[DataFields.STATE_DATA]
+            control_states = control_data.state_data
 
         # retrieving matched data
         return self._get_matched_data(treatments, control_states)
@@ -363,7 +363,7 @@ class ValidationDataLoader(BaseCoupledDataLoader):
         control_states = None
         if self.has_controls:
             control_data = self.data.get_controls(self.batch_size)
-            control_states = control_data[DataFields.STATE_DATA]
+            control_states = control_data.state_data
 
         # constructing output dictionary
         out_dict = {}
