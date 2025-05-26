@@ -189,7 +189,7 @@ class TestDataLoaders(BaseDataTest):
         if seen_combinatorial_perturbations is None:
             # check that we have the correct number of batches
             if len(validation_batch) > 1:
-                msg = f"When {seen_combinatorial_perturbations=} the validation batch should have only one element. Found {len(validate_batch)}."
+                msg = f"When {seen_combinatorial_perturbations=} the validation batch should have only one element. Found {len(validation_batch)}."
                 raise ValueError(msg)
 
             # check that we have the correct key
@@ -200,7 +200,7 @@ class TestDataLoaders(BaseDataTest):
                 if perturbations_with_rep is None:
                     msg = f"When {seen_combinatorial_perturbations=} and `data.perturbations_in_obsm` is not None, `perturbations_with_rep` should be not None. FOund None."
                     raise ValueError(msg)
-                treatment = [perturbation for perturbation in self.data.perturbations_with_rep]
+                treatment = [perturbation for perturbation in data.perturbations_with_rep]
                 expected_key = "_".join(treatment)
 
         # when we can construct groups
@@ -211,7 +211,7 @@ class TestDataLoaders(BaseDataTest):
             if set_num_treatments_to_load:
                 # check that we have the correct number of batches
                 if len(validation_batch) != num_treatments_to_load:
-                    msg = f"When {set_num_treatments_to_load=} the validation batch should have {num_treatments_to_load} element. Found {len(validate_batch)}."
+                    msg = f"When {set_num_treatments_to_load=} the validation batch should have {num_treatments_to_load} element. Found {len(validation_batch)}."
                     raise ValueError(msg)
 
                 # check that we have the correct keys
@@ -229,7 +229,7 @@ class TestDataLoaders(BaseDataTest):
                 # check that we have the correct keys
                 if tuple(validate_batch.keys()) != expected_keys:
                     msg = f"When {set_num_treatments_to_load=} the validation batch should have all the perturbation ids appearing in `seen_combinatorial_perturbations`."
-                    raise 
+                    raise ValueError(msg)
 
         # for each element verify that the batch dictionary is correct
         for perturbation, perturbation_batch in validate_batch.items():
