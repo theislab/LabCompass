@@ -18,7 +18,6 @@ __all__ = [
     "BaseDataLoader",
     "TrainDataLoader",
     "ValidationDataLoader",
-    "PredictionDataLoader",
 ]
 
 
@@ -75,16 +74,26 @@ class BaseCoupledDataLoader(BaseDataLoader):
         trtm_states = trtm_data.state_data
 
         # control states
-        target_idx = np.arange(self.batch_size)
+        source_idx, target_idx = None, None
         if self.has_controls:
-
             # matching the two groups
             source_idx, target_idx = self.coupling.match_groups(control_states, trtm_states)
-
-        # moving states to torch tensors
-        if self.has_controls:
             source = torch.from_numpy(control_states[source_idx]).to(self.device).float()
-        target = torch.from_numpy(trtm_states[target_idx]).to(self.device).float()
+
+        # define utility function to
+        def _move_to_tensor_and_permute(
+            data: np.ndarray,
+            idxs: np.ndarray | None,
+        ) -> torch.tensor:
+            """"""
+            if idxs is None:
+                tensor = torch.from_numpy(data)
+            else:
+                tensor = torch.from_numpy(data[idxs])
+            return tensor.to(self.device).float()
+
+        # move target to tensor and permute it
+        target = _move_to_tensor_and_permute(trtm_states, target_idx)
 
         # handling transformations
         if self.state_transforms is not None:
@@ -100,14 +109,18 @@ class BaseCoupledDataLoader(BaseDataLoader):
         # handling perturbation data
         if self.data.perturbation_data is not None:
             trtm_perts = trtm_data.perturbation_data
-            condition = {cond: torch.from_numpy(cond_data[target_idx]).to(self.device).float()
-                         for cond, cond_data in trtm_perts.items()}
+            condition = {
+                cond: _move_to_tensor_and_permute(cond_data, target_idx)
+                    for cond, cond_data in trtm_perts.items()
+            }
             out_dict[DataFields.PERTURBATION_DATA] = condition
             
         if self.data.target_data is not None:
             trtm_perts_target_rep = trtm_data.target_data
-            trtm_perts_target_rep = {key: torch.from_numpy(val[target_idx]).to(self.device).float()
-                                     for key, val in trtm_perts_target_rep.items()}
+            trtm_perts_target_rep = {
+                target_covariate: _move_to_tensor_and_permute(target_covariate_data, target_idx)
+                    for target_covariate, target_covariate_data in trtm_perts_target_rep.items()
+            }
             out_dict[DataFields.TARGET_DATA] = trtm_perts_target_rep
         
         return out_dict
@@ -346,6 +359,27 @@ class ValidationDataLoader(BaseCoupledDataLoader):
         # returning all the treaments otherwise
         return self.data.seen_combinatorial_perturbations
 
+    def _parse_perturbation_id(
+        self,
+        treatment: Sequence[str] | None,
+    ) -> str:
+        """"""
+        if treatment is None:
+            if self.data.perturbations_in_obsm is None:
+                return "unconditional"
+            else:
+                # concatenate perturbation names
+                if self.data.perturbations_with_rep is None:
+                    msg = f"When {self.data.perturbations_in_obsm=} `perturbations_with_rep` should not  be None."
+                    raise ValueError(msg)
+                # concatenate perturbation names
+                treatment = [perturbation for perturbation in self.data.perturbations_with_rep]
+                return "_".join(treatment)
+        else:
+            msg = f""
+            assert isinstance(treatment, Sequence), msg
+            return "_".join(treatment)
+
     def sample(
         self,
     ) -> dict[str, TensorLike | dict[str, TensorLike]]:
@@ -375,26 +409,8 @@ class ValidationDataLoader(BaseCoupledDataLoader):
             treatement_data = self._get_matched_data(treatment, control_states)
 
             # constructing perturbation identifier to store the results
-            if treatment is None:
-                if self.data.perturbations_in_obsm is None:
-                    treatment_id = "unconditional"
-                else:
-                    # concatenate perturbation names
-                    if self.data.perturbations_with_rep is None:
-                        msg = f"When {self.data.perturbations_in_obsm=} `perturbations_with_rep` should not  be None."
-                        raise ValueError(msg)
-                    # concatenate perturbation names
-                    treatment = [perturbation for perturbation in self.data.perturbations_with_rep]
-                    treatment_id = "_".join(treatment)
-            else:
-                msg = f""
-                assert isinstance(treatment, Sequence), msg
-                treatment_id = "_".join(treatment)
+            treatment_id = self._parse_perturbation_id(treatment)
 
             # storing output dictionary for current perturbation
             out_dict[treatment_id] = treatement_data
         return out_dict
-
-
-class PredictionDataLoader(BaseDataLoader):
-    """"""

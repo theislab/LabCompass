@@ -119,7 +119,6 @@ class TestDataLoaders(BaseDataTest):
         set_num_treatments_to_load: bool,
     ) -> None:
         """"""
-
         # validating parametrized inputs
         (
             sample_rep,
