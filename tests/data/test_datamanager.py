@@ -137,7 +137,7 @@ class TestDataManager:
         if perturbation_reps is None:
             msg = f""
             assert perturbations_with_rep is None, msg
-        if perturbations_in_obsm is not None,
+        if perturbations_in_obsm is not None:
             msg = f""
             assert perturbations_with_rep is None, msg
 
