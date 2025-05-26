@@ -137,7 +137,10 @@ class TestDataManager:
         if perturbation_reps is None:
             msg = f""
             assert perturbations_with_rep is None, msg
-        
+        if perturbations_in_obsm is not None,
+            msg = f""
+            assert perturbations_with_rep is None, msg
+
         # when we have only one perturbation
         if perturbations == ("treatment0", ):
             if perturbation_reps is not None:
@@ -169,6 +172,20 @@ class TestDataManager:
                 assert perturbations_with_rep == expected, msg
         # retrieving data
         data = data_manager.get_data()
+
+        # test seen combinatorial perturbations
+        seen_combinatorial_perturbations = data.seen_combinatorial_perturbations
+
+        # when we should not have any perturbation with rep
+        if perturbations is None:
+            msg = f""
+            assert seen_combinatorial_perturbations is None, msg
+        if perturbation_reps is None:
+            msg = f""
+            assert seen_combinatorial_perturbations is None, msg
+        if perturbations_in_obsm is not None,
+            msg = f""
+            assert seen_combinatorial_perturbations is None, msg
 
         # perturbation data
         perturbation_data = data.perturbation_data
