@@ -11,7 +11,60 @@ from sc_exp_design.constants import DataFields
 class TestDataLoaders:
     """"""
 
-    
+    @staticmethod
+    def validate_batch(
+        train_batch: dict,
+        has_controls: bool,
+        batch_size: int,
+        num_genes: int,
+        perturbations: str | list[str] | tuple[str, ...] | None,
+        data: sc_exp_design.data.DataContainer,
+    ) -> None:
+        """
+        Validates the contents and shapes of a batch of data.
+        """
+        # Control states
+        if has_controls:
+            msg = (
+                f"When has_controls={has_controls} the batch dictionary should contain the key "
+                f"{DataFields.SOURCE_STATE}. Found {train_batch.keys()}."
+            )
+            assert DataFields.SOURCE_STATE in train_batch.keys(), msg
+
+            expected_shape = (batch_size, num_genes)
+            control_states = train_batch[DataFields.SOURCE_STATE]
+            msg = f"Shape error for control states. Got {control_states.shape}, expected {expected_shape}."
+            assert hasattr(control_states, "shape"), "Control states must have a 'shape' attribute."
+            assert control_states.shape == expected_shape, msg
+
+        # Target states
+        msg = f"The batch dictionary should contain the key {DataFields.TARGET_STATE}. Found {train_batch.keys()}."
+        assert DataFields.TARGET_STATE in train_batch.keys(), msg
+
+        expected_shape = (batch_size, num_genes)
+        target_states = train_batch[DataFields.TARGET_STATE]
+        msg = f"Shape error for target states. Got {target_states.shape}, expected {expected_shape}."
+        assert hasattr(target_states, "shape"), "Target states must have a 'shape' attribute."
+        assert target_states.shape == expected_shape, msg
+
+        # Perturbation data
+        if perturbations is not None:
+            msg = (
+                f"When perturbations are passed, the batch dictionary is expected to contain the "
+                f"\"{DataFields.PERTURBATION_DATA}\" key. Found {train_batch.keys()}."
+            )
+            assert DataFields.PERTURBATION_DATA in train_batch.keys(), msg
+
+            perturbation_data = train_batch[DataFields.PERTURBATION_DATA]
+            assert isinstance(perturbation_data, dict), "Perturbation data must be a dictionary."
+
+            for covariate in data.data.perturbation_covariates:
+                msg = (
+                    f"Perturbation covariate key {covariate} not found in "
+                    f"perturbation data keys {perturbation_data.keys()}."
+                )
+                assert covariate in perturbation_data, msg
+
     @pytest.mark.parametrize("sample_rep", [None, "states"])
     @pytest.mark.parametrize("control_key", [None, "is_control"])
     @pytest.mark.parametrize("perturbations", [None, ("treatment0",), ("treatment0", "treatment1"), ("treatment0", "treatment1", "treatment2"), ])
@@ -135,35 +188,13 @@ class TestDataLoaders:
             has_controls=has_controls,
         )
 
-        # sampling batch of train data
+        # sampling batch of train data and validating it
         train_batch = train_dataloader.sample()
-
-        # control states
-        if has_controls:
-            msg = f"When {has_controls=} the batch dictionary should contain the key {DataFields.SOURCE_STATE}. Found {train_batch.keys()}."
-            assert DataFields.SOURCE_STATE in train_batch.keys(), msg
-
-            # check shape
-            expected_shape = (batch_size, num_genes)
-            control_states = train_batch[DataFields.SOURCE_STATE]
-            msg = f"Shape error for control states. Got {control_states.shape}, expected {expected_shape}."
-            assert control_states.shape == expected_shape, msg
-
-        # treatment states
-        msg = f"The batch dictionary should contain the key {DataFields.TARGET_STATE}. Found {train_batch.keys()}."
-        assert DataFields.TARGET_STATE in train_batch.keys(), msg
-
-        # check shape
-        expected_shape = (batch_size, num_genes)
-        target_states = train_batch[DataFields.TARGET_STATE]
-        msg = f"Shape error for control states. Got {target_states.shape}, expected {expected_shape}."
-        assert target_states.shape == expected_shape, msg
-
-        # perturbation data
-        if perturbations is not None:
-            msg = f"When perturbations are passed the batch dictionary is expected to contain the \"{DataFields.PERTURBATION_DATA}\" key. Found {train_batch.keys()}."
-            assert DataFields.PERTURBATION_DATA in train_batch.keys(), msg
-
-            for perturbation_covariate in data.data.perturbation_covariates:
-                msg = f"Perturbation covariate key {perturbation_covariate} not found in perturbation data keys {train_batch[DataFields.PERTURBATION_DATA].keys()}."
-                assert perturbation_covariate in train_batch[DataFields.PERTURBATION_DATA].keys(), msg
+        self.validate_batch(
+            train_batch,
+            has_controls,
+            batch_size,
+            num_genes,
+            perturbations,
+            data,
+        ) 
