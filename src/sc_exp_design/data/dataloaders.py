@@ -244,7 +244,7 @@ class TrainDataLoader(BaseCoupledDataLoader):
         :rtype: class: `Sequence[str] | None`
         """
         # no perturbation data is passed to the AnnotatedPerturbationData object
-        if (self.data.seen_combinatorial_perturbations is None) or (len(self.data.perturbations_in_obsm) == 0):
+        if (self.data.seen_combinatorial_perturbations is None) or (len(self.data.perturbations_in_obsm) > 0):
             return None
         # need to sample one perturbation from the set of unique perturbations
         return random.choice(self.data.seen_combinatorial_perturbations)
