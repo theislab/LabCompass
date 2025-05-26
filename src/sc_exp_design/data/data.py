@@ -103,7 +103,7 @@ class AnnotatedPerturbationData(BaseDataStruct):
         :rtype: class: `Sequence[Sequence[str]] | None`
         """
         # no perturbation data is passed to the AnnotatedPerturbationData object or no perturbation with associated representation
-        if (self.perturbation_data is None) or (self.perturbations_with_rep is None) or (len(self.perturbations_in_obsm) == 0):
+        if (self.perturbation_data is None) or (self.perturbations_with_rep is None) or (len(self.perturbations_in_obsm) != 0 or self.perturbations_in_obsm is not None):
             return None 
         return self.adata.obs[[pert for pert in self.perturbations_with_rep.keys()]].drop_duplicates().values.tolist()
 

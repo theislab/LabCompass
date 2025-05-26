@@ -338,7 +338,7 @@ class ValidationDataLoader(BaseCoupledDataLoader):
         :rtype: class: `Sequence[str | None]`
         """
         # no perturbation data is passed to the AnnotatedPerturbationData object
-        if (self.data.seen_combinatorial_perturbations is None) or (len(self.data.perturbations_in_obsm) == 0):
+        if (self.data.seen_combinatorial_perturbations is None) or  (len(self.data.perturbations_in_obsm) != 0 or self.data.perturbations_in_obsm is not None):
             return (None, )
         # retrieving the maximum number of treatements to load if specified
         if self.num_treatments_to_load is not None:
