@@ -104,7 +104,7 @@ class BaseCoupledDataLoader(BaseDataLoader):
                          for cond, cond_data in trtm_perts.items()}
             out_dict[DataFields.PERTURBATION_DATA] = condition
             
-        if self.data.target_reprs is not None:
+        if self.data.target_data is not None:
             trtm_perts_target_rep = trtm_data.target_data
             trtm_perts_target_rep = {key: torch.from_numpy(val[target_idx]).to(self.device).float()
                                      for key, val in trtm_perts_target_rep.items()}
@@ -178,7 +178,7 @@ class SequentialDataLoader(BaseDataLoader):
             out[DataFields.PERTURBATION_DATA] = perturbation_data
         
         # retrieving optional target covariates
-        if self.data.target_reprs is not None:
+        if self.data.target_data is not None:
             target_data = {}
             for covariate, covariate_data in self.data.target_reprs.items():
                 target_data[covariate] = torch.from_numpy(covariate_data[batch_idxs]).to(self.device).float()
