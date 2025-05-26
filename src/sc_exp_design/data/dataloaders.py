@@ -69,7 +69,7 @@ class BaseCoupledDataLoader(BaseDataLoader):
         trtm_data = self.data.get_treatments(self.batch_size, treatments)
         trtm_states = trtm_data.state_data
 
-        # control states
+        # control states and coupling
         source_idx, target_idx = None, None
         if self.has_controls:
             # sanity check
@@ -79,7 +79,7 @@ class BaseCoupledDataLoader(BaseDataLoader):
             source_idx, target_idx = self.coupling.match_groups(control_states, trtm_states)
             source = torch.from_numpy(control_states[source_idx]).to(self.device).float()
 
-        # define utility function to
+        # define utility function
         def _move_to_tensor_and_permute(
             data: np.ndarray,
             idxs: np.ndarray | None,
