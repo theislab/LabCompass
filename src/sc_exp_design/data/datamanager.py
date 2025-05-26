@@ -206,6 +206,9 @@ class DataManager:
         # no representation found
         if self.perturbation_reps is None:
             return None
+        # perturbation in obsm found
+        if len(self.perturbations_in_obsm) > 0:
+            return None
         # defining list of perturbations for which we have found the representation
         perturbations_with_rep = {}
         # iterating over each perturbation covariate

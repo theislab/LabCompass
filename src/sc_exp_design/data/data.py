@@ -116,7 +116,7 @@ class AnnotatedPerturbationData:
             self.treatment_idxs_per_condition = {
                 DataFields.CONDITION_VALUES: self.treatment_idxs,
                 **{
-                    tuple(treatment): np.argwhere(self.adata.obs[[pert for pert in self.perturbations_with_rep.keys()]] == treatment)[:, 0] 
+                    treatment: np.argwhere(self.adata.obs[[pert for pert in self.perturbations_with_rep.keys()]] == treatment)[:, 0] 
                         for treatment in self.seen_combinatorial_perturbations
                 }
             }
@@ -144,7 +144,8 @@ class AnnotatedPerturbationData:
         # no perturbation data is passed to the AnnotatedPerturbationData object or no perturbation with associated representation
         if (self.perturbation_data is None) or (self.perturbations_with_rep is None) or (len(self.perturbations_in_obsm) > 0):
             return None 
-        return self.adata.obs[[pert for pert in self.perturbations_with_rep.keys()]].drop_duplicates().values.tolist()
+        combs = self.adata.obs[[pert for pert in self.perturbations_with_rep.keys()]].drop_duplicates().values.tolist()
+        return [tuple(comb) for comb in combs]
 
     def get_controls(
         self,
