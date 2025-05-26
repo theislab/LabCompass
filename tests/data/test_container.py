@@ -4,7 +4,8 @@ import pytest
 from sc_exp_design.data.data import DataContainer
 
 
-class TestBatchData:
+
+class TestDataContainer:
     """
     """
 
