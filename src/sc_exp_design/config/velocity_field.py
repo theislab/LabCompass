@@ -5,6 +5,7 @@ from dataclasses import field as dc_field
 from functools import partial
 from typing import Any, Literal
 
+from sc_exp_design.exceptions import ConfigurationError
 from sc_exp_design.types import MLPConfigFields
 from sc_exp_design.utils import get_conditions_to_pool
 
@@ -212,42 +213,60 @@ class NeuralVelocityFieldConfig:
 
         # sanity check resnet block
         if self.use_resnet_blocks:
-            msg = f"You must encode the state when using the ResNet"
-            assert self.encode_state, msg
+            if not self.encode_state:
+                msg = f"You must encode the state when using the ResNet"
+                raise ConfigurationError(msg)
 
         # sanity check on condition encoder
         if self.use_guidance:
-            msg = f"With {self.use_guidance=} you need to pass a dictionary in the proper format as the `self.perturbation_layers_before_pooling` attribute, found `None`"
-            assert self.perturbation_layers_before_pooling is not None, msg
+            if self.perturbation_layers_before_pooling is None:
+                msg = f"With {self.use_guidance=} you need to pass a dictionary in the proper format as the `self.perturbation_layers_before_pooling` attribute, found `None`"
+                raise ConfigurationError(msg)
+     
             if self.encode_conditions:
+                # layers before pooling
                 for condition, layers_dict in self.perturbation_layers_before_pooling.items():
-                    msg = f"`layers_dict` is expected to be an instance of `dict`, found {type(layers_dict)}"
-                    assert isinstance(layers_dict, dict), msg
+                    if not isinstance(layers_dict, dict):
+                        msg = f"`layers_dict` is expected to be an instance of `dict`, found {type(layers_dict)}"
+                        raise TypeError(msg)
                     MLPConfigFields.verify_keys(layers_dict)
                     self.perturbation_layers_before_pooling[condition] = layers_dict
-                msg = f"With {self.encode_conditions=} you need to pass a dictionary in the proper format as the `self.perturbation_layers_after_pooling` attribute, found `None`"
-                assert self.perturbation_layers_after_pooling is not None, msg
-                msg = f"`self.perturbation_layers_after_pooling` is expected to be an instance of `dict`, found {type(self.perturbation_layers_after_pooling)}"
-                assert isinstance(self.perturbation_layers_after_pooling, dict), msg
+
+                # layers after pooling
+                if self.perturbation_layers_after_pooling is None:
+                    msg = f"With {self.encode_conditions=} you need to pass a dictionary in the proper format as the `self.perturbation_layers_after_pooling` attribute, found `None`"
+                    raise ConfigurationError(msg)
+                if not isinstance(self.perturbation_layers_after_pooling, dict):
+                    msg = f"`self.perturbation_layers_after_pooling` is expected to be an instance of `dict`, found {type(self.perturbation_layers_after_pooling)}"
+                    raise TypeError(msg)
+
+                # setting extra arguments
                 mlp_kwargs_verifier(self.perturbation_layers_after_pooling)
                 self.perturbation_layers_after_pooling["input_dim"] = self.perturbation_layers_after_pooling_input_dim
                 self.perturbation_layers_after_pooling["output_dim"] = self.perturbation_latent_dim
             else:
+                # no encoding of conditions
                 for condition, layers_dict in self.perturbation_layers_before_pooling.items():
-                    msg = f"`layers_dict` is expected to be an instance of `dict`, found {type(layers_dict)}"
-                    assert isinstance(layers_dict, dict), msg
-                    msg = f"`layers_dict` is expected to contain the \"input_dim\" key, which was not found."
-                    assert "input_dim" in layers_dict.keys(), msg
-                    msg = f"`layers_dict[\"input_dim\"] is expected to be an `int`, found {type(layers_dict['input_dim'])}"
-                    assert isinstance(layers_dict["input_dim"], int), msg          
+                    if not isinstance(layers_dict, dict):
+                        msg = f"`layers_dict` is expected to be an instance of `dict`, found {type(layers_dict)}"
+                        raise TypeError(msg)
+
+                    if not "input_dim" in layers_dict.keys():
+                        msg = f"`layers_dict` is expected to contain the \"input_dim\" key, which was not found."
+                        raise KeyError(msg)
+
+                    if not isinstance(layers_dict["input_dim"], int):
+                        msg = f"`layers_dict[\"input_dim\"] is expected to be an `int`, found {type(layers_dict['input_dim'])}"
+                        raise TypeError(msg)
         else:
             msg = f"With {self.use_guidance=} an unguided flow model will be initialized, thus the settings for the condition encoder will be ignored."
             logger.warning(msg)
         
         # sanity check on use classifier free guidance
         if self.use_classifier_free_guidance:
-            msg = f"With {self.use_classifier_free_guidance=} you need to instantiate a guided flow, but found {self.use_guidance=}."
-            assert self.use_guidance, msg
+            if not self.use_guidance:
+                msg = f"With {self.use_classifier_free_guidance=} you need to instantiate a guided flow, but found {self.use_guidance=}."
+                raise ConfigurationError(msg)
 
     @property
     def time_encoder_input_dim(
@@ -317,9 +336,11 @@ class NeuralVelocityFieldConfig:
                 covariate_pool_dict = self.perturbation_layers_before_pooling[perturbation_to_pool]
                 if dim == 0:
                     dim = dim + covariate_pool_dict["output_dim"]
-                msg = f"The output layers of the pooled variables must all have the same dimensionality."
-                assert covariate_pool_dict["output_dim"] == dim, msg
-        
+                
+                if not covariate_pool_dict["output_dim"] == dim:
+                    msg = f"The output layers of the pooled variables must all have the same dimensionality."
+                    raise ConfigurationError(msg)
+
         # Not pooled layers 
         if self.perturbation_covariates_not_pooled is not None:
             for condition in self.perturbation_covariates_not_pooled:
