@@ -31,11 +31,10 @@ class DataManager:
         perturbation_covariates: dict[str, str | Sequence[str]] | None = None,
         perturbation_reps: dict[str, str | Sequence[str]] | None = None,
         load_target_covariates: bool = False,
-        target_covariates: dict[str, Literal["one_hot", "label", "identity"]] | None = None,
+        target_covariates: dict[str, Literal["one_hot", "label", "identity"] | None] | None = None,
         target_covariates_in_obsm: Sequence[str] | None = None,
         target_covariates_kwargs: dict[str, Any] | None = None,
         has_controls: bool = True
-
     ) -> None:
         """
         Initializes the :class: `DataManager` object
@@ -387,6 +386,10 @@ class DataManager:
                 # no encoding, taking as is (regression)
                 elif target_covariate_rep == "identity":
                     covariate_target_rep_data = covariate_data
+
+                    # optionally adding a trailing dimension
+                    if covariate_target_rep_data.ndim == 1:
+                        covariate_target_rep_data = covariate_target_rep_data.reshape(-1, 1) 
 
                 # raise value error otherwise
                 else:

@@ -19,6 +19,12 @@ def num_targets() -> int:
 
 
 @pytest.fixture
+def dim_target_covariates() -> int:
+    """"""
+    return 8
+
+
+@pytest.fixture
 def num_unique_treatments() -> int:
     """"""
     return 5
@@ -127,6 +133,21 @@ def targets(
 
 
 @pytest.fixture
+def target_covariate_in_obsm_data(
+    num_cells: int,
+    dim_target_covariates: int,
+) -> np.ndarray:
+    """"""
+    return np.zeros((num_cells, dim_target_covariates))
+
+
+@pytest.fixture
+def target_covariates_in_obsm() -> str:
+    """"""
+    return "target3"
+
+
+@pytest.fixture
 def adata(
     num_unique_treatments: int,
     num_unique_groups: int,
@@ -137,6 +158,9 @@ def adata(
     tot_perturbed_cells: int,
     num_cells: int,
     states: np.ndarray,
+    dim_target_covariates: int,
+    target_covariates_in_obsm: str,
+    target_covariate_in_obsm_data: np.ndarray,
 ) -> anndata.AnnData:
     """"""
     # defining treatment data
@@ -234,9 +258,15 @@ def adata(
     target0_label = "target0"
     target1_num_unique_values = 9
     target1_label = "target1"
+    target2_label = "target2"
 
     # defining function for retrieving all target covariate data
-    def get_target_data(num_unique_values):
+    def get_target_data(
+        num_unique_values: int | None,
+        continuous_target: bool = False,
+    ) -> np.ndarray:
+        if continuous_target:
+            return np.random.randn(num_cells, )
         target_id_to_label_map = {
             idx:f"tgt{idx}" for idx in range(num_unique_values)
         }
@@ -247,7 +277,8 @@ def adata(
     # retrieving target data
     target0_data = get_target_data(target0_num_unique_values)
     target1_data = get_target_data(target1_num_unique_values)
-    
+    target2_data = get_target_data(None, continuous_target=True)
+
     # shuffling target data
     shuffled_indices = np.random.permutation(num_cells)
     target0_data = target0_data[shuffled_indices]
@@ -267,6 +298,7 @@ def adata(
         control_key: is_control,
         target0_label: target0_data,
         target1_label: target1_data,
+        target2_label: target2_data,
         treatment0_label: treatment0_perturbation_labels,
         treatment1_label: treatment1_perturbation_labels,
     }
@@ -280,6 +312,7 @@ def adata(
         f"{treatment1_label}_dose": treatment1_dosages,
         f"{treatment1_label}_time": treatment1_times,
         f"{treatment2_label}_features": treatment2_features,
+        f"{target_covariates_in_obsm}": target_covariate_in_obsm_data,
     }
 
     return anndata.AnnData(

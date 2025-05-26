@@ -131,7 +131,7 @@ class FlowMatching(BaseModel):
         perturbation_covariates: dict[str, str | Sequence[str]] | None = None,
         perturbation_reps: dict[str, str | Sequence[str]] | None = None,
         load_target_covariates: bool = False,
-        target_covariates: dict[str, Literal["one_hot", "label", "identity"]] | None = None,
+        target_covariates: dict[str, Literal["one_hot", "label", "identity"] | None] | None = None,
         target_covariates_in_obsm: dict[str, bool] | None = None,
         target_covariates_kwargs: dict[str, Any] | None = None,
     ) -> None:
