@@ -271,9 +271,9 @@ class TestDataManager:
             assert "state_data" in control_data.keys()
 
             # collect expected number of treatment cells
-            expected_num_cells = batch_size
-            if not batch_data:
-                expected_num_cells = num_control_cells
+            expected_num_cells = num_control_cells
+            if batch_data:
+                expected_num_cells = batch_size
             
             # define expected shape for control states           
             expected_shape = (expected_num_cells, num_genes)

@@ -77,6 +77,9 @@ class AnnotatedPerturbationData:
         Registers the indices of control and treatment data for more efficient dataloading.
         """
 
+        # pre-compute seen combinatorial perturbations
+        self.seen_combinatorial_perturbations = self._get_seen_combinatorial_perturbations()
+
         # pre-allocating attributes        
         self.control_idxs = None
         self.control_data = None
@@ -113,7 +116,7 @@ class AnnotatedPerturbationData:
             self.treatment_idxs_per_condition = {
                 DataFields.CONDITION_VALUES: self.treatment_idxs,
                 **{
-                    treatment: np.argwhere(self.adata.obs[[pert for pert in self.perturbations_with_rep.keys()]] == treatment)[:, 0] 
+                    tuple(treatment): np.argwhere(self.adata.obs[[pert for pert in self.perturbations_with_rep.keys()]] == treatment)[:, 0] 
                         for treatment in self.seen_combinatorial_perturbations
                 }
             }
@@ -122,8 +125,7 @@ class AnnotatedPerturbationData:
             treatment: self.data[treatment_idxs] for treatment, treatment_idxs in self.treatment_idxs_per_condition.items()
         }
 
-    @property
-    def seen_combinatorial_perturbations(
+    def _get_seen_combinatorial_perturbations(
         self,
     ) -> Sequence[Sequence[str]] | None:
         """
@@ -225,7 +227,7 @@ class AnnotatedPerturbationData:
         if batch_size is not None:
             batch_idxs = np.random.choice(np.arange(len(trtm_data)), size=batch_size)
 
-            trtm_state_data = trtm_data[batch_idxs]
+            trtm_data = trtm_data[batch_idxs]
 
         # dictionary of treatments 
         output_dict = {DataFields.STATE_DATA: trtm_data.state_data,}
