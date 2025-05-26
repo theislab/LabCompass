@@ -67,6 +67,18 @@ def batch_size() -> int:
 
 
 @pytest.fixture
+def num_treatments_to_load() -> int:
+    """"""
+    return 6
+
+    
+@pytest.fixture
+def target_covariates_in_obsm() -> str:
+    """"""
+    return "target3"
+
+
+@pytest.fixture
 def tot_perturbed_cells(
     num_unique_treatments: int,
     num_perturbed_cells: int,
@@ -139,12 +151,6 @@ def target_covariate_in_obsm_data(
 ) -> np.ndarray:
     """"""
     return np.zeros((num_cells, dim_target_covariates))
-
-
-@pytest.fixture
-def target_covariates_in_obsm() -> str:
-    """"""
-    return "target3"
 
 
 @pytest.fixture

@@ -376,7 +376,7 @@ class ValidationDataLoader(BaseCoupledDataLoader):
 
             # constructing perturbation identifier to store the results
             if treatment is None:
-                if self.data.perturbations_in_obsm==None:
+                if self.data.perturbations_in_obsm is None:
                     treatment_id = "unconditional"
                 else:
                     # concatenate perturbation names
