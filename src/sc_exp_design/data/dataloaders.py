@@ -64,10 +64,6 @@ class BaseCoupledDataLoader(BaseDataLoader):
         :return: Returns the data of the batch in a dictionary.
         :rtype: class: `dict[str, TensorLike | dict[str, TensorLike]]`
         """
-        # sanity check
-        if self.has_controls:
-            msg = f""
-            assert control_states is not None, msg
 
         # treatment states
         trtm_data = self.data.get_treatments(self.batch_size, treatments)
@@ -76,6 +72,9 @@ class BaseCoupledDataLoader(BaseDataLoader):
         # control states
         source_idx, target_idx = None, None
         if self.has_controls:
+            # sanity check
+            msg = f""
+            assert control_states is not None, msg
             # matching the two groups
             source_idx, target_idx = self.coupling.match_groups(control_states, trtm_states)
             source = torch.from_numpy(control_states[source_idx]).to(self.device).float()
