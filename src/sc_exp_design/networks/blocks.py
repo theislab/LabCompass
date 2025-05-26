@@ -610,7 +610,7 @@ class ConditionEncoder(BaseModule):
         elif self.pooling == "sum":
             self.pooling_layer = lambda x: torch.sum(x, dim=1)
         elif self.pooling == "self_attention":
-            msg = f""
+            msg = f"Self attention pooling currently not supported."
             raise NotImplementedError(msg)
         else:
             msg = f"{self.pooling=} not available, possible options are `['mean', 'self_attention']`"

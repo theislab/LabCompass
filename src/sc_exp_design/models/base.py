@@ -31,9 +31,9 @@ class BaseModel:
         # checking that the file exists
         if os.path.exists(dump_path):
             if not overwrite:
-                msg = f""
+                msg = f"Cannot overwrite saved model at {dump_path} when {override=}."
                 raise RuntimeError(msg)
-            msg = f""
+            msg = f"Ovverriding model at {dump_path}."
             logger.warning(msg)
 
         # saving the model
@@ -44,7 +44,7 @@ class BaseModel:
     def load(
         cls,
         file_name: str,
-    ) -> "FlowMatching":
+    ) -> "BaseModel":
         """"""
         # loading model file
         with open(file_name, "rb") as fp:
@@ -52,7 +52,7 @@ class BaseModel:
 
         # veriying types
         if type(model) is not cls:
-            msg = f""
+            msg = f"The loaded model is not of the correct type. Expected {cls}, found {type(model)}."
             raise TypeError(msg)
         
         return model

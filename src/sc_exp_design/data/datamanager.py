@@ -156,9 +156,9 @@ class DataManager:
         if isinstance(perturbations_in_obsm, str):
             perturbations_in_obsm = (perturbations_in_obsm, )
         for perturbation in perturbations_in_obsm:
-            msg = f""
+            msg = f"Identifier of perturbation in obsm should be a string, foun {type(perturbation)}."
             assert isinstance(perturbation, str), msg
-            msg = f""
+            msg = f"Perturbation in obsm {perturbation} not found in the keys of `perturbation_reps` ({perturbation_reps.keys()})."
             assert perturbation in perturbation_reps.keys(), msg
 
         self.perturbations = perturbations
@@ -198,7 +198,7 @@ class DataManager:
         :rtype: class: `dict[str, Sequence[str]] | None`
         """
         # sanity check as we need to have initialized `self.adata` attribute
-        msg = f""
+        msg = f"To retrieve the perturbations with unique representations, `self.adata` should be an `anndata.Adata` object. Found `None`."
         assert self.adata is not None, msg
         # no perturbation found
         if self.perturbations is None:

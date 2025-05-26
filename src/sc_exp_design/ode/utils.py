@@ -44,12 +44,12 @@ def push_forward(
     # handling number of samples
     if num_samples is not None:
         if not generate_from_noise:
-            msg = f""
+            msg = f"It is not possible to generate more than one sample unless generating from noise. Setting `num_samples` to 1."
             logger.warning(msg)
             num_samples = 1
     else:
         num_samples = 1
-    msg = f""
+    msg = f"`num_samples` is supposed to be an integer. Found {type(num_samples)}."
     assert isinstance(num_samples, int), msg
     if condition is not None:
         condition = {
@@ -63,7 +63,7 @@ def push_forward(
     initial_state = source
     if generate_from_noise:
         initial_state = noise_distribution((num_samples, *batch_size, velocity_field.config.flow_dim)).squeeze().to(device)
-    msg = f""
+    msg = f"`initial_state` is supposed to be a sample from either the source or the noise distribution. Found None."
     assert initial_state is not None, msg
 
     # defining velocity function

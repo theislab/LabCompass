@@ -85,7 +85,7 @@ class FlowMatching(BaseModel):
         elif flow_type == "variance_preserving":
             flow_class = VariancePreservingFlow
         else:
-            msg = f""
+            msg = f"{flow_type} is not a supported flow type. Possible values are `[\"constant_noise\", \"encoding_decoding\", \"rectified\", \"variance_preserving\"]`."
             raise ValueError(msg)
         # setting optional flow kwargs
         if flow_kwargs is None:
@@ -98,7 +98,7 @@ class FlowMatching(BaseModel):
         elif coupling_type == "ot":
             coupling_class = OTCoupling
         else:
-            msg = f""
+            msg = f"{coupling_type} is not a supported coupling type. Possible values are `[\"independent\", \"ot\"]`."
             raise ValueError(msg)
         # setting optional coupling kwargs
         if coupling_kwargs is None:
@@ -226,11 +226,11 @@ class FlowMatching(BaseModel):
         :type solver_kwargs: class:`dict[str, Any] | None`
         """
         if not self.has_controls:
-            msg = f""
+            msg = f"Cannot use {cvf_config.use_source_as_condition=} when no controls are available (i.e.: {self.has_controls=})."
             assert not cvf_config.use_source_as_condition, msg
         else:
             if self.generate_from_noise:
-                msg = f""
+                msg = f"When generating from noise, you need to set `cvf_config.use_source_as_condition` to `True` in order to pass source information. Found {cvf_config.use_source_as_condition=}."
                 assert cvf_config.use_source_as_condition, msg
 
         self.cvf_config = cvf_config
@@ -442,7 +442,7 @@ class FlowMatching(BaseModel):
             if (source is not None) and (condition is not None):
                 # sanity check
                 for condition_covariate, condition_data in condition.items():
-                    msg = f""
+                    msg = f"Shape mismatch for {condition_covariate=}. When passing both `source` and `condition_data`, they should share the same batch dimension. Found {condition_data.shape=} and {source.shape}."
                     assert condition_data.shape[0] == source.shape[0], msg
                 batch_size = source.shape[0]
             # when we only have the source states (unconditional generation)
@@ -455,7 +455,7 @@ class FlowMatching(BaseModel):
                 ref_batch_size = list(condition.values())[0].shape[0]
                 # sanity check
                 for condition_covariate, condition_data in condition.items():
-                    msg = f""
+                    msg = f"Shape mismatch for {condition_covariate=}. When passing both `condition_data`, all values they should share the same batch dimension. Found {condition_data.shape=} and {reference_batch_size=}."
                     assert condition_data.shape[0] == ref_batch_size, msg
                 batch_size = ref_batch_size
             # otherwise we retrieve it from the dataloaders

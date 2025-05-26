@@ -280,11 +280,11 @@ class NeuralVelocityFieldConfig:
         :rtype: class: `int`
         """
         dim = 0
-        for layers_dict in self.perturbation_layers_before_pooling.values():
+        for perturbation, layers_dict in self.perturbation_layers_before_pooling.items():
             if isinstance(layers_dict, dict):
                 input_dim = layers_dict["input_dim"]
             else:
-                msg = f""
+                msg = f"The `layers_dict` object for {perturbation=} is expected to be a dictionary, found {type(layers_dict)}"
                 raise TypeError(msg)
             dim = dim + input_dim
         return dim

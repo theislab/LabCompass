@@ -118,10 +118,10 @@ class TestDataManager:
 
         # when we should not have any perturbation with rep
         if perturbations is None:
-            msg = f""
+            msg = f"When `perturbations` is None also `perturbations_with_rep` should be None. Found {perturbations_with_rep}."
             assert perturbations_with_rep is None, msg
         if perturbation_reps is None:
-            msg = f""
+            msg = f"When `perturbations_reps` is None also `perturbations_with_rep` should be None. Found {perturbations_with_rep}."
             assert perturbations_with_rep is None, msg
         
         # when we have only one perturbation
@@ -161,10 +161,10 @@ class TestDataManager:
         perturbation_data = data.perturbation_data
 
         if perturbations is None:
-            msg = f""
+            msg = f"When `perturbations` is None also `perturbation_data` should be None. Found {perturbation_data}."
             assert perturbation_data is None, msg
         else:
-            msg = f""
+            msg = f"When `perturbations` is passed also `perturbation_data` should be not None. Found None."
             assert perturbation_data is not None, msg
 
             # perturbation representations
@@ -172,8 +172,9 @@ class TestDataManager:
                 reps = perturbation_reps[perturbation]
 
                 for rep in reps:
-                    msg = f""
-                    assert f"repr_{perturbation}_{rep}" in perturbation_data.keys(), msg
+                    expected_key = f"repr_{perturbation}_{rep}"
+                    msg = f"Expected key {expected_key} not found in {perturbation_data.keys()=}"
+                    assert expected_key in perturbation_data.keys(), msg
             
             # perturbation covariates
             for perturbation in perturbations:
@@ -182,8 +183,9 @@ class TestDataManager:
                         covs = perturbation_covariates[perturbation]
 
                         for cov in covs:
-                            msg = f""
-                            assert f"cov_{perturbation}_{cov}" in perturbation_data.keys(), msg
+                            expected_key = f"cov_{perturbation}_{cov}"        
+                            msg = f"Expected key {expected_key} not found in {perturbation_data.keys()=}"
+                            assert expected_key in perturbation_data.keys(), msg
         
         # target data
         target_data = data.target_reprs

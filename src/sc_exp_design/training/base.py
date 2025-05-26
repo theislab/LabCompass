@@ -151,7 +151,7 @@ class BaseTrainer(abc.ABC):
             keys_to_plot = (keys_to_plot, )
         # sanity checks
         for key in keys_to_plot:
-            msg = f""
+            msg = f"{key=} to plot not found in {self.training_logs.keys()}."
             assert key in self.training_logs.keys(), msg
         # retrieving the logs we want to plot
         logs_to_plot = {log_id: log_data for log_id, log_data in self.training_logs.items() if log_id in keys_to_plot}

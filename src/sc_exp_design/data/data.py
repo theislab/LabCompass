@@ -125,7 +125,7 @@ class AnnotatedPerturbationData(BaseDataStruct):
         """
         # sanity check
         if self.has_controls:
-            msg = f""
+            msg = f"When {self.has_control=}, you should provide the control key in `self.control_key`, found {self.control_key}"
             assert self.control_key is not None, msg
         else:
             msg = "Controls are not available in this dataset (has_controls=False)."

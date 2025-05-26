@@ -202,12 +202,12 @@ class NeuralVelocityField(BaseModule):
         condition_latent = cond
         if self.config.use_guidance and self.config.encode_conditions:
             # sanity check (condition should be not None)
-            msg = f""
+            msg = f"When using guidance you should pass the condition data. Found None."
             assert cond is not None, msg
             condition_latent = self.condition_encoder(cond)
         elif self.config.use_guidance and (not self.config.encode_conditions):
             # sanity check (condition should be not None)
-            msg = f""
+            msg = f"When using guidance you should pass the condition data. Found None."
             assert cond is not None, msg
             cond_values = [val for key, val in cond.items() if key in self.config.perturbation_layers_before_pooling]
             condition_latent = torch.concatenate(cond_values, dim=-1)
@@ -221,7 +221,7 @@ class NeuralVelocityField(BaseModule):
         if not self.config.use_resnet_blocks:
             if self.config.use_guidance:
                 # sanity check (condition should be not None)
-                msg = f""
+                msg = f"When using guidance you should pass the condition data. Found None."
                 assert cond is not None, msg
                 latent_concat = torch.cat([t_latent, xt_latent, condition_latent], dim=-1)
             else:
@@ -235,7 +235,7 @@ class NeuralVelocityField(BaseModule):
                 
         # encoding source
         if self.config.use_source_as_condition:
-            msg = f""
+            msg = f"When using source as condition you should pass the source states. Found None."
             assert source is not None, msg
             source_latent = source
             if self.config.encode_source:
@@ -296,7 +296,7 @@ class NeuralVelocityField(BaseModule):
         """
         # sanity checks
         if self.config.use_source_as_condition:
-            msg = f""
+            msg = f"When using source as condition you should pass the source states. Found None."
             assert source is not None, msg
 
         def vf_fn(

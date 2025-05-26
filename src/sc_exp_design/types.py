@@ -53,7 +53,7 @@ class MLPConfigFields:
             assert layers_dict["input_dim"] is not None, msg
         else:
             # otherwise we are already passing the argument so it should not be there
-            msg = f""
+            msg = f"When {require_input_dim=}, `layers_dict` should not contain the \"input_dim\" key as this will be automatically set."
             assert "input_dim" not in keys, msg
         # optional check on output dimension
         if require_output_dim_key:
@@ -65,7 +65,7 @@ class MLPConfigFields:
             assert layers_dict["output_dim"] is not None, msg
         else:
             # otherwise we are already passing the argument so it should not be there
-            msg = f""
+            msg = f"When {require_output_dim=}, `layers_dict` should not contain the \"input_dim\" key as this will be automatically set."
             assert "output_dim" not in keys, msg
         # cheking the other keys
         for key, value in layers_dict.items(): 

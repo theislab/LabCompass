@@ -67,7 +67,7 @@ class BaseCoupledDataLoader(BaseDataLoader):
         """
         # sanity check
         if self.has_controls:
-            msg = f""
+            msg = f"`self.has_controls` is set to `True`, but no control states found."
             assert control_states is not None, msg
 
         # treatment states
@@ -383,7 +383,7 @@ class ValidationDataLoader(BaseCoupledDataLoader):
                     treatment = [perturbation for perturbation in self.data.perturbations_with_rep]
                     treatment_id = "_".join(treatment)
             else:
-                msg = f""
+                msg = f"The identifier for the treatment to load during validation is supposed to be a sequence; found {type(treatment)}"
                 assert isinstance(treatment, Sequence), msg
                 treatment_id = "_".join(treatment)
 
