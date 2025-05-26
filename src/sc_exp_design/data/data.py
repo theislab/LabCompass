@@ -44,12 +44,12 @@ class AnnotatedPerturbationData:
         to their representation. This will represent the quantities that we want to optimize for by choosing the perturbations, defaults to `None`.
     :type target_data:
 
-    :param perturbations_with_reps: Optional dictionary mapping each perturbation covariate to its uniqua values. This is needed in the
+    :param perturbations_with_rep: Optional dictionary mapping each perturbation covariate to its uniqua values. This is needed in the
         case of Optimal Transport couplings as we want to be able to sample a unique perturbation for each batch of target data, defaults to `None`.
         In the cases when :param: `perturbation_data` is `None`, it should be set to `None`. Similarly, it should be `None` in the case where it is not
         possible to use OT coupling, like for example when the perturbations are given by dense and continuous vectors of features (i.e.: when :param: `perturbations_in_obsm` is not `None`).
         Defaults to `None`.
-    :type perturbations_with_reps: class: `dict[str, Sequence[str]] | None`
+    :type perturbations_with_rep: class: `dict[str, Sequence[str]] | None`
 
     :param has_controls: Flag indicating whether a notion of control states applies to the current data.
         When this is the case, the :param: `control_key` needs to be properly set. Defaults to `True`.
@@ -272,7 +272,7 @@ class AnnotatedPerturbationData:
     ) -> bool:
         """Flag indicating whether the data configuration allows for the definition of groups for possible OT coupling.
         
-        Returns False when self.seen_combinatorial_perturbations is None. This happens in the following cases:
+        Returns False when :attr: `self.seen_combinatorial_perturbations` is None. This happens in the following cases:
 
         * No perturbation data is provided (i.e.: unconditional generation).
         * No perturbation has unique identifiers specified in :attr: `self.perturbation_reps` which is None.
