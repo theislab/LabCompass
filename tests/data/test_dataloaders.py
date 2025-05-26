@@ -184,7 +184,6 @@ class TestDataLoaders(BaseDataTest):
         seen_combinatorial_perturbations = data.seen_combinatorial_perturbations
         perturbations_with_rep = data.perturbations_with_rep 
 
-
         # when perturbations do not induce a group for OT
         if seen_combinatorial_perturbations is None:
             # check that we have the correct number of batches
@@ -198,9 +197,9 @@ class TestDataLoaders(BaseDataTest):
             else:
                 # concatenate perturbation names
                 if perturbations_with_rep is None:
-                    msg = f"When {seen_combinatorial_perturbations=} and `data.perturbations_in_obsm` is not None, `perturbations_with_rep` should be not None. FOund None."
+                    msg = f"When {seen_combinatorial_perturbations=} and `data.perturbations_in_obsm` is not None, `perturbations_with_rep` should be not None. Found None."
                     raise ValueError(msg)
-                treatment = [perturbation for perturbation in data.perturbations_with_rep]
+                treatment = [perturbation for perturbation in perturbations_with_rep]
                 expected_key = "_".join(treatment)
 
         # when we can construct groups

@@ -244,7 +244,7 @@ class TrainDataLoader(BaseCoupledDataLoader):
         :rtype: class: `Sequence[str] | None`
         """
         # no perturbation data is passed to the AnnotatedPerturbationData object
-        if (self.data.seen_combinatorial_perturbations is None) or (len(self.data.perturbations_in_obsm) > 0):
+        if not self.data.allow_grouped_coupling:
             return None
         # need to sample one perturbation from the set of unique perturbations
         return random.choice(self.data.seen_combinatorial_perturbations)
@@ -338,7 +338,7 @@ class ValidationDataLoader(BaseCoupledDataLoader):
         :rtype: class: `Sequence[str | None]`
         """
         # no perturbation data is passed to the AnnotatedPerturbationData object
-        if (self.data.seen_combinatorial_perturbations is None) or (len(self.data.perturbations_in_obsm) == 0):
+        if not self.data.allow_grouped_coupling:
             return (None, )
         # retrieving the maximum number of treatements to load if specified
         if self.num_treatments_to_load is not None:
@@ -379,6 +379,10 @@ class ValidationDataLoader(BaseCoupledDataLoader):
                 if self.data.perturbations_in_obsm is None:
                     treatment_id = "unconditional"
                 else:
+                    # concatenate perturbation names
+                    if self.data.perturbations_with_rep is None:
+                        msg = f"When {self.data.perturbations_in_obsm=} `perturbations_with_rep` should not  be None."
+                        raise ValueError(msg)
                     # concatenate perturbation names
                     treatment = [perturbation for perturbation in self.data.perturbations_with_rep]
                     treatment_id = "_".join(treatment)
