@@ -226,7 +226,7 @@ class TestDataLoaders(BaseDataTest):
                     msg = f"When {set_num_treatments_to_load=} the validation batch should have {len(seen_combinatorial_perturbations)} elements (one for each combionatorial perturbation). Found {len(validate_batch)}."
                     raise ValueError(msg)
 
-                # check that we have
+                # check that we have the correct keys
                 if tuple(validate_batch.keys()) != expected_keys:
                     msg = f"When {set_num_treatments_to_load=} the validation batch should have all the perturbation ids appearing in `seen_combinatorial_perturbations`."
                     raise 
