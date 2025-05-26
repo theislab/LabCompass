@@ -8,40 +8,16 @@ import anndata
 import numpy as np
 
 from sc_exp_design.constants import DataFields
+from sc_exp_design.data.container import DataContainer
 from sc_exp_design.types import TensorLike
 
 __all__ = [
-    "BaseDataStruct",
     "AnnotatedPerturbationData",
 ]
 
 
-class BaseDataStruct(abc.ABC):
-    """
-    Abstract base class for data structures used in modeling perturbations and controls.
-    """
-    
-    @abc.abstractmethod
-    def get_controls(
-        self,
-        *args,
-        **kwargs,
-    ) -> Any:
-        """"""
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def get_treatments(
-        self,
-        *args,
-        **kwargs,
-    ) -> Any:
-        """"""
-        raise NotImplementedError
-
-
 @dataclass
-class AnnotatedPerturbationData(BaseDataStruct):
+class AnnotatedPerturbationData:
     """
     Data structure for annotated perturbation data.
     
@@ -100,62 +76,33 @@ class AnnotatedPerturbationData(BaseDataStruct):
         """
         Registers the indices of control and treatment data for more efficient dataloading.
         """
-        # register control indices
-        self.__register_control_data()
 
-        # register treatment idxs
-        self.__register_treatment_data()
-
-
-    def __register_control_data(
-        self,
-    ) -> None:
-        """
-        Registers the control data.
-        """
-        # pre-allocating variables
+        # pre-allocating attributes        
         self.control_idxs = None
-        self.control_state_data = None
-        self.control_perturbation_data = None
-        self.control_target_repr = None
+        self.control_data = None
 
+        self.treatment_idxs = None
+        self.treatment_idxs_per_condition = None
+        self.treatment_data = None
+
+        # initializing data container
+        self.data = DataContainer(
+            self.state_data,
+            self.perturbation_data,
+            self.target_reprs,
+        )
+
+        # storing control data
         if self.has_controls:
             # sanity check
             msg = f""
             assert self.control_key is not None, msg
 
-            # register indices
+            # register indices and state data
             self.control_idxs = np.argwhere(self.adata.obs[self.control_key] == True)[:, 0]
-            
-            # register state data
-            self.control_state_data = self.state_data[self.control_idxs]
+            self.control_data = self.data[self.control_idxs]
 
-            # register perturbation data
-            if self.perturbation_data is not None:
-                self.control_perturbation_data = {
-                    key: val[self.control_idxs] for key, val in self.perturbation_data.items()
-                }
-            
-            # register target data
-            if self.target_reprs is not None:
-                self.control_target_repr = {
-                    key: val[self.control_idxs] for key, val in self.target_reprs.items()
-                }
-
-    def __register_treatment_data(
-        self,
-    ) -> None:
-        """
-        Registers the perturbation data.
-        """
-        # pre-allocating variables
-        self.treatment_idxs = None
-        self.treatment_idxs_per_condition = None
-        self.treatment_state_data = None
-        self.treatment_perturbation_data = None
-        self.treatment_target_repr = None
-
-        # register indices
+        # storing perturbation data
         if self.has_controls:
             self.treatment_idxs = np.argwhere(self.adata.obs[self.control_key] == False)[:, 0]
         else:
@@ -170,27 +117,10 @@ class AnnotatedPerturbationData(BaseDataStruct):
                         for treatment in self.seen_combinatorial_perturbations
                 }
             }
-        
         # register state data
-        self.treatment_state_data = {
-            treatment: self.state_data[treatment_idxs] for treatment, treatment_idxs in self.treatment_idxs_per_condition.items()
+        self.treatment_data = {
+            treatment: self.data[treatment_idxs] for treatment, treatment_idxs in self.treatment_idxs_per_condition.items()
         }
-
-        # register perturbation data
-        if self.perturbation_data is not None:
-            self.treatment_perturbation_data = {
-                treatment: {
-                    key: val[treatment_idxs] for key, val in self.perturbation_data.items()
-                } for treatment, treatment_idxs in self.treatment_idxs_per_condition.items()
-            }
-
-        # register target data
-        if self.target_reprs is not None:
-            self.treatment_target_repr = {
-                treatment: {
-                    key: val[treatment_idxs] for key, val in self.target_reprs.items()
-                } for treatment, treatment_idxs in self.treatment_idxs_per_condition.items()
-            }
 
     @property
     def seen_combinatorial_perturbations(
@@ -210,7 +140,7 @@ class AnnotatedPerturbationData(BaseDataStruct):
         :rtype: class: `Sequence[Sequence[str]] | None`
         """
         # no perturbation data is passed to the AnnotatedPerturbationData object or no perturbation with associated representation
-        if (self.perturbation_data is None) or (self.perturbations_with_rep is None) or (len(self.perturbations_in_obsm) == 0):
+        if (self.perturbation_data is None) or (self.perturbations_with_rep is None) or (len(self.perturbations_in_obsm) > 0):
             return None 
         return self.adata.obs[[pert for pert in self.perturbations_with_rep.keys()]].drop_duplicates().values.tolist()
 
@@ -239,31 +169,20 @@ class AnnotatedPerturbationData(BaseDataStruct):
             raise ValueError(msg)
         
         # collect control ids and features
-        ctrl_state_data = self.control_state_data
-
-        # collect control annotations from perturbation data 
-        if self.perturbation_data is not None:
-            ctrl_perturbation_data = self.control_perturbation_data
-        if self.target_reprs is not None:
-            ctrl_pert_repr = self.control_target_repr
+        ctrl_data = self.control_data
 
         # collect batch subset of the observations 
         if batch_size is not None:
-            batch_idxs = np.random.choice(self.control_idxs.shape[0], size=batch_size)
+            batch_idxs = np.random.choice(np.arange(len(ctrl_data)), size=batch_size)
 
-            ctrl_state_data = ctrl_state_data[batch_idxs]
-
-            if self.perturbation_data is not None:
-                ctrl_perturbation_data = {key: val[batch_idxs] for key, val in ctrl_perturbation_data.items()}
-            if self.target_reprs is not None:
-                ctrl_pert_repr = {key: val[batch_idxs] for key, val in ctrl_pert_repr.items()}
+            ctrl_data = ctrl_data[batch_idxs]
 
         # Dictionary of controls 
-        output_dict = {DataFields.STATE_DATA: ctrl_state_data,}        
+        output_dict = {DataFields.STATE_DATA: ctrl_data.state_data,}        
         if self.perturbation_data is not None:
-            output_dict[DataFields.PERTURBATION_DATA] = ctrl_perturbation_data
+            output_dict[DataFields.PERTURBATION_DATA] = ctrl_data.perturbation_data
         if self.target_reprs is not None:
-            output_dict[DataFields.TARGET_DATA] = ctrl_pert_repr
+            output_dict[DataFields.TARGET_DATA] = ctrl_data.target_data
         return output_dict
 
     def get_treatments(
@@ -300,39 +219,25 @@ class AnnotatedPerturbationData(BaseDataStruct):
                 treatments = DataFields.CONDITION_VALUES
 
         # retrieve indices
-        trtm_obs_idx = self.treatment_idxs_per_condition[treatments]
-        
-        # retrieve state data
-        trtm_state_data = self.treatment_state_data[treatments]
-
-        # collect treatment annotations from perturbation data 
-        if self.perturbation_data is not None:
-            trtm_perturbation_data = self.treatment_perturbation_data[treatments]
-        if self.target_reprs is not None:
-            trtm_pert_repr = self.treatment_target_repr[treatments]
+        trtm_data = self.treatment_data[treatments]
         
         # collect batch subset of the observations 
         if batch_size is not None:
-            batch_idxs = np.random.choice(trtm_obs_idx.shape[0], size=batch_size)
+            batch_idxs = np.random.choice(np.arange(len(trtm_data)), size=batch_size)
 
-            trtm_state_data = trtm_state_data[batch_idxs]
-            
-            if self.perturbation_data is not None:
-                trtm_perturbation_data = {key: val[batch_idxs] for key, val in trtm_perturbation_data.items()}
-            if self.target_reprs is not None:
-                trtm_pert_repr = {key: val[batch_idxs] for key, val in trtm_pert_repr.items()}
+            trtm_state_data = trtm_data[batch_idxs]
 
         # dictionary of treatments 
-        output_dict = {DataFields.STATE_DATA: trtm_state_data,}
+        output_dict = {DataFields.STATE_DATA: trtm_data.state_data,}
         if self.perturbation_data is not None:
-            output_dict[DataFields.PERTURBATION_DATA] = trtm_perturbation_data
+            output_dict[DataFields.PERTURBATION_DATA] = trtm_data.perturbation_data
         if self.target_reprs is not None:
-            output_dict[DataFields.TARGET_DATA] = trtm_pert_repr
+            output_dict[DataFields.TARGET_DATA] = trtm_data.target_data
         return output_dict
 
     def __getitem__(
         self,
-        idx: int,
+        idx: int | slice,
     ) -> "AnnotatedPerturbationData":
         """
         Durden method needed to slice the :class: `AnnotatedPerturbationData` object.
@@ -345,10 +250,10 @@ class AnnotatedPerturbationData(BaseDataStruct):
         # retrieving optional data
         perturbation_data = None
         if self.perturbation_data is not None:
-            perturbation_data = {perturbation: perturbation_data[idx] for perturbation, perturbation_data in self.perturbation_data.items()}
+            perturbation_data = {perturbation: perturbation_covariate[idx] for perturbation, perturbation_covariate in self.perturbation_data.items()}
         target_reprs = None
         if self.target_reprs is not None:
-            target_reprs = {target: target_data[idx] for target, target_data in self.target_reprs.items()}
+            target_reprs = {target: target_covariate[idx] for target, target_covariate in self.target_reprs.items()}
         return AnnotatedPerturbationData(
             adata,
             self.control_key,

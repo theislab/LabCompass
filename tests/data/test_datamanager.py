@@ -8,8 +8,6 @@ import torch
 import sc_exp_design
 
 
-batch_size = 64
-
 class TestDataManager:
     """"""
     @pytest.mark.parametrize("sample_rep", [None, "states"])
@@ -60,7 +58,7 @@ class TestDataManager:
         ]
     )
     @pytest.mark.parametrize("has_controls", [True, False])
-    @pytest.mark.parametrize("batch_size", [None, batch_size])
+    @pytest.mark.parametrize("batch_data", [False, True])
     @pytest.mark.parametrize("treatments", [None, ]) # TODO: Add othe option to test
     def test_data_manager(
         self,
@@ -70,6 +68,7 @@ class TestDataManager:
         num_perturbed_cells: int,
         tot_perturbed_cells: int,
         num_perturbation_feats: int,
+        batch_size: int,
         sample_rep: None | str,
         control_key: None | str,
         perturbations: None | str | Sequence[str],
@@ -79,7 +78,7 @@ class TestDataManager:
         load_target_covariates: bool,
         target_covariates: dict[str, Literal["one_hot", "label", "identity"] | None] | None,
         has_controls: bool,
-        batch_size: None | int,
+        batch_data: bool,
         treatments: None,
     ) -> None:
         """"""
@@ -205,7 +204,7 @@ class TestDataManager:
                 assert target in target_data.keys(), msg
         
         # treatments
-        treatment_data = data.get_treatments(batch_size=batch_size)
+        treatment_data = data.get_treatments(batch_size=batch_size if batch_data else None)
         
         # state data
         msg = f""
@@ -213,7 +212,7 @@ class TestDataManager:
 
         # collect expected number of treatment cells
         expected_num_cells = batch_size
-        if batch_size is None:
+        if not batch_data:
             expected_num_cells = num_perturbed_cells
             if treatments is None:
                 expected_num_cells = tot_perturbed_cells
@@ -265,7 +264,7 @@ class TestDataManager:
         
         # controls
         if has_controls:
-            control_data = data.get_controls(batch_size=batch_size)
+            control_data = data.get_controls(batch_size=batch_size if batch_data else None)
 
             # state data
             msg = f""
@@ -273,7 +272,7 @@ class TestDataManager:
 
             # collect expected number of treatment cells
             expected_num_cells = batch_size
-            if batch_size is None:
+            if not batch_data:
                 expected_num_cells = num_control_cells
             
             # define expected shape for control states           

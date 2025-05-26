@@ -1,7 +1,21 @@
+from collections.abc import Sequence
+
 import pytest
 
 import anndata
 import numpy as np
+
+
+@pytest.fixture
+def num_combinatorial_treatments() -> int:
+    """"""
+    return 3
+
+
+@pytest.fixture
+def num_targets() -> int:
+    """"""
+    return 2
 
 
 @pytest.fixture
@@ -41,6 +55,12 @@ def num_perturbation_feats() -> int:
 
 
 @pytest.fixture
+def batch_size() -> int:
+    """"""
+    return 64
+
+
+@pytest.fixture
 def tot_perturbed_cells(
     num_unique_treatments: int,
     num_perturbed_cells: int,
@@ -65,6 +85,45 @@ def states(
 ) -> np.ndarray:
     """"""
     return np.ones((num_cells, num_genes))
+
+
+@pytest.fixture
+def treatment_labels(
+    num_combinatorial_treatments: int,
+) -> Sequence[str]:
+    """"""
+    return (f"treatment{u}" for u in range(num_combinatorial_treatments))
+
+
+@pytest.fixture
+def perturbations(
+    num_cells: int,
+    num_perturbation_feats: int,
+    treatment_labels: Sequence[str],
+) -> dict[str, np.ndarray]:
+    """"""
+    return {
+        treatment: np.zeros((num_cells, num_perturbation_feats)) for treatment in treatment_labels
+    }
+
+
+@pytest.fixture
+def target_labels(
+    num_targets: int,
+) -> Sequence[str]:
+    """"""
+    return (f"target{u}" for u in range(num_targets))
+
+
+@pytest.fixture
+def targets(
+    num_cells: int,
+    target_labels: Sequence[str],
+) -> dict[str, np.ndarray]:
+    """"""
+    return {
+        target: np.zeros((num_cells, 1)) for target in target_labels
+    }
 
 
 @pytest.fixture
