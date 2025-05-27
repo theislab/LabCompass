@@ -184,11 +184,10 @@ class NeuralVelocityFieldConfig:
     encode_source: bool = False
     source_latent_dim: int = 10
     source_encoder_mlp_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {},)
-    use_resnet_blocks: bool = False 
+    conditioning_type: Literal["concatenation", "resnet", "film"] = "concatenation"
     n_resnet_blocks: int = 3
     resnet_dropout_prob: float = 0.0
     resnet_normalization: Literal["layer", "batch"] | None = None
-    use_film_block: bool = False 
     use_classifier_free_guidance: bool = False
     cfg_null_condition_token: float = -1.0
     
@@ -215,14 +214,9 @@ class NeuralVelocityFieldConfig:
         mlp_kwargs_verifier(self.decoder_mlp_kwargs)
         mlp_kwargs_verifier(self.source_encoder_mlp_kwargs)
 
-        # sanity check resnet block
-        if self.use_resnet_blocks:
-            msg = f"You must encode the state when using the ResNet"
-            assert self.encode_state, msg
-
-        # sanity check resnet block
-        if self.use_film_block:
-            msg = f"You must encode the state and use guidance when using the FiLM"
+        # sanity check conditioning block
+        if self.conditioning_type in ("resnet", "film"):
+            msg = f"You must encode the state and use guidance when using the {self.conditioning_type} conditioning."
             assert self.encode_state and self.use_guidance, msg
 
         # sanity check on condition encoder
@@ -364,14 +358,20 @@ class NeuralVelocityFieldConfig:
         if self.use_source_as_condition:
             source_latent_dim = self.flow_dim
             if self.encode_source:
-                source_latent_dim = self.source_latent_dim       
+                source_latent_dim = self.source_latent_dim
+        # states
+        state_latent_dim = self.flow_dim
+        if self.encode_state:
+            state_latent_dim = self.state_encoder_output_dim        
         # concatenation state, conditions, source and time 
-        if not self.use_resnet_blocks:
-            state_latent_dim = self.flow_dim
-            if self.encode_state:
-                state_latent_dim = self.state_encoder_output_dim 
-                    
+        if self.conditioning_type == "concatenation":
             return state_latent_dim + time_latent_dim + perturbation_latent_dim + source_latent_dim
+        # resnet block
+        elif self.conditioning_type == "resnet":
+            return state_latent_dim
+        # film block
+        elif self.conditioning_type == "film":
+            ...
         # concatenation only happens at the conditioning dimension with resnet 
         return time_latent_dim + perturbation_latent_dim + source_latent_dim
     
