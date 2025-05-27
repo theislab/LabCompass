@@ -32,7 +32,7 @@ class DataContainer:
 
         # check type state data
         msg = f"State data of the wrong type. Expected `np.ndarray | int | float`, found {type(self.state_data)}."
-        assert isinstance(self.state_data, np.ndarray | int | float | np.long), msg
+        assert isinstance(self.state_data, np.ndarray | int | float | np.generic), msg
 
         # retrieving reference number of observations                
         if isinstance(self.state_data, np.ndarray) and self.state_data.ndim != 1:
@@ -58,7 +58,7 @@ class DataContainer:
             for perturbation_covariate, covariate_data in self.perturbation_data.items():
                 # check type
                 msg = f"Data for perturbation covariate {perturbation_covariate} of the wrong type. Expected `np.ndarray | int | float`, found {type(covariate_data)}."
-                assert isinstance(covariate_data, np.ndarray | int | float | np.long), msg
+                assert isinstance(covariate_data, np.ndarray | int | float | np.generic), msg
 
                 # ensuring type
                 covariate_data = self._ensure_array(covariate_data)
@@ -75,7 +75,7 @@ class DataContainer:
             for target_covariate, covariate_data in self.target_data.items():
                 # check type
                 msg = f"Data for target covariate {target_covariate} of the wrong type. Expected `np.ndarray | int | float`, found {type(covariate_data)}."
-                assert isinstance(covariate_data, np.ndarray | int | float | np.long), msg
+                assert isinstance(covariate_data, np.ndarray | int | float | np.generic), msg
 
                 # ensuring type
                 covariate_data = self._ensure_array(covariate_data)
