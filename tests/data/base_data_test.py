@@ -33,6 +33,7 @@ from sc_exp_design.data import DataContainer
         {"treatment0": ("treatment0_label", "treatment0_group"), "treatment1": ("treatment1_label", "treatment1_group")},
         {"treatment0": ("treatment0_label", ), "treatment1": ("treatment1_label", "treatment1_group")},
         {"treatment0": ("treatment0_label", "treatment0_group"), "treatment1": ("treatment1_group", )},
+        {"treatment2": ("treatment2_features",)}
     ]
 )
 @pytest.mark.parametrize("load_target_covariates", [False, True])

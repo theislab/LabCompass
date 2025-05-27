@@ -191,7 +191,7 @@ class TestDataLoaders(BaseDataTest):
                 raise ValueError(msg)
 
             # check that we have the correct key
-            if data.perturbations_in_obsm is None:
+            if len(data.perturbations_in_obsm) == 0:
                 expected_key = "unconditional"
             else:
                 # concatenate perturbation names
@@ -230,7 +230,7 @@ class TestDataLoaders(BaseDataTest):
                     raise ValueError(msg)
 
         # for each element verify that the batch dictionary is correct
-        for perturbation, perturbation_batch in validate_batch.items():
+        for perturbation, perturbation_batch in validation_batch.items():
             validate_batch(
                 perturbation_batch,
                 has_controls,

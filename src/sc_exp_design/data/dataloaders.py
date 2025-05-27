@@ -364,7 +364,7 @@ class ValidationDataLoader(BaseCoupledDataLoader):
     ) -> str:
         """"""
         if treatment is None:
-            if self.data.perturbations_in_obsm is None:
+            if len(self.data.perturbations_in_obsm) == 0:
                 return "unconditional"
             else:
                 # concatenate perturbation names
