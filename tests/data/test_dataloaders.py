@@ -213,7 +213,7 @@ class TestDataLoaders(BaseDataTest):
                     raise ValueError(msg)
 
                 # check that we have the correct keys
-                for perturbation_key in validate_batch.keys():
+                for perturbation_key in validation_batch.keys():
                     if perturbation_key not in expected_keys:
                         msg = f"Perturbation identitfier {perturbation_key} not found in {expected_keys=}."
                         raise ValueError(msg)
@@ -225,7 +225,7 @@ class TestDataLoaders(BaseDataTest):
                     raise ValueError(msg)
 
                 # check that we have the correct keys
-                if tuple(validate_batch.keys()) != expected_keys:
+                if tuple(validation_batch.keys()) != expected_keys:
                     msg = f"When {set_num_treatments_to_load=} the validation batch should have all the perturbation ids appearing in `seen_combinatorial_perturbations`."
                     raise ValueError(msg)
 
