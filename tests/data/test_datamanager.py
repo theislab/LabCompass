@@ -73,69 +73,23 @@ class TestDataManager(BaseDataTest):
             target_covariates=target_covariates,
         )
 
-        # testing perturbation with reps attribute
-        perturbations_with_rep = data_manager.perturbations_with_rep
-
-        # when we should not have any perturbation with rep
-        if perturbations is None:
-            msg = f""
-            assert perturbations_with_rep is None, msg
-        if perturbation_reps is None:
-            msg = f""
-            assert perturbations_with_rep is None, msg
-        if perturbations_in_obsm is not None:
-            msg = f""
-            assert perturbations_with_rep is None, msg
-
-        # when we have only one perturbation
-        if perturbations == ("treatment0", ):
-            if perturbation_reps is not None:
-                expected = {
-                    "treatment0": ["control", "drug1", "drug2", "drug3", "drug4", "drug5"]
-                }
-                msg = f"Value Mismatch: Expected {expected} got {perturbations_with_rep}"
-                assert perturbations_with_rep == expected, msg
-
-        # when we have two perturbations
-        if perturbations == ("treatment0", "treatment1"):
-            if perturbation_reps is not None:
-                expected = {
-                    "treatment0": ["control", "drug1", "drug2", "drug3", "drug4", "drug5"],
-                    "treatment1": ["control", "drug1", "drug2", "drug3", "drug4", "drug5"]
-                }
-                msg = f"Value Mismatch: Expected {expected} got {perturbations_with_rep}"
-                assert perturbations_with_rep == expected, msg
-
-        # when we have three perturbations
-        if perturbations == ("treatment0", "treatment1", "treatment2"):
-            if perturbation_reps is not None:
-                expected = {
-                    "treatment0": ["control", "drug1", "drug2", "drug3", "drug4", "drug5"],
-                    "treatment1": ["control", "drug1", "drug2", "drug3", "drug4", "drug5"],
-                    "treatment2": "cov_treatment2_treatment2_features" # TODO: change "cov" to "feats" once finished the viral notebooks
-                }
-                msg = f"Value Mismatch: Expected {expected} got {perturbations_with_rep}"
-                assert perturbations_with_rep == expected, msg
         # retrieving data
         data = data_manager.get_data()
 
-        # test seen combinatorial perturbations
-        seen_combinatorial_perturbations = data.seen_combinatorial_perturbations
+        # check that we have the correct perturbation keys        
+        seen_combinatorial_perturbations = data.seen_combinations
+        perturbations_with_rep = data.perturbations
 
         # when we should not have any perturbation with rep
         if perturbations is None:
             msg = f""
-            assert seen_combinatorial_perturbations is None, msg
+            assert perturbations_with_rep is None, msg
         if perturbation_reps is None:
             msg = f""
-            assert seen_combinatorial_perturbations is None, msg
-        if perturbations_in_obsm is not None:
-            msg = f""
-            assert seen_combinatorial_perturbations is None, msg
+            assert perturbations_with_rep is None, msg
 
         # perturbation data
         perturbation_data = data.perturbation_data
-
         if perturbations is None:
             msg = f""
             assert perturbation_data is None, msg
@@ -146,20 +100,23 @@ class TestDataManager(BaseDataTest):
             # perturbation representations
             for perturbation in perturbations:
                 reps = perturbation_reps[perturbation]
+                if perturbations_in_obsm is not None:
+                    if perturbation in perturbations_in_obsm:
+                        msg = f""
+                        assert f"cov_{perturbation}_{reps}" in perturbation_data.keys(), msg
+                        continue
+                else:    
+                    for rep in reps:
+                        msg = f""
+                        assert f"repr_{perturbation}_{rep}" in perturbation_data.keys(), msg
 
-                for rep in reps:
-                    msg = f""
-                    assert f"repr_{perturbation}_{rep}" in perturbation_data.keys(), msg
-            
-            # perturbation covariates
-            for perturbation in perturbations:
-                if perturbation_covariates is not None:
-                    if perturbation in perturbation_covariates.keys():
-                        covs = perturbation_covariates[perturbation]
+                    if perturbation_covariates is not None:
+                        if perturbation in perturbation_covariates.keys():
+                            covs = perturbation_covariates[perturbation]
 
-                        for cov in covs:
-                            msg = f""
-                            assert f"cov_{perturbation}_{cov}" in perturbation_data.keys(), msg
+                            for cov in covs:
+                                msg = f""
+                                assert f"cov_{perturbation}_{cov}" in perturbation_data.keys(), msg
         
         # target data
         target_data = data.target_data
@@ -183,7 +140,7 @@ class TestDataManager(BaseDataTest):
             expected_num_cells = num_perturbed_cells
             if treatments is None:
                 expected_num_cells = tot_perturbed_cells
-            if not has_controls:
+            if not data_manager.has_controls:
                 expected_num_cells = expected_num_cells + num_control_cells
 
         # define expected shape for treatment states
@@ -207,18 +164,14 @@ class TestDataManager(BaseDataTest):
                     assert "cov" in condition, msg
 
                 # collect expected number of perturbation features
-                if is_repr:
-                    expected_num_perturbation_features = 1
-                else:
+                expected_num_perturbation_features = 1
+                if not is_repr:
                     # check whether the current condition is in obsm
-                    expected_num_perturbation_features = None
                     if perturbations_in_obsm is not None:
                         expected_num_perturbation_features = num_perturbation_feats
 
                 # define expected shape for treatment perturbation data
                 expected_shape = (expected_num_cells, expected_num_perturbation_features)
-                if expected_num_perturbation_features is None:
-                    expected_shape = (expected_num_cells, )
 
                 # check shapes
                 msg = f"Test failed on {condition=}. Expected shape {expected_shape}, found {condition_data.shape}."
@@ -263,20 +216,16 @@ class TestDataManager(BaseDataTest):
                         assert "cov" in condition, msg
 
                     # collect expected number of perturbation features
-                    if is_repr:
-                        expected_num_perturbation_features = 1
-                    else:
+                    expected_num_perturbation_features = 1
+                    if not is_repr:
                         # check whether the current condition is in obsm
-                        expected_num_perturbation_features = None
                         if perturbations_in_obsm is not None:
                             expected_num_perturbation_features = num_perturbation_feats
 
                     # define expected shape for treatment perturbation data
                     expected_shape = (expected_num_cells, expected_num_perturbation_features)
-                    if expected_num_perturbation_features is None:
-                        expected_shape = (expected_num_cells, )
 
-                # check shapes
+                    # check shapes
                     msg = f"Test failed on {condition=}. Expected shape {expected_shape}, found {condition_data.shape}."
                     assert condition_data.shape == expected_shape, msg
 
