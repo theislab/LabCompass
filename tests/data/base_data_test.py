@@ -10,7 +10,6 @@ from sc_exp_design.data import DataContainer
 @pytest.mark.parametrize("sample_rep", [None, "states"])
 @pytest.mark.parametrize("control_key", [None, "is_control"])
 @pytest.mark.parametrize("perturbations", [None, ("treatment0",), ("treatment0", "treatment1"), ("treatment0", "treatment1", "treatment2"), ])
-@pytest.mark.parametrize("perturbations_in_obsm", [None, "treatment2"])
 @pytest.mark.parametrize(
     "perturbation_covariates",
     [

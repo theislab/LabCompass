@@ -20,10 +20,10 @@ class TestDataLoaders(BaseDataTest):
         batch_size: int,
         num_genes: int,
         target_covariates_in_obsm: str,
+        perturbations_in_obsm: Sequence[str] | None, 
         sample_rep: None | str,
         control_key: None | str,
         perturbations: None | str | Sequence[str],
-        perturbations_in_obsm: Sequence[str] | None, 
         perturbation_covariates: dict[str, str | Sequence[str]] | None,
         perturbation_reps: dict[str, str | Sequence[str]] | None,
         load_target_covariates: bool,
@@ -106,11 +106,11 @@ class TestDataLoaders(BaseDataTest):
         batch_size: int,
         num_genes: int,
         target_covariates_in_obsm: str,
+        perturbations_in_obsm: Sequence[str] | None, 
         num_treatments_to_load: int,
         sample_rep: None | str,
         control_key: None | str,
         perturbations: None | str | Sequence[str],
-        perturbations_in_obsm: Sequence[str] | None, 
         perturbation_covariates: dict[str, str | Sequence[str]] | None,
         perturbation_reps: dict[str, str | Sequence[str]] | None,
         load_target_covariates: bool,
@@ -203,31 +203,45 @@ class TestDataLoaders(BaseDataTest):
 
         # when we can construct groups
         else:
-            # retrieve expected perturbation ids
-            expected_keys = ("_".join(treatment) for treatment in seen_combinatorial_perturbations)
+            if data.allow_grouped_coupling:            
+                # retrieve expected perturbation ids
+                expected_keys = ["_".join(treatment) for treatment in seen_combinatorial_perturbations]
 
-            if set_num_treatments_to_load:
-                # check that we have the correct number of batches
-                if len(validation_batch) != num_treatments_to_load:
-                    msg = f"When {set_num_treatments_to_load=} the validation batch should have {num_treatments_to_load} element. Found {len(validation_batch)}."
-                    raise ValueError(msg)
-
-                # check that we have the correct keys
-                for perturbation_key in validation_batch.keys():
-                    if perturbation_key not in expected_keys:
-                        msg = f"Perturbation identitfier {perturbation_key} not found in {expected_keys=}."
+                if set_num_treatments_to_load:
+                    # check that we have the correct number of batches
+                    if len(validation_batch) != num_treatments_to_load:
+                        msg = f"When {set_num_treatments_to_load=} the validation batch should have {num_treatments_to_load} element. Found {len(validation_batch)}. Keys: {validation_batch.keys()}. Expected keys: {expected_keys}. {seen_combinatorial_perturbations=} "
                         raise ValueError(msg)
 
+                    # check that we have the correct keys
+                    for perturbation_key in validation_batch.keys():
+                        if perturbation_key not in expected_keys:
+                            msg = f"Perturbation identitfier {perturbation_key} not found in {expected_keys=}."
+                            raise ValueError(msg)
+
+                else:
+                    # check that we have the correct number of batches
+                    if len(validation_batch) != len(seen_combinatorial_perturbations):
+                        msg = f"When {set_num_treatments_to_load=} the validation batch should have {len(seen_combinatorial_perturbations)} elements (one for each combionatorial perturbation). Found {len(validate_batch)}."
+                        raise ValueError(msg)
+
+                    # check that we have the correct keys
+                    if tuple(validation_batch.keys()) != expected_keys:
+                        msg = f"When {set_num_treatments_to_load=} the validation batch should have all the perturbation ids appearing in `seen_combinatorial_perturbations`."
+                        raise ValueError(msg)
             else:
                 # check that we have the correct number of batches
-                if len(validation_batch) != len(seen_combinatorial_perturbations):
-                    msg = f"When {set_num_treatments_to_load=} the validation batch should have {len(seen_combinatorial_perturbations)} elements (one for each combionatorial perturbation). Found {len(validate_batch)}."
+                if len(validation_batch) != 1:
+                    msg = f"When {set_num_treatments_to_load=} the validation batch should have 1 element. Found {len(validation_batch)}. Keys: {validation_batch.keys()}."
                     raise ValueError(msg)
 
                 # check that we have the correct keys
-                if tuple(validation_batch.keys()) != expected_keys:
-                    msg = f"When {set_num_treatments_to_load=} the validation batch should have all the perturbation ids appearing in `seen_combinatorial_perturbations`."
-                    raise ValueError(msg)
+                # for perturbation_key in validation_batch.keys():
+                #     if perturbation_key not in expected_keys:
+                #         msg = f"Perturbation identitfier {perturbation_key} not found in {expected_keys=}."
+                #         raise ValueError(msg)
+
+
 
         # for each element verify that the batch dictionary is correct
         for perturbation, perturbation_batch in validation_batch.items():

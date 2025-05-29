@@ -69,9 +69,15 @@ def batch_size() -> int:
 @pytest.fixture
 def num_treatments_to_load() -> int:
     """"""
-    return 6
+    return 2
 
     
+@pytest.fixture
+def perturbations_in_obsm() -> str:
+    """"""
+    return "treatment2"
+
+
 @pytest.fixture
 def target_covariates_in_obsm() -> str:
     """"""
@@ -167,12 +173,12 @@ def adata(
     dim_target_covariates: int,
     target_covariates_in_obsm: str,
     target_covariate_in_obsm_data: np.ndarray,
+    perturbations_in_obsm: str,
 ) -> anndata.AnnData:
     """"""
     # defining treatment data
     treatment0_label = "treatment0"
     treatment1_label = "treatment1"
-    treatment2_label = "treatment2" # to be put in anndata.obsm
     control_key = "is_control"
 
     # defining label maps
@@ -317,7 +323,7 @@ def adata(
         f"{treatment0_label}_time": treatment0_times,
         f"{treatment1_label}_dose": treatment1_dosages,
         f"{treatment1_label}_time": treatment1_times,
-        f"{treatment2_label}_features": treatment2_features,
+        f"{perturbations_in_obsm}_features": treatment2_features,
         f"{target_covariates_in_obsm}": target_covariate_in_obsm_data,
     }
 

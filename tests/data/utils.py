@@ -97,7 +97,7 @@ def validate_parametrized_inputs(
     if perturbations_in_obsm is not None:
         if perturbation_reps is None:
             perturbation_reps = {}
-        perturbation_reps["treatment2"] = "cov_treatment2_features" # TODO: change "cov" to "feats" once finished the viral notebooks
+        perturbation_reps["treatment2"] = "treatment2_features" # TODO: change "cov" to "feats" once finished the viral notebooks
     return (
         sample_rep,
         control_key,
