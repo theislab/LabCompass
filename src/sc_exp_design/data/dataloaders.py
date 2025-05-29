@@ -350,7 +350,7 @@ class ValidationDataLoader(BaseCoupledDataLoader):
         :rtype: class: `Sequence[str | None]`
         """
         # no perturbation data is passed to the AnnotatedPerturbationData object
-        if self.data.allow_grouped_couplings:
+        if not self.data.allow_grouped_couplings:
             return (None, )
         # retrieving the maximum number of treatements to load if specified
         if self.num_treatments_to_load is not None:
@@ -370,11 +370,11 @@ class ValidationDataLoader(BaseCoupledDataLoader):
                 return "unconditional"
             else:
                 # concatenate perturbation names
-                if self.data.seen_combinations is None:            
+                if not self.data.allow_grouped_couplings:            
                     # concatenate perturbation names
                     treatment = [perturbation for perturbation in self.data.perturbations]
                     return "_".join(treatment)
-                
+
                 else:
                     msg = f"When `self.data.seen_combinations` is provided `treatment` should not be None."
                     raise ValueError(msg)
