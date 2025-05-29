@@ -354,7 +354,8 @@ class ValidationDataLoader(BaseCoupledDataLoader):
             return (None, )
         # retrieving the maximum number of treatements to load if specified
         if self.num_treatments_to_load is not None:
-            return random.choices(self.data.seen_combinatorial_perturbations, k=self.num_treatments_to_load)
+            pert_idxs = np.random.choice(np.arange(len(self.data.seen_combinatorial_perturbations)), self.num_treatments_to_load, replace=False)
+            return [self.data.seen_combinatorial_perturbations[idx] for idx in pert_idxs]
         # returning all the treaments otherwise
         return self.data.seen_combinatorial_perturbations
 
@@ -405,11 +406,11 @@ class ValidationDataLoader(BaseCoupledDataLoader):
         for treatment in treatments:
 
             # retrieving matched treatment data
-            treatement_data = self._get_matched_data(treatment, control_states)
+            treatment_data = self._get_matched_data(treatment, control_states)
 
             # constructing perturbation identifier to store the results
             treatment_id = self._parse_perturbation_id(treatment)
 
             # storing output dictionary for current perturbation
-            out_dict[treatment_id] = treatement_data
+            out_dict[treatment_id] = treatment_data
         return out_dict

@@ -69,6 +69,7 @@ class AnnotatedPerturbationData:
     perturbations_with_rep: dict[str, Sequence[str]] | None = None
     has_controls: bool = True
     perturbations_in_obsm: Sequence[str] | None = None
+    allow_grouped_couplings: bool = True
 
     def __post_init__(
         self,
@@ -142,7 +143,7 @@ class AnnotatedPerturbationData:
         :rtype: class: `Sequence[Sequence[str]] | None`
         """
         # no perturbation data is passed to the AnnotatedPerturbationData object or no perturbation with associated representation
-        if (self.perturbation_data is None) or (self.perturbations_with_rep is None):
+        if (self.perturbation_data is None) or (self.perturbations_with_rep is None) or len(self.perturbations_in_obsm) > 0:
             return None 
         combs = self.adata.obs[[pert for pert in self.perturbations_with_rep.keys()]].drop_duplicates().values.tolist()
         return [tuple(comb) for comb in combs]
@@ -209,11 +210,11 @@ class AnnotatedPerturbationData:
         # case 0: Seen combinatorial perturbation is not None.
         # treatment should be either None or be appering inside self.seen_combinatorial_perturbations
         else:
-            if treatments is not None:
-                msg = f""
-                assert treatments in self.seen_combinatorial_perturbations, msg
-            else:
+            # when no treatment is passed
+            if treatments is None or len(treatments) == 0:
                 treatments = DataFields.CONDITION_VALUES
+            msg = f"{treatments=} not found in {self.treatment_idxs_per_condition.keys()=}"
+            assert treatments in self.treatment_idxs_per_condition.keys(), msg
 
         # retrieve indices
         trtm_data = self.treatment_data[treatments]
@@ -265,22 +266,3 @@ class AnnotatedPerturbationData:
         :rtype: class: `int`
         """
         return self.adata.shape[0]
-
-    @property
-    def allow_grouped_coupling(
-        self,
-    ) -> bool:
-        """Flag indicating whether the data configuration allows for the definition of groups for possible OT coupling.
-        
-        Returns False when :attr: `self.seen_combinatorial_perturbations` is None. This happens in the following cases:
-
-        * No perturbation data is provided (i.e.: unconditional generation).
-        * No perturbation has unique identifiers specified in :attr: `self.perturbation_reps` which is None.
-        The latter is handled originally by :method: `DataManager.perturbations_with_rep` and returns None in the following cases:
-            * No perturbation covariate is provided (i.e.: unconditional generation).
-            * No perturbation covariate has an associated unique representation.
-            * There is at least one perturbation covariate in :attr: `self.perturbations_in_obsm`.
-        """
-        if self.seen_combinatorial_perturbations is None:
-            return False
-        return True
