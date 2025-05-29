@@ -1,9 +1,8 @@
 import abc
 from collections.abc import Sequence
 from typing import Literal
-
-import numpy as np
 import random
+
 import numpy as np
 import torch
 
