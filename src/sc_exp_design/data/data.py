@@ -122,6 +122,47 @@ class AnnotatedPerturbationData:
             treatment: self.data[treatment_idxs] for treatment, treatment_idxs in self.treatment_idxs_per_condition.items()
         }
 
+    def __getitem__(
+        self,
+        idx: int | slice,
+    ) -> "AnnotatedPerturbationData":
+        """
+        Durden method needed to slice the :class: `AnnotatedPerturbationData` object.
+
+        Retrieves all the data from the original instance and returns a new instance of :class: `AnnotatedPerturbationData`.
+        """
+        # retrieving adata and states
+        adata = self.adata[idx]
+        state_data = self.state_data[idx]
+        # retrieving optional data
+        perturbation_data = None
+        if self.perturbation_data is not None:
+            perturbation_data = {perturbation: perturbation_covariate[idx] for perturbation, perturbation_covariate in self.perturbation_data.items()}
+        target_data = None
+        if self.target_data is not None:
+            target_data = {target: target_covariate[idx] for target, target_covariate in self.target_data.items()}
+        return AnnotatedPerturbationData(
+            adata,
+            self.control_key,
+            state_data,
+            perturbation_data=perturbation_data,
+            target_data=target_data,
+            seen_combinations=self.seen_combinations,
+            perturbations_with_rep=self.perturbations_with_rep,
+            has_controls=self.has_controls,
+            perturbations=self.perturbations
+        )
+    
+    def __len__(
+        self,
+    ) -> int:
+        """
+        Returns the number of observations present in the data.
+
+        :rtype: class: `int`
+        """
+        return self.adata.shape[0]
+
     def get_controls(
         self,
         batch_size: int | None = None,
@@ -201,43 +242,11 @@ class AnnotatedPerturbationData:
 
         return trtm_data
 
-    def __getitem__(
+    @property
+    def allow_grouped_couplings(
         self,
-        idx: int | slice,
-    ) -> "AnnotatedPerturbationData":
-        """
-        Durden method needed to slice the :class: `AnnotatedPerturbationData` object.
-
-        Retrieves all the data from the original instance and returns a new instance of :class: `AnnotatedPerturbationData`.
-        """
-        # retrieving adata and states
-        adata = self.adata[idx]
-        state_data = self.state_data[idx]
-        # retrieving optional data
-        perturbation_data = None
-        if self.perturbation_data is not None:
-            perturbation_data = {perturbation: perturbation_covariate[idx] for perturbation, perturbation_covariate in self.perturbation_data.items()}
-        target_data = None
-        if self.target_data is not None:
-            target_data = {target: target_covariate[idx] for target, target_covariate in self.target_data.items()}
-        return AnnotatedPerturbationData(
-            adata,
-            self.control_key,
-            state_data,
-            perturbation_data=perturbation_data,
-            target_data=target_data,
-            seen_combinations=self.seen_combinations,
-            perturbations_with_rep=self.perturbations_with_rep,
-            has_controls=self.has_controls,
-            perturbations=self.perturbations
-        )
-    
-    def __len__(
-        self,
-    ) -> int:
-        """
-        Returns the number of observations present in the data.
-
-        :rtype: class: `int`
-        """
-        return self.adata.shape[0]
+    ) -> bool:
+        """"""
+        if self.seen_combinations is None or self.perturbations is None:
+            return False
+        return True
