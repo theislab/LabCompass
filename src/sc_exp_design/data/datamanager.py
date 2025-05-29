@@ -8,6 +8,11 @@ from sklearn.preprocessing import OneHotEncoder, LabelEncoder
 
 from sc_exp_design.constants import DataFields
 from sc_exp_design.data.data import AnnotatedPerturbationData
+from sc_exp_design.data.schemas import (
+    StateDataSchema,
+    PerturbationDataSchema,
+    TargetDataSchema,
+)
 from sc_exp_design.types import TensorLike
 
 logger = logging.getLogger(__name__)
@@ -34,7 +39,6 @@ class DataManager:
         target_covariates: dict[str, Literal["one_hot", "label", "identity"] | None] | None = None,
         target_covariates_in_obsm: Sequence[str] | None = None,
         target_covariates_kwargs: dict[str, Any] | None = None,
-        has_controls: bool = True
     ) -> None:
         """
         Initializes the :class: `DataManager` object
@@ -100,305 +104,57 @@ class DataManager:
         :param target_covariates_kwargs: Optional keyword arguments used to retrieve the desired representation for the target covariates.
             Defaults to `None`.
         :type target_covariates_kwargs: class: `dict[str, Any]`
-        
-        :param has_controls: Flag indicating whether a notion of control states applies to the current data.
-            When this is the case, the :param: `control_key` needs to be properly set. Defaults to `True`.
-        :type has_controls: class: `bool`
-
         """
+
+        # storing attributes
         self.adata = adata
         self.sample_rep = sample_rep
         self.control_key = control_key
-        self.has_controls = has_controls
-        
-        # sanity check perturbations_in_obsm is iterable  
-        if perturbations_in_obsm is not None:
-            if isinstance(perturbations_in_obsm, str):
-                perturbations_in_obsm = (perturbations_in_obsm,)
-
-        # preparing the attributes
-        if perturbations is not None:
-            # handling type of perturbations argument
-            if isinstance(perturbations, str):
-                perturbations = (perturbations,)
-            # iterating over the perturbations
-            for perturbation in perturbations:
-                # perturbation level covariates
-                if perturbation_reps is not None:
-                    if perturbation in perturbation_reps.keys():
-                        rep = perturbation_reps[perturbation]
-                        if (perturbations_in_obsm is not None) and (perturbation in perturbations_in_obsm):
-                            msg = "When a perturbation is in .obsm, there should be only one representation."
-                            assert isinstance(rep, str), msg
-                        # strings as an iterable
-                        if isinstance(rep, str):
-                            rep = (rep,)
-                        perturbation_reps[perturbation] = rep
-                    # skip perturbation if no representation found, warn
-                    else:
-                        msg = f"{perturbation} in `self.perturbation` has no representation associated to it, skipping."
-                        logger.warning(msg)
-                        continue
-                # cell level covariates
-                if perturbation_covariates is not None:
-                    if perturbation in perturbation_covariates.keys():
-                        covariates = perturbation_covariates[perturbation]
-                        if isinstance(covariates, str):
-                            covariates = (covariates,)
-                    else:
-                        covariates = ()
-                    perturbation_covariates[perturbation] = covariates
-
-        # sanity check perturbations_in_obsm
-        if perturbations_in_obsm is None:
-            perturbations_in_obsm = ()
-        if isinstance(perturbations_in_obsm, str):
-            perturbations_in_obsm = (perturbations_in_obsm, )
-        for perturbation in perturbations_in_obsm:
-            msg = f""
-            assert isinstance(perturbation, str), msg
-            msg = f""
-            assert perturbation in perturbation_reps.keys(), msg
-
         self.perturbations = perturbations
         self.perturbations_in_obsm = perturbations_in_obsm
         self.perturbation_covariates = perturbation_covariates
         self.perturbation_reps = perturbation_reps
         self.load_target_covariates = load_target_covariates
-
-        # when we need some target representation for the conditions
-        if self.load_target_covariates:
-            msg = f"With {self.load_target_covariates=} you need to specify the target covariate reprs in `target_covariates`, `None` found"
-            assert target_covariates is not None, msg
-            if target_covariates_kwargs is None:
-                target_covariates_kwargs = {}
-                for target_covariate, target_covariate_rep in target_covariates.items():
-                    target_covariates_kwargs[target_covariate] = {}
-
-            if target_covariates_in_obsm is None:
-                target_covariates_in_obsm = ()
-
         self.target_covariates = target_covariates
         self.target_covariates_in_obsm = target_covariates_in_obsm
         self.target_covariates_kwargs = target_covariates_kwargs
 
-    @property
-    def perturbations_with_rep(
+        # initializing data schemas
+        self.__init_schemas()
+
+    def __init_schemas(
         self,
-    ) -> dict[str, Sequence[str]] | None:
-        """
-        Retrieves a dictionary mapping each perturbation to its unique values.
+    ) -> None:
+        """"""
 
-        Returns a dictionary with keys given by the modeled perturbation and values being the list
-        of unique values that each perturbation can assume. This is needed to get a complete list
-        of perturbations from which we can sample unique perturbation when using OT couplings.
-        When either :attr: `self.perturbations` or :attr: `self.perturbation_reps` are `None`, it returns `None`.
+        # state data schema
+        self.state_data_schema = StateDataSchema(
+            self.adata,
+            self.sample_rep,
+        )
 
-        :rtype: class: `dict[str, Sequence[str]] | None`
-        """
-        # sanity check as we need to have initialized `self.adata` attribute
-        msg = f""
-        assert self.adata is not None, msg
-        # no perturbation found
-        if self.perturbations is None:
-            return None
-        # no representation found
-        if self.perturbation_reps is None:
-            return None
-        # perturbation in obsm found
-        if len(self.perturbations_in_obsm) > 0:
-            return None
-        # defining list of perturbations for which we have found the representation
-        perturbations_with_rep = {}
-        # iterating over each perturbation covariate
-        for perturbation in self.perturbations:
-            if perturbation not in self.perturbations_in_obsm:
-                # This will contain a list with all the representation modalities for the current perturbation. 
-                # It will be automatically constructed even when the perturbation does not have an associated representation
-                # (check `self.__init__`), in which case it will be a 0-elements sequence.
-                # Hence, we can check the length of this list to verify whether the perturbation has an associated representation or not.
-                perturbation_covariate_rep = self.perturbation_reps[perturbation]
-                # when we have at least one element, it means that we have found an associated representation
-                # and we can append the perturbation label to the list of perturbations.
-                if len(perturbation_covariate_rep) > 0:
-                    # now we iterate over the different representation and verify that 
-                    # they share the same keys (i.e.: the unique values of the current perturbation)
-                    # using the first representation as reference
-                    reference_keys = list(self.adata.uns[perturbation_covariate_rep[0]].keys())
-                    for rep in perturbation_covariate_rep:
-                        # retrieving the covariates and their representations
-                        covariate_reps_keys = list(self.adata.uns[rep].keys())
-                        # sanity check, we should have the same keys for each representation
-                        # associated to the current perturbation
-                        msg = "" # probably should do this check within the `self.__init__` method like the other ones
-                        assert covariate_reps_keys == reference_keys, msg
-                    # now we can append the dictionary that maps the current perturbation to its unique values.
-                    perturbations_with_rep[perturbation] = reference_keys
-            # If in obsm, add a string for perturbation rep
-            else:
-                # if in .obsm, key is perturbation and value is a str representing the associated representation 
-                perturbations_with_rep[perturbation] = self.perturbation_reps[perturbation]  
-        return perturbations_with_rep
+        # perturbation data schema
+        self.perturbation_data_schema = PerturbationDataSchema(
+            self.adata,
+            self.perturbations,
+            self.perturbations_in_obsm,
+            self.perturbation_covariates,
+            self.perturbation_reps,
+        )
 
-    def __get_state_data(
-        self,
-        adata: anndata.AnnData,
-    ) -> TensorLike:
-        """
-        :param adata: Annotated data object containing single-cell data.
-        :type adata: class: `AnnData`
-
-        :return: The primary state representation of cells.
-        :rtype: class: `TensorLike`
-
-        :raises ValueError: If :attr: `self.sample_rep` is specified but not found in :attr: `adata.obsm`.
-        """
-        if self.sample_rep is None:
-            state_data = adata.X
-        else:
-            if self.sample_rep not in adata.obsm.keys():
-                msg = f"{self.sample_rep=} not found in `adata.obsm` (Keys found: {list(adata.obsm.keys())})"
+        # target data schema
+        self.target_data_schema = None
+        if self.load_target_covariates:
+            # sanity check
+            if self.target_covariates is None:
+                msg = f"With {self.load_target_covariates=} you need to specify the target covariate reprs in `target_covariates`, `None` found"
                 raise ValueError(msg)
-            state_data = adata.obsm[self.sample_rep]
-        return state_data
-
-    def __get_perturbation_data(
-        self,
-        adata: anndata.AnnData,
-    ) -> dict[str, TensorLike]:
-        """
-        :param adata: Annotated data object containing single-cell data.
-        :type adata: class: `AnnData`
-
-        :return: Dictionary mapping perturbation features to tensor representations.
-        :rtype: class: `dict[str, TensorLike]`
-
-        :raises ValueError: If a specified perturbation or its representation is not found in `adata`.
-        """
-        # retrieving perturbation data
-        perturbation_data = {}
-        # iterating over each perturbation covariate
-        for perturbation in self.perturbations:
-            if (self.perturbations_in_obsm is not None) and (perturbation in self.perturbations_in_obsm):
-                rep = self.perturbation_reps[perturbation][0]
-                perturbation_data[f"{DataFields.CONDITION_FEATS}_{perturbation}_{rep}"] = adata.obsm[rep]
-            else:
-                # sanity check on the input AnnData
-                if perturbation not in adata.obs.keys():
-                    msg = f"{perturbation} not found in `adata.obs.keys()`"
-                    raise ValueError(msg)
-                
-                # what perturbation was applied
-                covariate_data = adata.obs[perturbation].values
-                # optionally retrieving the representation of such covariate
-                if self.perturbation_reps is not None:
-                    perturbation_covariate_rep = self.perturbation_reps[perturbation]
-                    for rep in perturbation_covariate_rep:
-                        # sanity check on the input AnnData
-                        if rep not in adata.uns.keys():
-                            msg = f"{perturbation_covariate_rep} not found in `adata.uns.keys()`"
-                            raise ValueError(msg)
-                        # retrieving the covariates and their representations
-                        covariate_reps_dict = adata.uns[rep]
-                        # mapping each observation condition to their representation
-                        covariate_reps = [covariate_reps_dict[covariate] for covariate in covariate_data]
-                        covariate_reps = np.stack(covariate_reps, axis=0)
-                        # storing the results
-                        covariate_rep_key = f"{DataFields.CONDITION_REP}_{perturbation}_{rep}"
-                        perturbation_data[covariate_rep_key] = covariate_reps
-                        
-                # loading perturbation covariates that are individual for each cell
-                if self.perturbation_covariates is not None:
-                    perturbation_covariates = self.perturbation_covariates[perturbation]
-                    # iterating over each of such covariates associated to the current perturbation
-                    # which should be stored in the corresponding obsm field of the AnnData object
-                    for covariate in perturbation_covariates:
-                        # sanity check on the input AnnData
-                        if covariate not in adata.obsm.keys():
-                            msg = f"{covariate=} not found in `self.adata.obsm.keys()`"
-                            raise ValueError(msg)
-                        # retrieving the covariate data
-                        covariate_data = adata.obsm[covariate]
-                        # storing the results
-                        covariate_cov_key = f"{DataFields.CONDITION_COV}_{perturbation}_{covariate}"
-                        perturbation_data[covariate_cov_key] = covariate_data
-        return perturbation_data
-
-    def __get_target_data(
-        self,
-        adata: anndata.AnnData,
-    ) -> dict[str, TensorLike]:
-        """
-        :param adata: Annotated data object containing single-cell data.
-        :type adata: class: `AnnData`
-
-        :return: Dictionary mapping target covariates to encoded representations.
-        :rtype: class: `dict[str, TensorLike]`
-
-        :raises AssertionError: If a required perturbation target covariate is missing in `adata.obs` or `adata.obsm`.
-        :raises ValueError: If an unsupported encoding type is requested.
-        """
-        # dictionary storing representations for perturbation target covariates
-        out_dict = {}
-        
-        for target_covariate, target_covariate_rep in self.target_covariates.items():
-            # if covariate is stored in adata.obsm we retrieve its representation directly
-            if target_covariate in self.target_covariates_in_obsm:
-                # sanity check
-                msg = f"{target_covariate} not found in `adata.obsm.keys()`"
-                assert target_covariate in adata.obsm.keys(), msg
-                target_covariate_data = adata.obsm[target_covariate]
-                out_dict[target_covariate] = target_covariate_data
-            else:
-                # sanity check
-                msg = f"{target_covariate} not found in `adata.obs.columns`"
-                assert target_covariate in adata.obs.columns, msg
-
-                # retrieving the keywargs argument to get the target representation
-                covariate_target_rep_kwargs = self.target_covariates_kwargs[target_covariate]
-
-                # Collect the condition target covariate from the adata.obs 
-                covariate_data = adata.obs[[target_covariate]].values
-
-                # one hot encoded categories
-                if target_covariate_rep == "one_hot":
-                    # sanity check
-                    msg = f"When using \"one_hot\" as target representation in `target_covariates`, you need to pass a 2-dimensional array, found {covariate_data.ndim=} for {target_covariate}"
-                    assert covariate_data.ndim == 2, msg
-                    # encoding the condition
-                    covariate_rep_encoder = OneHotEncoder(**covariate_target_rep_kwargs)
-                    covariate_target_rep_data = covariate_rep_encoder.fit_transform(covariate_data).toarray()
-
-                # label encoding
-                elif target_covariate_rep == "label":
-                    # handling the shape of the covariate data to avoid warning from sklearn
-                    covariate_data = covariate_data.reshape(-1)
-                    covariate_rep_encoder = LabelEncoder()
-                    # when we specify the target categories of interest
-                    if DataFields.TARGET_CATEGORIES in covariate_target_rep_kwargs.keys():
-                        target_categories = covariate_target_rep_kwargs[DataFields.TARGET_CATEGORIES]
-                        covariate_rep_encoder.fit(target_categories)
-                        covariate_target_rep_data = covariate_rep_encoder.transform(covariate_data)
-                    # inferring target categories from data
-                    else:
-                        covariate_target_rep_data = covariate_rep_encoder.fit_transform(covariate_data)
-
-                # no encoding, taking as is (regression)
-                elif target_covariate_rep == "identity":
-                    covariate_target_rep_data = covariate_data
-
-                    # optionally adding a trailing dimension
-                    if covariate_target_rep_data.ndim == 1:
-                        covariate_target_rep_data = covariate_target_rep_data.reshape(-1, 1) 
-
-                # raise value error otherwise
-                else:
-                    msg = f"{target_covariate_rep=} not currently supported (avaiable options are `['one_hot', 'label', 'identity']`)"
-                    raise ValueError(msg)
-
-                # Retrun dictionary 
-                out_dict[target_covariate] = covariate_target_rep_data
-        return out_dict
+            self.target_data_schema = TargetDataSchema(
+                self.adata,
+                self.target_covariates,
+                self.target_covariates_in_obsm,
+                self.target_covariates_kwargs,
+            )
 
     def get_data(
         self,
@@ -413,29 +169,44 @@ class DataManager:
 
         :raises ValueError: If both `adata` and `self.adata` are `None`.
         """
+        # handling adata
         if adata is None and self.adata is None:
             msg = "Both `adata` and `self.adata` are None, you need to pass an `anndata.AnnData` object containing the data."
             raise ValueError(msg)
         elif adata is None:
             adata = self.adata
-        # return cell features 
-        state_data = self.__get_state_data(adata)
+
+        # retrieving state data
+        state_data = self.state_data_schema.get_data()
+
+        # retrieving perturbation data
         perturbation_data = None
-        # return perturbation data
         if self.perturbations is not None:
-            perturbation_data = self.__get_perturbation_data(adata)
+            perturbation_data = self.perturbation_data_schema.get_data()
+
         # condition target representation
         target_data = None
         if self.load_target_covariates:
-            target_data = self.__get_target_data(adata)
+            target_data = self.target_data_schema.get_data()
         
+        # constructing data object
         return AnnotatedPerturbationData(
             adata,
             self.control_key, 
             state_data,
             perturbation_data,
-            target_data,
-            self.perturbations_with_rep, 
-            self.has_controls,
-            self.perturbations_in_obsm,
+            target_data=target_data,
+            seen_combinations=self.perturbation_data_schema.seen_combinations, 
+            has_controls=self.has_controls,
+            perturbations=self.perturbations,
         )
+
+    @property
+    def has_controls(
+        self,
+    ) -> bool:
+        """Flag indicating whether a notion of control states applies to the current data. Automatically inferred by the presence of :attr: `self.control_key`    
+        """
+        if self.control_key is None:
+            return False
+        return True

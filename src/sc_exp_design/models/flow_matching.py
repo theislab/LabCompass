@@ -143,8 +143,6 @@ class FlowMatching(BaseModel):
         Once initialized the :class: `DataManager` class, it calls the :method: `DataManager.get_data` method to
         retrieve a structured representation of the analyzed dataset.
         """
-        has_controls = (control_key is not None)
-        
         # sanity check when considering perturbation in .obsm 
         if isinstance(self.coupling, OTCoupling) and perturbations_in_obsm is not None:
             msg = "With perturbations in obsm the coupling must be independent"
@@ -162,7 +160,6 @@ class FlowMatching(BaseModel):
             target_covariates=target_covariates,
             target_covariates_in_obsm=target_covariates_in_obsm,
             target_covariates_kwargs=target_covariates_kwargs,
-            has_controls=has_controls,
         )
         train_data = data_manager.get_data(train_adata)
 
@@ -357,7 +354,7 @@ class FlowMatching(BaseModel):
             train_batch_size,
             state_transforms=self.state_transforms,
             device_id=self.device_id,
-            has_controls=self.has_controls,
+            has_controls=self.data_manager.has_controls,
         )
 
         self.validation_dataloader = None
@@ -368,7 +365,7 @@ class FlowMatching(BaseModel):
                 validation_batch_size,
                 state_transforms=state_transforms,
                 device_id=self.device_id,
-                has_controls=self.has_controls,
+                has_controls=self.data_manager.has_controls,
                 num_treatments_to_load=num_treatments_to_load
             )
 

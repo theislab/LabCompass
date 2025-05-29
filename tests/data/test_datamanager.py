@@ -33,7 +33,6 @@ class TestDataManager(BaseDataTest):
         perturbation_reps: dict[str, str | Sequence[str]] | None,
         load_target_covariates: bool,
         target_covariates: dict[str, Literal["one_hot", "label", "identity"] | None] | None,
-        has_controls: bool,
         batch_data: bool,
         treatments: None,
     ) -> None:
@@ -49,7 +48,6 @@ class TestDataManager(BaseDataTest):
             perturbation_reps,
             load_target_covariates,
             target_covariates,
-            has_controls,
         ) = validate_parametrized_inputs(
             sample_rep,
             control_key,
@@ -59,7 +57,6 @@ class TestDataManager(BaseDataTest):
             perturbation_reps,
             load_target_covariates,
             target_covariates,
-            has_controls,
         )
 
         # initializing data manager
@@ -74,7 +71,6 @@ class TestDataManager(BaseDataTest):
             load_target_covariates=load_target_covariates,
             target_covariates_in_obsm=target_covariates_in_obsm,
             target_covariates=target_covariates,
-            has_controls=has_controls,
         )
 
         # testing perturbation with reps attribute
@@ -234,7 +230,7 @@ class TestDataManager(BaseDataTest):
             assert hasattr(treatment_data, "target_data"), msg
         
         # controls
-        if has_controls:
+        if data_manager.has_controls:
             control_data = data.get_controls(batch_size=batch_size if batch_data else None)
 
             # state data

@@ -28,7 +28,6 @@ class TestDataLoaders(BaseDataTest):
         perturbation_reps: dict[str, str | Sequence[str]] | None,
         load_target_covariates: bool,
         target_covariates: dict[str, Literal["one_hot", "label", "identity"] | None] | None,
-        has_controls: bool,
     ) -> None:
         """"""
 
@@ -42,7 +41,6 @@ class TestDataLoaders(BaseDataTest):
             perturbation_reps,
             load_target_covariates,
             target_covariates,
-            has_controls,
         ) = validate_parametrized_inputs(
             sample_rep,
             control_key,
@@ -52,7 +50,6 @@ class TestDataLoaders(BaseDataTest):
             perturbation_reps,
             load_target_covariates,
             target_covariates,
-            has_controls,
         )
 
         # initializing data manager
@@ -67,7 +64,6 @@ class TestDataLoaders(BaseDataTest):
             load_target_covariates=load_target_covariates,
             target_covariates_in_obsm=target_covariates_in_obsm,
             target_covariates=target_covariates,
-            has_controls=has_controls,
         )
 
         # retrieving data
@@ -85,14 +81,14 @@ class TestDataLoaders(BaseDataTest):
             coupling,
             batch_size,
             state_transforms,
-            has_controls=has_controls,
+            has_controls=data_manager.has_controls,
         )
 
         # sampling batch of train data and validating it
         train_batch = train_dataloader.sample()
         validate_batch(
             train_batch,
-            has_controls,
+            data_manager.has_controls,
             batch_size,
             num_genes,
             perturbations,
@@ -115,7 +111,6 @@ class TestDataLoaders(BaseDataTest):
         perturbation_reps: dict[str, str | Sequence[str]] | None,
         load_target_covariates: bool,
         target_covariates: dict[str, Literal["one_hot", "label", "identity"] | None] | None,
-        has_controls: bool,
         set_num_treatments_to_load: bool,
     ) -> None:
         """"""
@@ -129,7 +124,6 @@ class TestDataLoaders(BaseDataTest):
             perturbation_reps,
             load_target_covariates,
             target_covariates,
-            has_controls,
         ) = validate_parametrized_inputs(
             sample_rep,
             control_key,
@@ -139,7 +133,6 @@ class TestDataLoaders(BaseDataTest):
             perturbation_reps,
             load_target_covariates,
             target_covariates,
-            has_controls,
         )
 
         # initializing data manager
@@ -154,7 +147,6 @@ class TestDataLoaders(BaseDataTest):
             load_target_covariates=load_target_covariates,
             target_covariates_in_obsm=target_covariates_in_obsm,
             target_covariates=target_covariates,
-            has_controls=has_controls,
         )
 
         # retrieving data
@@ -172,7 +164,7 @@ class TestDataLoaders(BaseDataTest):
             coupling,
             batch_size,
             state_transforms,
-            has_controls=has_controls,
+            has_controls=data_manager.has_controls,
             num_treatments_to_load=num_treatments_to_load if set_num_treatments_to_load else None,
         )
 
@@ -180,8 +172,8 @@ class TestDataLoaders(BaseDataTest):
         validation_batch = validation_dataloader.sample()
 
         # check that we have the correct perturbaation keys        
-        seen_combinatorial_perturbations = data.seen_combinatorial_perturbations
-        perturbations_with_rep = data.perturbations_with_rep 
+        seen_combinatorial_perturbations = data.seen_combinations
+        perturbations_with_rep = data.perturbations
 
         # when perturbations do not induce a group for OT
         if seen_combinatorial_perturbations is None:
@@ -191,7 +183,7 @@ class TestDataLoaders(BaseDataTest):
                 raise ValueError(msg)
 
             # check that we have the correct key
-            if len(data.perturbations_in_obsm) == 0:
+            if data.perturbations is None:
                 expected_key = "unconditional"
             else:
                 # concatenate perturbation names
@@ -203,14 +195,14 @@ class TestDataLoaders(BaseDataTest):
 
         # when we can construct groups
         else:
-            if data.allow_grouped_coupling:            
+            if data_manager.perturbation_data_schema.allow_grouped_couplings:            
                 # retrieve expected perturbation ids
                 expected_keys = ["_".join(treatment) for treatment in seen_combinatorial_perturbations]
 
                 if set_num_treatments_to_load:
                     # check that we have the correct number of batches
                     if len(validation_batch) != num_treatments_to_load:
-                        msg = f"When {set_num_treatments_to_load=} the validation batch should have {num_treatments_to_load} element. Found {len(validation_batch)}. Keys: {validation_batch.keys()}. Expected keys: {expected_keys}. {seen_combinatorial_perturbations=} "
+                        msg = f"When {set_num_treatments_to_load=} the validation batch should have {num_treatments_to_load} element. Found {len(validation_batch)}. Keys: {validation_batch.keys()}. Expected keys: {expected_keys}. {seen_combinatorial_perturbations=}. {perturbations=} "
                         raise ValueError(msg)
 
                     # check that we have the correct keys
@@ -226,8 +218,8 @@ class TestDataLoaders(BaseDataTest):
                         raise ValueError(msg)
 
                     # check that we have the correct keys
-                    if tuple(validation_batch.keys()) != expected_keys:
-                        msg = f"When {set_num_treatments_to_load=} the validation batch should have all the perturbation ids appearing in `seen_combinatorial_perturbations`."
+                    if list(validation_batch.keys()) != expected_keys:
+                        msg = f"When {set_num_treatments_to_load=} the validation batch should have all the perturbation ids appearing in `seen_combinatorial_perturbations`. Got {tuple(validation_batch.keys())}, expected {expected_keys}"
                         raise ValueError(msg)
             else:
                 # check that we have the correct number of batches
@@ -247,7 +239,7 @@ class TestDataLoaders(BaseDataTest):
         for perturbation, perturbation_batch in validation_batch.items():
             validate_batch(
                 perturbation_batch,
-                has_controls,
+                data_manager.has_controls,
                 batch_size,
                 num_genes,
                 perturbations,

@@ -56,6 +56,5 @@ from sc_exp_design.data import DataContainer
         {"target3": None},
     ]
 )
-@pytest.mark.parametrize("has_controls", [True, False])
 class BaseDataTest:
     """"""

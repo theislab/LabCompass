@@ -259,7 +259,7 @@ class TrainDataLoader(BaseCoupledDataLoader):
         if not self.data.allow_grouped_coupling:
             return None
         # need to sample one perturbation from the set of unique perturbations
-        return random.choice(self.data.seen_combinatorial_perturbations)
+        return random.choice(self.data.seen_combinations)
 
     def sample(self) -> dict[str, TensorLike]:
         """
@@ -350,14 +350,14 @@ class ValidationDataLoader(BaseCoupledDataLoader):
         :rtype: class: `Sequence[str | None]`
         """
         # no perturbation data is passed to the AnnotatedPerturbationData object
-        if not self.data.allow_grouped_coupling:
+        if self.data.seen_combinations is None or self.data.perturbations is None:
             return (None, )
         # retrieving the maximum number of treatements to load if specified
         if self.num_treatments_to_load is not None:
-            pert_idxs = np.random.choice(np.arange(len(self.data.seen_combinatorial_perturbations)), self.num_treatments_to_load, replace=False)
-            return [self.data.seen_combinatorial_perturbations[idx] for idx in pert_idxs]
+            pert_idxs = np.random.choice(np.arange(len(self.data.seen_combinations)), self.num_treatments_to_load, replace=False)
+            return [self.data.seen_combinations[idx] for idx in pert_idxs]
         # returning all the treaments otherwise
-        return self.data.seen_combinatorial_perturbations
+        return self.data.seen_combinations
 
     def _parse_perturbation_id(
         self,
@@ -365,16 +365,19 @@ class ValidationDataLoader(BaseCoupledDataLoader):
     ) -> str:
         """"""
         if treatment is None:
-            if len(self.data.perturbations_in_obsm) == 0:
+            # unconditional generation
+            if self.data.perturbations is None:
                 return "unconditional"
             else:
                 # concatenate perturbation names
-                if self.data.perturbations_with_rep is None:
-                    msg = f"When {self.data.perturbations_in_obsm=} `perturbations_with_rep` should not  be None."
+                if self.data.seen_combinations is None:            
+                    # concatenate perturbation names
+                    treatment = [perturbation for perturbation in self.data.perturbations]
+                    return "_".join(treatment)
+                
+                else:
+                    msg = f"When `self.data.seen_combinations` is provided `treatment` should not be None."
                     raise ValueError(msg)
-                # concatenate perturbation names
-                treatment = [perturbation for perturbation in self.data.perturbations_with_rep]
-                return "_".join(treatment)
         else:
             msg = f""
             assert isinstance(treatment, Sequence), msg

@@ -70,24 +70,23 @@ def validate_parametrized_inputs(
     perturbation_reps: dict[str, str | Sequence[str]] | None,
     load_target_covariates: bool,
     target_covariates: dict[str, Literal["one_hot", "label", "identity"] | None] | None,
-    has_controls: bool,
 ) -> Sequence[Any]:
     """"""
     # handling inputs
     if target_covariates is None:
         load_target_covariates = False
 
-    # print(perturbation_reps)
     # we need to be passing the representation
     if perturbation_reps is not None:
         if perturbations is not None:
-            perturbations = tuple(perturbation for perturbation in perturbations if perturbation in perturbation_reps.keys())
+            perturbations = tuple(
+                perturbation for perturbation in perturbations if perturbation in perturbation_reps.keys()
+            )
+            # when no perturbation remains after filtering
+            if len(perturbations) == 0:
+                perturbations = None
     else:
         perturbations = None
-
-    # when there are no controls
-    if control_key is None:
-        has_controls = False
 
     # when we are using perturbations in obsm, we need to ensure that
     # it appears in `perturbations`
@@ -107,5 +106,4 @@ def validate_parametrized_inputs(
         perturbation_reps,
         load_target_covariates,
         target_covariates,
-        has_controls,
     )

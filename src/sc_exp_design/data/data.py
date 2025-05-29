@@ -66,10 +66,9 @@ class AnnotatedPerturbationData:
     state_data: TensorLike
     perturbation_data: dict[str, TensorLike] | None
     target_data: dict[str, TensorLike] | None = None
-    perturbations_with_rep: dict[str, Sequence[str]] | None = None
+    seen_combinations: Sequence[Sequence[str]] | None = None
     has_controls: bool = True
-    perturbations_in_obsm: Sequence[str] | None = None
-    allow_grouped_couplings: bool = True
+    perturbations: Sequence[str] | None = None
 
     def __post_init__(
         self,
@@ -77,9 +76,6 @@ class AnnotatedPerturbationData:
         """
         Registers the indices of control and treatment data for more efficient dataloading.
         """
-
-        # pre-compute seen combinatorial perturbations
-        self.seen_combinatorial_perturbations = self._get_seen_combinatorial_perturbations()
 
         # pre-allocating attributes        
         self.control_idxs = None
@@ -111,42 +107,20 @@ class AnnotatedPerturbationData:
             self.treatment_idxs = np.argwhere(self.adata.obs[self.control_key] == False)[:, 0]
         else:
             self.treatment_idxs = np.arange(len(self.adata))
-        if self.seen_combinatorial_perturbations is None:
-            self.treatment_idxs_per_condition = {DataFields.CONDITION_VALUES: self.treatment_idxs}
-        else:
+        if self.perturbations is not None and self.seen_combinations is not None:
             self.treatment_idxs_per_condition = {
                 DataFields.CONDITION_VALUES: self.treatment_idxs,
                 **{
-                    treatment: np.argwhere(self.adata.obs[[pert for pert in self.perturbations_with_rep.keys()]] == treatment)[:, 0] 
-                        for treatment in self.seen_combinatorial_perturbations
+                    treatment: np.argwhere(self.adata.obs[[pert for pert in self.perturbations]] == treatment)[:, 0] 
+                        for treatment in self.seen_combinations
                 }
             }
+        else:
+            self.treatment_idxs_per_condition = {DataFields.CONDITION_VALUES: self.treatment_idxs}
         # register state data
         self.treatment_data = {
             treatment: self.data[treatment_idxs] for treatment, treatment_idxs in self.treatment_idxs_per_condition.items()
         }
-
-    def _get_seen_combinatorial_perturbations(
-        self,
-    ) -> Sequence[Sequence[str]] | None:
-        """
-        Returns the list of unique perturbations present in the dataset.
-
-        These will be computed by using the keys of :attr:`AnnotatedPerturbationData.perturbations_with_rep` to retrieve the unique combinations
-        from the :attr: `obs` attribute of the :attr: `AnnotatedPerturbationData.adata` object. This is needed to sample unique conditions in the case of
-        Optimal Transport couplings.
-        It returns `None` in the following three cases:
-            * No perturbation data is provided.
-            * No perturbation representation is provided.
-            * There is at least one perturbation passed in :attr:`AnnotatedPerturbationData.perturbations_in_obsm`, in which case no OT coupling can be done.
-
-        :rtype: class: `Sequence[Sequence[str]] | None`
-        """
-        # no perturbation data is passed to the AnnotatedPerturbationData object or no perturbation with associated representation
-        if (self.perturbation_data is None) or (self.perturbations_with_rep is None) or len(self.perturbations_in_obsm) > 0:
-            return None 
-        combs = self.adata.obs[[pert for pert in self.perturbations_with_rep.keys()]].drop_duplicates().values.tolist()
-        return [tuple(comb) for comb in combs]
 
     def get_controls(
         self,
@@ -202,7 +176,7 @@ class AnnotatedPerturbationData:
         :rtype: Dict[str, TensorLike]
         """
         # case 0: Seen combinatorial perturbation is None. No specific treatment is to be retrieved.
-        if self.seen_combinatorial_perturbations is None:
+        if self.seen_combinations is None:
             # sanity check: we should not pass the treatments
             msg = f""
             assert treatments is None, msg
@@ -252,9 +226,10 @@ class AnnotatedPerturbationData:
             state_data,
             perturbation_data=perturbation_data,
             target_data=target_data,
+            seen_combinations=self.seen_combinations,
             perturbations_with_rep=self.perturbations_with_rep,
             has_controls=self.has_controls,
-            perturbations_in_obsm=self.perturbations_in_obsm
+            perturbations=self.perturbations
         )
     
     def __len__(
