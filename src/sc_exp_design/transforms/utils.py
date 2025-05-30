@@ -21,6 +21,7 @@ def one_hot_encode(
     # when we have only one dimension we reshape it to two
     if data.ndim == 1:
         msg = f"When using \"one_hot\" as target representation in `target_covariates`, you need to pass a 2-dimensional array, found {data.ndim=}. Reshaping the array."
+        logger.info(msg)
         data = data.reshape(-1, 1)
 
     # we need two dimensions
