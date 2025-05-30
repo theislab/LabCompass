@@ -121,22 +121,23 @@ class NeuralVelocityFieldConfig:
         Only used if :param: `use_source_as_condition` is `True`, defaults to `False`.
     :type encode_source: class: `bool`
 
-    :param source_latent_dim: The output dimensions for the source encoder.
+    :param source_encoder_output_dim: The output dimensions for the source encoder.
         This represents the latent dimensionality of the source states will be embedded into.
         Sets the attribute :attr:`MLPBlock.output_dim` of :attr:`NeuralVelocityField.time_encoder`.
         Only used if :param: `encode_source` is `True`, defaults to `10`.
-    :type source_latent_dim: class: `int`
+    :type source_encoder_output_dim: class: `int`
 
     :param source_encoder_mlp_kwargs: Dictionary containing the configurations for the source encoder :class:`MLPBlock`.
         If provided, it needs to specify the requirements defined by the :class: `MLPConfigFields` of :module: `sc_exp_design.types`.
         It should NOT contain neither the `"input_dim"` nor the `"output_dim"` keys, as these will be respectively taken
-        from :param: `flow_dim` and :param: `source_latent_dim`.
+        from :param: `flow_dim` and :param: `source_encoder_output_dim`.
         Only used if :param: `encode_source` is `True`, defaults to an empty dictionary.
     :type source_encoder_mlp_kwargs: class: `dict[str, Any]`
 
-    :param use_resnet_blocks: Whether to use :class: `ResnetBlock` as residual bottleneck before performing the concatenation.
-        Used only when :param: `encode_state` is `True`, defaults to `False`.
-    :type use_resnet_blocks: class: `bool`
+    :param conditioning_type: The conditioning strategy for the velocity field.
+        When "resnet", it is required to have :param: `encode_state` set to `True`.
+        When "film", it is also required to use use guidance by setting :param: `use_guidance` to `True`. Defaults to "concantenation"
+    :type conditioning_type: class: `Literal["concatenation", "resnet", "film"]`
 
     :param n_resnet_blocks: The number of residual network blocks to be instanciated.
         Only used when :param: `use_resnet_blocks` is `True`, defaults to `3`.
@@ -149,10 +150,6 @@ class NeuralVelocityFieldConfig:
     :param resnet_normalization: The normalization used by the residual network.
         Only used when :param: `use_resnet_blocks` is `True`, defaults to `None`.
     :type resnet_normalization: class: `Literal["layer", "batch"] | None`
-
-    :param use_film_block: Whether to use :class: `FiLMBlock` as conditioning approach.
-        Used only when :param: `encode_state` is `True` and `use_guidance` is `True`, defaults to `False`.
-    :type use_resnet_blocks: class: `bool`
     
     :param use_classifier_free_guidance: Whether to use classifier-free guidance, defaults to ´False´.
     :type use_classifier_free_guidance: class: `bool`
@@ -219,9 +216,13 @@ class NeuralVelocityFieldConfig:
             msg = f"You must encode the state and use guidance when using the {self.conditioning_type} conditioning."
             assert self.encode_state and self.use_guidance, msg
 
-        if self.conditioning_type == "resnet":
+        elif self.conditioning_type == "resnet":
             msg = f"You must encode the state when using the {self.conditioning_type} conditioning."
             assert self.encode_state, msg
+
+        elif self.condioning_type != "concatenation":
+            msg = f"Conditioning type {self.conditioning_type} is not supported. Possible values are [\"concatenation\", \"resnet\", \"film\"]"
+            raise ValueError(msg)
 
         # sanity check on condition encoder
         if self.use_guidance:
