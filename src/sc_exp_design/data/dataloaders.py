@@ -403,7 +403,6 @@ class ValidationDataLoader(BaseCoupledDataLoader):
 
         # constructing output dictionary
         out_dict = {}
-
         # iterating over the perturbations
         for treatment in treatments:
 

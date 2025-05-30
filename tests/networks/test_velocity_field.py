@@ -13,7 +13,7 @@ flow_dim = 2
 treatment0_dim = 5
 treatment1_dim = 7
 perturbation_dim_before_pooling = 32
-perturbation_latent_dim = 16
+perturbation_encoder_output_dim = 16
 state_latent_dim = 16
 time_features_num_freqs = 8
 time_latent_dim = 16
@@ -102,7 +102,7 @@ class TestNeuralVelocityField:
     @pytest.mark.parametrize("use_source_as_condition", [True, False])
     @pytest.mark.parametrize("encode_source", [True, False])
     @pytest.mark.parametrize("source_encoder_mlp_kwargs", [linear_config, mlp_config])
-    @pytest.mark.parametrize("use_resnet_blocks", [False, True])
+    @pytest.mark.parametrize("conditioning_type", ["concatenation", "resnet", "film"])
     @pytest.mark.parametrize("resnet_normalization", ["layer", "batch", None])
     @pytest.mark.parametrize("use_classifier_free_guidance", [True, False])
     def test_conditional_velocity_field(
@@ -120,7 +120,7 @@ class TestNeuralVelocityField:
         use_source_as_condition: bool,
         encode_source: bool,
         source_encoder_mlp_kwargs: dict[str, Any],
-        use_resnet_blocks: bool,
+        conditioning_type: Literal["concatenation", "resnet", "film"],
         resnet_normalization: Literal["layer", "batch"] | None,
         use_classifier_free_guidance: bool,
     ):
@@ -132,7 +132,9 @@ class TestNeuralVelocityField:
 
         # we can only use resnet when encoding states
         if not encode_state:
-            use_resnet_blocks = False
+            conditioning_type = "concatenation"
+        elif not use_guidance and conditioning_type == "film":
+            conditioning_type = "concatenation"
 
         # we can only use cfg when using guidance
         if not use_guidance:
@@ -151,16 +153,16 @@ class TestNeuralVelocityField:
             time_encoder_mlp_kwargs=time_encoder_mlp_kwargs(),
             use_guidance=use_guidance,
             encode_conditions=encode_conditions,
-            perturbation_latent_dim=perturbation_latent_dim,
+            perturbation_encoder_output_dim=perturbation_encoder_output_dim,
             perturbation_pooling=perturbation_pooling,
             perturbation_layers_before_pooling=perturbation_layers_before_pooling,
             perturbation_layers_after_pooling=perturbation_layers_after_pooling(),
             decoder_mlp_kwargs=decoder_mlp_kwargs(),
             use_source_as_condition=use_source_as_condition,
             encode_source=encode_source,
-            source_latent_dim=state_latent_dim,
+            source_encoder_output_dim=state_latent_dim,
             source_encoder_mlp_kwargs=source_encoder_mlp_kwargs(),
-            use_resnet_blocks=use_resnet_blocks,
+            conditioning_type=conditioning_type,
             resnet_normalization=resnet_normalization,
             use_classifier_free_guidance=use_classifier_free_guidance,
         )
@@ -169,50 +171,8 @@ class TestNeuralVelocityField:
         cvf = sc_exp_design.networks.NeuralVelocityField(
             config,
         )
-        vf_out = cvf.forward(t_test, x_test, cond, source=source)
-  
-        # retrieve target latent state dim
-        expected_latent_state_dim = flow_dim
-        if encode_state:
-            expected_latent_state_dim = state_latent_dim
-
-        # retrieve target latent time dim
-        expected_latent_time_dim = 1
-        if use_sinusoidal_time_features:
-            expected_latent_time_dim = time_features_num_freqs
-        if encode_time:
-            expected_latent_time_dim = time_latent_dim
-
-        # retrieve target latent condition dim
-        expected_latent_condition_dim = 0
-        if use_guidance:
-            expected_latent_condition_dim = sum(
-                [
-                    mlp_conf["input_dim"] for mlp_conf in perturbation_layers_before_pooling.values()
-                ]
-            )
-            if encode_conditions:
-                expected_latent_condition_dim = perturbation_latent_dim
-
-        # retrieve target latent source dim
-        expected_latent_source_dim = 0
-        if use_source_as_condition:
-            expected_latent_source_dim = flow_dim
-            if encode_source:
-                expected_latent_source_dim = state_latent_dim
-
-        # retrieving the expected joint latent dim
-        expected_joint_latent_dim = expected_latent_state_dim + expected_latent_time_dim + expected_latent_condition_dim + expected_latent_source_dim
-        if use_resnet_blocks:
-            expected_joint_latent_dim = expected_latent_state_dim
-
+        vf = cvf.forward(t_test, x_test, cond, source=source)
+ 
         # sanity check on velocity field output
-        msg = f"The velocity field has the wrong shape. Got {vf_out[VFStepFields.VF].shape}, expected {(batch_size, flow_dim)}."
-        assert vf_out[VFStepFields.VF].shape == (batch_size, flow_dim), msg
-
-        # sanity check on latent states
-        msg = f"Shape mismatch state latent repr. Got: {vf_out[VFStepFields.LATENT_STATE].shape}, expected: {(batch_size, expected_latent_state_dim)}"
-        assert vf_out[VFStepFields.LATENT_STATE].shape == (batch_size, expected_latent_state_dim), msg
-
-        msg = f"Shape mismatch joint latent repr. Got: {vf_out[VFStepFields.LATENT_REPR].shape}, expected: {(batch_size, expected_joint_latent_dim)}"
-        assert vf_out[VFStepFields.LATENT_REPR].shape == (batch_size, expected_joint_latent_dim), msg
+        msg = f"The velocity field has the wrong shape. Got {vf.shape}, expected {(batch_size, flow_dim)}."
+        assert vf.shape == (batch_size, flow_dim), msg
