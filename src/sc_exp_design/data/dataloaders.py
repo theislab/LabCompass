@@ -367,7 +367,6 @@ class ValidationDataLoader(BaseCoupledDataLoader):
 
         # constructing output dictionary
         out_dict = {}
-
         # iterating over the perturbations
         for treatment in treatments:
 
@@ -385,7 +384,7 @@ class ValidationDataLoader(BaseCoupledDataLoader):
             else:
                 msg = f""
                 assert isinstance(treatment, Sequence), msg
-                treatment_id = "_".join(treatment)
+                treatment_id = "_".join(str(treatment))
 
             # storing output dictionary for current perturbation
             out_dict[treatment_id] = treatement_data
