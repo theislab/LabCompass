@@ -367,7 +367,6 @@ class ValidationDataLoader(BaseCoupledDataLoader):
 
         # constructing output dictionary
         out_dict = {}
-        print(treatments)
         # iterating over the perturbations
         for treatment in treatments:
 
