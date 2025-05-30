@@ -155,7 +155,7 @@ class NeuralVelocityField(BaseModule):
                         self.config.state_encoder_output_dim, 
                         out_dim=None,  # dimensionality preserving 
                         dropout_prob=self.config.resnet_dropout_prob, 
-                        embedding_dim=self.config.decoder_input_dim,
+                        embedding_dim=self.config.resnet_embedding_dim,
                         normalization=self.config.resnet_normalization
                     )
                 ) 
@@ -164,7 +164,7 @@ class NeuralVelocityField(BaseModule):
         self.film_block = None
         if self.config.conditioning_type == "film":
             self.film_block = FiLMBlock(
-                in_dim=(self.config.state_encoder_output_dim + self.config.time_encoder_output_dim),
+                in_dim=(self.config.state_latent_dim + self.config.time_latent_dim),
                 cond_dim=(self.config.perturbation_latent_dim + self.config.source_latent_dim))
         # Decoder
         self.decoder = MLPBlock(
@@ -179,7 +179,7 @@ class NeuralVelocityField(BaseModule):
         xt: Tensor,
         cond: dict[str, Tensor] | None = None,
         source: Tensor | None = None,
-    ) -> dict[str, Tensor]:
+    ) -> Tensor:
         """
         Forward pass through the neural velocity field model.
         
@@ -225,7 +225,7 @@ class NeuralVelocityField(BaseModule):
             xt_latent = self.x_encoder(xt)
 
         # concatenating original and latent representations
-        if self.config.conditioning_type == "concantenation":
+        if self.config.conditioning_type == "concatenation":
             if self.config.use_guidance:
                 # sanity check (condition should be not None)
                 msg = f""
@@ -252,7 +252,7 @@ class NeuralVelocityField(BaseModule):
             source_latent = source
             if self.config.encode_source:
                 source_latent = self.source_encoder(source)
-            if self.conditioning_type == "concatenation":
+            if self.config.conditioning_type == "concatenation":
                 # concatenating to the input for the decoder
                 latent_concat = torch.cat([latent_concat, source_latent], dim=-1)
             else:
@@ -268,31 +268,7 @@ class NeuralVelocityField(BaseModule):
             latent_concat = self.film_block(latent_concat, condition_concat)
 
         # forward pass on neural velocity field
-        vf = self.decoder(latent_concat)
-        # creating output dictionary
-        output_dict = {VFStepFields.VF: vf, VFStepFields.LATENT_REPR: latent_concat, VFStepFields.LATENT_STATE: xt_latent}
-
-        return output_dict
-
-    def vf(
-        self,
-        t: Tensor,
-        xt: Tensor,
-        cond: dict[str, Tensor] | None = None,
-        source: Tensor | None = None,
-    ) -> Tensor:
-        """
-        Computes the velocity field given time and state.
-        
-        Args:
-            t (Tensor): Time input.
-            xt (Tensor): State input.
-            cond (dict[str, Tensor] | None, optional): Conditioning variables. Defaults to None.
-        
-        Returns:
-            Tensor: Velocity field output.
-        """
-        return self.forward(t, xt, cond=cond, source=source)[VFStepFields.VF]
+        return self.decoder(latent_concat)
 
     def get_vf_fn(
         self,
@@ -325,8 +301,8 @@ class NeuralVelocityField(BaseModule):
                 # get null condition token
                 null_condition_token = self.get_null_condition_token(cond)
                 # computing unguided and guided velocity fields
-                vf_unguided = self.vf(t, xt, cond=null_condition_token, source=source)
-                vf_guided = self.vf(t, xt, cond=cond, source=source)
+                vf_unguided = self.forward(t, xt, cond=null_condition_token, source=source)
+                vf_guided = self.forward(t, xt, cond=cond, source=source)
                 # computing the final velocity field
                 vf = vf_unguided + cfg_guidance_strength * (vf_guided - vf_unguided)
                 return vf

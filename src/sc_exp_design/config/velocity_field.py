@@ -67,8 +67,8 @@ class NeuralVelocityFieldConfig:
     :param encode_conditions: Whether to encode the guidance conditions using the :class: `ConditionEncoder` object from :module: `sc_exp_design.networks`, defaults to `False`.
     :type encode_conditions:
 
-    :param perturbation_latent_dim: Latent dimensionality for the encoded conditions. Only used if :param: `encode_conditions` is set to `True`, defaults to `10`.
-    :type perturbation_latent_dim: class:`int`
+    :param perturbation_encoder_output_dim: Latent dimensionality for the encoded conditions. Only used if :param: `encode_conditions` is set to `True`, defaults to `10`.
+    :type perturbation_encoder_output_dim: class:`int`
 
     :param perturbation_layers_before_pooling: Dictionary mapping each condition to be encoded to the configuration of its encoder.
         Each key of :attr:`.NeuralVelocityFieldConfig.condiion_layers_before_pooling` will be given by a :class:`str` with
@@ -100,7 +100,7 @@ class NeuralVelocityFieldConfig:
     :param perturbation_layers_after_pooling: Configuration for the condition decoder, used to initialize the :attr:`ConditionEncoder.after_pooling` attribute of
         :attr:`NeuralVelocityField.condition_encoder`. Should be a :class:`dict`. If provided, it needs to specify the requirements defined by the :class: `MLPConfigFields` of :module: `sc_exp_design.types`.
         It should NOT contain neither the `"input_dim"` nor the `"output_dim"` keys, as these will be respectively taken
-        from :attr: `NeuralVelocityFieldConfig.perturbation_layers_after_pooling_input_dim` and :param: `perturbation_latent_dim`.
+        from :attr: `NeuralVelocityFieldConfig.perturbation_layers_after_pooling_input_dim` and :param: `perturbation_encoder_output_dim`.
         Defaults to `None`.
     :type perturbation_layers_after_pooling: class:`MLPConfigFields | None`
 
@@ -173,7 +173,7 @@ class NeuralVelocityFieldConfig:
     time_encoder_mlp_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
     use_guidance: bool = True
     encode_conditions: bool = False
-    perturbation_latent_dim: int = 10
+    perturbation_encoder_output_dim: int = 10
     perturbation_layers_before_pooling: dict[str, dict[str, Any]] | None = None
     perturbation_covariates_not_pooled: Sequence[str] | None = None
     perturbation_pooling: Literal["mean", "sum", "self_attention"] = "mean"
@@ -182,7 +182,7 @@ class NeuralVelocityFieldConfig:
     decoder_mlp_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
     use_source_as_condition: bool = False
     encode_source: bool = False
-    source_latent_dim: int = 10
+    source_encoder_output_dim: int = 10
     source_encoder_mlp_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {},)
     conditioning_type: Literal["concatenation", "resnet", "film"] = "concatenation"
     n_resnet_blocks: int = 3
@@ -200,7 +200,7 @@ class NeuralVelocityFieldConfig:
         * When :attr: `NeuralVelocityFieldConfig.use_guidance` is set to `True` it verifies that the :attr: `NeuralVelocityFieldConfig.perturbation_layers_before_pooling` is not None.
         * When :attr: `NeuralVelocityFieldConfig.encode_conditions` is set to `False` it verifies that the :attr: `NeuralVelocityFieldConfig.perturbation_layers_before_pooling` is properly set.
         * When :attr: `NeuralVelocityFieldConfig.encode_conditions` is set to `True` it also verifies that the :attr: `NeuralVelocityFieldConfig.perturbation_layers_after_pooling` is properly set.
-            It also sets the "input_dim" and "output_dim" keys using respectively :attr: `NeuralVelocityFieldConfig.perturbation_layers_after_pooling_input_dim` and :attr: `NeuralVelocityFieldConfig.perturbation_latent_dim`.
+            It also sets the "input_dim" and "output_dim" keys using respectively :attr: `NeuralVelocityFieldConfig.perturbation_layers_after_pooling_input_dim` and :attr: `NeuralVelocityFieldConfig.perturbation_encoder_output_dim`.
 
         """
         # sanity check on mlp configurations
@@ -215,9 +215,13 @@ class NeuralVelocityFieldConfig:
         mlp_kwargs_verifier(self.source_encoder_mlp_kwargs)
 
         # sanity check conditioning block
-        if self.conditioning_type in ("resnet", "film"):
+        if self.conditioning_type == "film":
             msg = f"You must encode the state and use guidance when using the {self.conditioning_type} conditioning."
             assert self.encode_state and self.use_guidance, msg
+
+        if self.conditioning_type == "resnet":
+            msg = f"You must encode the state when using the {self.conditioning_type} conditioning."
+            assert self.encode_state, msg
 
         # sanity check on condition encoder
         if self.use_guidance:
@@ -233,10 +237,9 @@ class NeuralVelocityFieldConfig:
                 assert self.perturbation_layers_after_pooling is not None, msg
                 msg = f"`self.perturbation_layers_after_pooling` is expected to be an instance of `dict`, found {type(self.perturbation_layers_after_pooling)}"
                 assert isinstance(self.perturbation_layers_after_pooling, dict), msg
-                print(self.perturbation_layers_after_pooling)
                 mlp_kwargs_verifier(self.perturbation_layers_after_pooling)
                 self.perturbation_layers_after_pooling["input_dim"] = self.perturbation_layers_after_pooling_input_dim
-                self.perturbation_layers_after_pooling["output_dim"] = self.perturbation_latent_dim
+                self.perturbation_layers_after_pooling["output_dim"] = self.perturbation_encoder_output_dim
             else:
                 for condition, layers_dict in self.perturbation_layers_before_pooling.items():
                     msg = f"`layers_dict` is expected to be an instance of `dict`, found {type(layers_dict)}"
@@ -334,6 +337,53 @@ class NeuralVelocityFieldConfig:
         return dim
 
     @property
+    def perturbation_latent_dim(
+        self,
+    ) -> int:
+        """Returns the latent dimensionality of the perturbations. When no guidance is used returns 0."""
+        if self.use_guidance and self.encode_conditions:
+            return self.perturbation_encoder_output_dim
+        elif self.use_guidance and (not self.encode_conditions):
+            return self.condition_input_dim
+        return 0
+
+    @property
+    def time_latent_dim(
+        self,
+    ) -> int:
+        """Returns the latent dimensionality of the time index."""
+        if self.encode_time:
+            return self.time_encoder_output_dim
+        return self.time_encoder_input_dim
+
+    @property
+    def source_latent_dim(
+        self,
+    ) -> int:
+        """Returns the latent dimension of the source conditioning. Returns 0 when the source is not used to condition the VF."""
+        if self.use_source_as_condition:
+            if self.encode_source:
+                return self.source_encoder_output_dim
+            return self.flow_dim
+        return 0
+
+    @property
+    def state_latent_dim(
+        self,
+    ) -> int:
+        """Returns the latent dimension of the states."""
+        if self.encode_state:
+            return self.state_encoder_output_dim 
+        return self.flow_dim
+
+    @property
+    def resnet_embedding_dim(
+        self,
+    ) -> int:
+        """Returns the dimensionality of the residual network condition embedding."""
+        return self.time_latent_dim + self.perturbation_latent_dim + self.source_latent_dim
+
+    @property
     def decoder_input_dim(
         self,
     ) -> int:
@@ -342,39 +392,17 @@ class NeuralVelocityFieldConfig:
         It adds the correct dimensions for each different case.
 
         :rtype: class: `int`
-        """
-        # perturbations
-        perturbation_latent_dim = 0
-        if self.use_guidance and self.encode_conditions:
-            perturbation_latent_dim = self.perturbation_latent_dim
-        elif self.use_guidance and (not self.encode_conditions):
-            perturbation_latent_dim = self.condition_input_dim
-        # time
-        time_latent_dim = self.time_encoder_input_dim
-        if self.encode_time:
-            time_latent_dim = self.time_encoder_output_dim
-        # source
-        source_latent_dim = 0
-        if self.use_source_as_condition:
-            source_latent_dim = self.flow_dim
-            if self.encode_source:
-                source_latent_dim = self.source_latent_dim
-        # states
-        state_latent_dim = self.flow_dim
-        if self.encode_state:
-            state_latent_dim = self.state_encoder_output_dim        
+        """    
         # concatenation state, conditions, source and time 
         if self.conditioning_type == "concatenation":
-            return state_latent_dim + time_latent_dim + perturbation_latent_dim + source_latent_dim
+            return self.state_latent_dim + self.time_latent_dim + self.perturbation_latent_dim + self.source_latent_dim
         # resnet block
         elif self.conditioning_type == "resnet":
-            return state_latent_dim
+            return self.state_latent_dim
         # film block
         elif self.conditioning_type == "film":
-            return state_latent_dim + time_latent_dim
-        # concatenation only happens at the conditioning dimension with resnet 
-        return time_latent_dim + perturbation_latent_dim + source_latent_dim
-    
+            return self.state_latent_dim + self.time_latent_dim        
+
     @property
     def initialize_source_encoder(
         self,
