@@ -21,7 +21,11 @@ __all__ = [
 
 @dataclass
 class BaseDataSchema(abc.ABC):
-    """"""
+    """Base class for handling data schemas given an underlying :object: `anndata.AnnData`.
+    
+    :param adata: The annotated data object on which to validate and enforce the data schema.
+    :type adata: class: `anndata.AnnData`
+    """
 
     adata: anndata.AnnData
 
@@ -29,7 +33,14 @@ class BaseDataSchema(abc.ABC):
         self,
         adata: anndata.AnnData | None = None,
     ) -> anndata.AnnData:
-        """"""
+        """Resolves optional extra annotated data arguments.
+
+        When external annotated data are provided, it enforces and uses its schema over them.
+        Otherwise returns the :attr: `self.adata` object by default.
+
+        :param adata: Optional external annotated data on which to enforce the data schema, defaults to `None`.
+        :type adata: class: `anndata.AnnData | None`
+        """
         # handling adata
         if adata is None and self.adata is None:
             msg = "Both `adata` and `self.adata` are None, you need to pass an `anndata.AnnData` object containing the data."
@@ -42,13 +53,22 @@ class BaseDataSchema(abc.ABC):
     def get_data(
         self,
     ) -> Any:
-        """"""
+        """Enforces the data schema and returned the compiled data."""
         raise NotImplementedError
 
 
 @dataclass
 class StateDataSchema(BaseDataSchema):
-    """"""
+    """Schema for handling state data. Currently supports only unimodal states.
+
+    :param adata: The annotated data object on which to validate and enforce the data schema.
+    :type adata: class: `anndata.AnnData`
+
+    :param sample_rep: Optional key indicating the location of the sample representation
+        within the :attr: `self.adata.obsm` object. When not provided, it will automatically retrieve
+        the :attr: `self.adata.X` to be used a state representation.
+    :type sample_rep: class: `str | None`
+    """
 
     adata: anndata.AnnData
     sample_rep: str | None
@@ -56,7 +76,10 @@ class StateDataSchema(BaseDataSchema):
     def __post_init__(
         self,
     ) -> None:
-        """"""
+        """Performs sanity checks on the annotated data object.
+        
+        It verifies that the :attr: `sample_rep` key appear in :attr: `self.adata.obsm` when provided.
+        """
         # when we provide the sample rep key it should appear in `self.adata.obsm`
         if self.sample_rep is not None:
             if self.sample_rep not in self.adata.obsm.keys():
@@ -66,8 +89,13 @@ class StateDataSchema(BaseDataSchema):
     def get_data(
         self,
         adata: anndata.AnnData | None = None,
-    ) -> dict[str, np.ndarray]:
-        """"""
+    ) -> np.ndarray:
+        """Enforces the data schema and returns the compiled state data.
+        
+        :param adata: Optional annotated data object on which to enforce the schema.
+            When not provided, it will automatically use :attr: `self.adata`.
+        :type adata: class: `anndata.AnnData | None`
+        """
         # handling adata
         adata = self._resolve_adata(adata)
         
@@ -81,7 +109,40 @@ class StateDataSchema(BaseDataSchema):
 
 @dataclass
 class PerturbationDataSchema(BaseDataSchema):
-    """"""
+    """Schema for handling perturbation data.
+    
+    :param adata: The annotated data object on which to validate and enforce the data schema.
+    :type adata: class: `anndata.AnnData`
+
+    :param perturbations: Optional identifiers for the modeled perturbations.
+        When a single string identifier is passed, it will be coerced to a sequence.
+        Each element of :param: `perturbations` is required to have an associated
+        representation in :param: `perturbation_reps`.
+        Every identifier in :param: `perturbations` that is not appearing in :param: `perturbations_in_obsm`,
+        should be the name of a column in :attr: `self.adata.obs`.
+    :type perturbations: class: `str | Sequence[str] | None`
+
+    :param perturbations_in_obsm: Optional identifiers for the perturbations associated
+        to a continuous representation. When a string identifier is passed, it will be coerced to
+        a sequence with only one element. When `None`, it will be coerced to an empty sequence.
+        Each element in :param: `perturbations_in_obsm` should also be appearing in :param: `perturbations`.
+        All perturbations appearing here, will need to have at most one representation passed in :param: `perturbation_reps`.
+        Such perturbation representations will have to be found inside :attr: `self.adata.obsm`.
+        When these are provided, it is not possible to use grouped couplings (i.e.: Optimal Transport).
+    :type perturbations_in_obsm: class: `str | Sequence[str] | None`
+
+    :param perturbation_covariates: Optional dictionary mapping perturbations in :param: `perturbations`
+        to their modeled covariates to be found in :attr: `self.adata.obsm`.
+    :type perturbation_covariates: class: `dict[str, str | Sequence[str]] | None`
+
+    :param perturbation_reps: Optional dictionary mapping perturbations to their respective representation.
+        For perturbations appearing inside :param: `perturbations_in_obsm`, such representation is to be found
+        in :attr: `self.adata.obsm`. It will map the remaining perturbations to their modeled representation
+        to be found in :attr: `self.adata.uns`. For each perturbation in the keys of :param: `perturbation_reps`
+        the provided value should map to a dictioanry field in :attr: `self.adata.uns`, whose keys will
+        have to match the unique values appearing in the :attr: `self.adata.obs[perturbation]` column. 
+    :type perturbation_reps: class: `dict[str, str | Sequence[str]] | None`
+    """
 
     adata: anndata.AnnData
     perturbations: str | Sequence[str] | None
@@ -92,7 +153,7 @@ class PerturbationDataSchema(BaseDataSchema):
     def __post_init__(
         self,
     ) -> None:
-        """"""
+        """Performs sanity checks on the configurations and the annotated data object."""
         # sanity check perturbations_in_obsm
         # when not provided, initialize empty sequence
         if self.perturbations_in_obsm is None:
@@ -189,10 +250,22 @@ class PerturbationDataSchema(BaseDataSchema):
     def __configure_covariate_metadata(
         self,
         identifiers: Sequence[str] | str,
-        adata_field_key: Literal["uns", "obs"],
+        adata_field_key: Literal["uns", "obsm"],
         allow_only_one_element: bool = False
     ) -> Sequence[str] | str:
-        """"""
+        """Configures the covariates metadata and performs some additional sanity checks
+        
+        :param identifiers: Sequence of covariate identifiers for the current perturbation.
+        :type identifiers: class: `Sequence[str] | str`
+
+        :param adata_field_key: Key indicating the field in the annotated data object 
+            where such identifiers are to be found.
+        :type adata_field_key: class `Literal["uns", "obsm"]`
+
+        :param allow_only_one_element: Whether to allow for only one identifier to be passed.
+            This is needed for all the perturbations is :attr: `self.perturbations_in_obsm`.
+        :type allow_only_one_element: class: `bool`
+        """
         # retrieving adata field
         adata_field = getattr(self.adata, adata_field_key)
 
@@ -230,7 +303,14 @@ class PerturbationDataSchema(BaseDataSchema):
         perturbation: str,
         adata: anndata.AnnData,
     ) -> dict[str, np.ndarray]:
-        """"""
+        """Retrieves the data for a given perturbation identifier.
+        
+        :param perturbation: Identifier for the current perturbation for which to retrieve the data.
+        :type perturbation: class: `str`
+
+        :param adata: Annotated data object on which to enforce the data schema for the current perturbation.
+        :type adata: class: `anndata.AnnData`
+        """
         # initializing output dictionary
         perturbation_data = {}
 
@@ -277,7 +357,12 @@ class PerturbationDataSchema(BaseDataSchema):
         self,
         adata: anndata.AnnData | None = None,
     ) -> dict[str, np.ndarray]:
-        """"""
+        """Enforces the data schema and returns the compiled perturbation data.
+        
+        :param adata: Optional annotated data object on which to enforce the schema.
+            When not provided, it will automatically use :attr: `self.adata`.
+        :type adata: class: `anndata.AnnData | None`
+        """
         # handling adata
         adata = self._resolve_adata(adata)
         
@@ -323,7 +408,7 @@ class PerturbationDataSchema(BaseDataSchema):
     def seen_combinations(
         self,
     ) -> Sequence[Sequence[str]] | None:
-        """"""
+        """Returns a sequence of unique perturbation combinations appearing in the data."""
         # no perturbation to group over
         if not self.allow_grouped_couplings:
             return None
@@ -333,7 +418,24 @@ class PerturbationDataSchema(BaseDataSchema):
 
 @dataclass
 class TargetDataSchema(BaseDataSchema):
-    """"""
+    """Schema for handling target data
+
+    :param target_covariates: Dictionary mapping each string identifier for the target covariates to be loaded to their
+        target representation: This can be either `"label"` for loading labels, `"one_hot"` for loading one hot encoded
+        vectors or `"identity"` to keep the retrieved representation as is.
+        These covariates are to be found as keys of the :attr: `obs` attribute of :param: `adata`, unless appearing
+        in :param: `target_covariates_in_obsm`, in which case their representation is to be retrieved from :attr: `obsm`.
+        Defaults to `None`.
+    :type target_covariates: class: `dict[str, Literal["one_hot", "label", "identity"]] | None`
+    
+    :param target_covariates_in_obsm: Optional sequence of string identifiers indicating the target covariates to be retrieved from
+        the :attr: `obsm` attribute of :param: `adata`, defaults to `None`.
+    :type target_covariates_in_obsm: class: `Sequence[str] | None`.
+
+    :param target_covariates_kwargs: Optional keyword arguments used to retrieve the desired representation for the target covariates.
+        Defaults to `None`.
+    :type target_covariates_kwargs: class: `dict[str, Any]`
+    """
 
     adata: anndata.AnnData
     target_covariates: dict[str, Literal["one_hot", "label", "identity"]]
@@ -374,7 +476,15 @@ class TargetDataSchema(BaseDataSchema):
         target_covariate: str,
         adata: anndata.AnnData,
     ) -> np.ndarray:
-        """"""
+        """
+        Retrieves the data for a given target covariate identifier identifier.
+        
+        :param target_covariate: Identifier for the current target covariate for which to retrieve the data.
+        :type target_covariate: class: `str`
+
+        :param adata: Annotated data object on which to enforce the data schema for the current perturbation.
+        :type adata: class: `anndata.AnnData`
+        """
 
         # when target covariate is in obsm
         if target_covariate in self.target_covariates_in_obsm:
@@ -415,7 +525,12 @@ class TargetDataSchema(BaseDataSchema):
         self,
         adata: anndata.AnnData | None = None,
     ) -> dict[str, np.ndarray]:
-        """"""
+        """Enforces the data schema and returns the compiled perturbation data.
+        
+        :param adata: Optional annotated data object on which to enforce the schema.
+            When not provided, it will automatically use :attr: `self.adata`.
+        :type adata: class: `anndata.AnnData | None`
+        """
         # handling adata
         adata = self._resolve_adata(adata)
         

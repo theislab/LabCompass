@@ -205,7 +205,9 @@ class DataManager:
     def has_controls(
         self,
     ) -> bool:
-        """Flag indicating whether a notion of control states applies to the current data. Automatically inferred by the presence of :attr: `self.control_key`    
+        """Flag indicating whether a notion of control states applies to the current data.
+        
+        Automatically inferred by the presence of :attr: `self.control_key`    
         """
         if self.control_key is None:
             return False
