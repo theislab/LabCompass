@@ -371,7 +371,7 @@ class NeuralVelocityFieldConfig:
             return state_latent_dim
         # film block
         elif self.conditioning_type == "film":
-            ...
+            return state_latent_dim + time_latent_dim
         # concatenation only happens at the conditioning dimension with resnet 
         return time_latent_dim + perturbation_latent_dim + source_latent_dim
     

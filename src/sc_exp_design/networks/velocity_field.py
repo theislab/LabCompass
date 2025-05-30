@@ -146,7 +146,8 @@ class NeuralVelocityField(BaseModule):
                 **self.config.source_encoder_mlp_kwargs,
             )
         # ResNet
-        if self.config.use_resnet_blocks:            
+        self.resnet_blocks = None
+        if self.config.conditioning_type == "resnet":            
             resnet_blocks = []
             for _ in range(self.config.n_resnet_blocks):
                 resnet_blocks.append(
@@ -160,20 +161,14 @@ class NeuralVelocityField(BaseModule):
                 ) 
             self.resnet_blocks = nn.ModuleList(resnet_blocks)   
         #FiLM
-        if self.config.use_film_block:
+        self.film_block = None
+        if self.config.conditioning_type == "film":
             self.film_block = FiLMBlock(
                 in_dim=(self.config.state_encoder_output_dim + self.config.time_encoder_output_dim),
                 cond_dim=(self.config.perturbation_latent_dim + self.config.source_latent_dim))
-        # Decoder 
-        if not self.config.use_resnet_blocks and not self.config.use_film_block:
-            decoder_input_dim = self.config.decoder_input_dim
-        elif self.config.use_resnet_blocks:
-            decoder_input_dim = self.config.state_encoder_output_dim
-        elif self.config.use_film_block:
-            decoder_input_dim = self.config.state_encoder_output_dim + self.config.time_encoder_output_dim
-        
+        # Decoder
         self.decoder = MLPBlock(
-            decoder_input_dim,
+            self.config.decoder_input_dim,
             self.config.flow_dim,
             **self.config.decoder_mlp_kwargs
         )
@@ -230,7 +225,7 @@ class NeuralVelocityField(BaseModule):
             xt_latent = self.x_encoder(xt)
 
         # concatenating original and latent representations
-        if not self.config.use_resnet_blocks and not self.config.use_film_block:
+        if self.config.conditioning_type == "concantenation":
             if self.config.use_guidance:
                 # sanity check (condition should be not None)
                 msg = f""
@@ -238,13 +233,13 @@ class NeuralVelocityField(BaseModule):
                 latent_concat = torch.cat([t_latent, xt_latent, condition_latent], dim=-1)
             else:
                 latent_concat = torch.cat([t_latent, xt_latent], dim=-1)
-        elif self.config.use_resnet_blocks:
+        elif self.config.conditioning_type == "resnet":
             latent_concat = xt_latent
             if self.config.use_guidance:
                 condition_concat = torch.cat([t_latent, condition_latent], dim=-1)  
             else:
                 condition_concat = t_latent
-        elif self.config.use_film_block:
+        elif self.config.conditioning_type == "film":
             msg = f"FiLM is only possible with guidance"
             assert self.config.use_guidance, msg
             condition_concat = condition_latent 
@@ -257,21 +252,21 @@ class NeuralVelocityField(BaseModule):
             source_latent = source
             if self.config.encode_source:
                 source_latent = self.source_encoder(source)
-            if not self.config.use_resnet_blocks and not self.config.use_film_block:
+            if self.conditioning_type == "concatenation":
                 # concatenating to the input for the decoder
                 latent_concat = torch.cat([latent_concat, source_latent], dim=-1)
             else:
                 condition_concat = torch.cat([condition_concat, source_latent], dim=-1)  # concatenate
             
         # ResNet 
-        if self.config.use_resnet_blocks:
+        if self.config.conditioning_type == "resnet":
             for block in self.resnet_blocks:
                 latent_concat = block(latent_concat, condition_concat)
 
         # FiLM
-        if self.config.use_film_block:
+        elif self.config.conditioning_type == "film":
             latent_concat = self.film_block(latent_concat, condition_concat)
-            
+
         # forward pass on neural velocity field
         vf = self.decoder(latent_concat)
         # creating output dictionary
