@@ -25,15 +25,6 @@ __all__ = [
 
 @dataclass(frozen=True)
 class Metrics:
-    """
-#<<<<<<< Updated upstream
-    r_squared: Callable[[TensorLike, TensorLike], float] = compute_r_squared
-    energy_distance: Callable[[TensorLike, TensorLike], float] = compute_e_distance
-    maximum_mean_discrepancy: Callable[[TensorLike, TensorLike], float] = compute_mmd
-    wasserstein_distance: Callable[[TensorLike, TensorLike], float] = compute_wasserstein_distance
-    sinkhorn_divergence: Callable[[TensorLike, TensorLike], float] = partial(compute_wasserstein_distance, method="sinkhorn")
-#=======
-    """
     weights: TensorLike
     r_squared: Callable[[TensorLike, TensorLike], float] = field(init=False)
     energy_distance: Callable[[TensorLike, TensorLike], float] = field(init=False)
@@ -78,4 +69,3 @@ class Metrics:
 
         object.__setattr__(self, 'generational_homogeneity', compute_n_gen_knn_cell_props)
         object.__setattr__(self, 'coclustering', compute_coclustering)
-#>>>>>>> Stashed changes
