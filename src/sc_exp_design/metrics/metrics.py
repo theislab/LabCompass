@@ -8,6 +8,11 @@ import ot as pot
 from sklearn.metrics import pairwise_distances, r2_score
 from sklearn.metrics.pairwise import rbf_kernel
 from sklearn.neighbors import kneighbors_graph
+from sklearn.utils import check_random_state
+
+import igraph
+from igraph import Graph
+from collections.abc import Generator
 import torch
 
 from sc_exp_design.types import TensorLike
@@ -20,7 +25,8 @@ __all__ = [
     "compute_weighted_max_mse",
     "compute_cell_props",
     "compute_marginal_e_distance",
-    "compute_n_gen_knn_cell_props"
+    "compute_n_gen_knn_cell_props",
+    "compute_coclustering"
 ]
 
 
@@ -305,3 +311,77 @@ def compute_n_gen_knn_cell_props(
         pred_in_neigh = (graph[target_idx, pred_idx].A != 0).sum() / k
         props.append(pred_in_neigh)
     return np.mean(props)
+
+
+
+def get_igraph_from_adjacency(
+    adjacency: TensorLike, 
+    *, 
+    directed: bool = False
+) -> Graph:
+    """Get igraph graph from adjacency matrix."""
+    
+    sources, targets = adjacency.nonzero()
+    weights = adjacency[sources, targets]
+    g = Graph(directed=directed)
+    g.add_vertices(adjacency.shape[0])
+    g.add_edges(list(zip(sources, targets, strict=True)))
+    g.es["weight"] = weights
+    if g.vcount() != adjacency.shape[0]:
+        logg.warning(
+            f"The constructed graph has only {g.vcount()} nodes. "
+            "Your adjacency matrix contained redundant nodes."
+        )
+    return g
+
+
+def compute_clustering(
+    adjacency: TensorLike, 
+    k: int, 
+    random_state: int = 0,
+    **clustering_args
+) -> TensorLike:
+    """Computes Leiden clustering give adjacency matrix"""
+
+    graph = kneighbors_graph(adjacency, n_neighbors=k, mode='connectivity', )
+    g = get_igraph_from_adjacency(graph, directed=False)
+    part = g.community_leiden(**clustering_args)
+    groups = np.array(part.membership)
+    return groups
+
+
+
+def compute_coclustering(
+    pred: TensorLike, 
+    target: TensorLike, 
+    n_iterations: float = -1, 
+    resolution: float = 1., 
+    k: int = 15, 
+    **clustering_args
+) -> float:
+    """Computes proportion of generated and groudtruth cells that co-cluster"""
+    
+    clustering_args = dict(clustering_args)
+    clustering_args["n_iterations"] = n_iterations
+    if resolution is not None:
+        clustering_args["resolution"] = resolution
+    clustering_args.setdefault("objective_function", "modularity")
+
+    if isinstance(pred, torch.Tensor):
+        pred = pred.numpy()
+    if isinstance(target, torch.Tensor):
+        target = target.numpy()
+        
+    # handdling shapes
+    if len(pred.shape) < 3:
+        pred = pred.reshape((1, pred.shape[0], pred.shape[1]))
+    if len(target.shape) < 3:
+        target = target.reshape((1, target.shape[0], target.shape[1]))
+    coclust_props = []
+    
+    for i in range(pred.shape[0]):
+        combined = np.concat([target[i, :, :], pred[i, :, :]])
+        clustering = compute_clustering(combined, k, **clustering_args)
+        coclust_props.append(np.sum(clustering[:target.shape[1]] == clustering[target.shape[1]:]) / target.shape[1])
+        
+    return np.nanmean(coclust_props)
