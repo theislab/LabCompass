@@ -145,11 +145,11 @@ class TestDataManager:
 
         # when we have three perturbations
         if perturbations == ("treatment0", "treatment1", "treatment2"):
-            if perturbations_reps is not None:
+            if perturbation_reps is not None:
                 expected = {
                     "treatment0": ["control", "drug1", "drug2", "drug3", "drug4", "drug5"],
                     "treatment1": ["control", "drug1", "drug2", "drug3", "drug4", "drug5"],
-                    "treatment2": "feats_treatment2_treatment2_features"
+                    "treatment2": "feats_treatment2_treatment2_features",
                     "treatment2": "cov_treatment2_treatment2_features" # TODO: change "cov" to "feats" once finished the viral notebooks
                 }
                 msg = f"Value Mismatch: Expected {expected} got {perturbations_with_rep}"

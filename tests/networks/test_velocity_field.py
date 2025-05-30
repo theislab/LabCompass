@@ -104,6 +104,7 @@ class TestNeuralVelocityField:
     @pytest.mark.parametrize("source_encoder_mlp_kwargs", [linear_config, mlp_config])
     @pytest.mark.parametrize("use_resnet_blocks", [False, True])
     @pytest.mark.parametrize("resnet_normalization", ["layer", "batch", None])
+    @pytest.mark.parametrize("use_classifier_free_guidance", [True, False])
     def test_conditional_velocity_field(
         self,
         encode_state: bool,
@@ -121,6 +122,7 @@ class TestNeuralVelocityField:
         source_encoder_mlp_kwargs: dict[str, Any],
         use_resnet_blocks: bool,
         resnet_normalization: Literal["layer", "batch"] | None,
+        use_classifier_free_guidance: bool,
     ):
 
         # retrieving current settings
@@ -131,6 +133,10 @@ class TestNeuralVelocityField:
         # we can only use resnet when encoding states
         if not encode_state:
             use_resnet_blocks = False
+
+        # we can only use cfg when using guidance
+        if not use_guidance:
+            use_classifier_free_guidance = False
 
         # initializing configurations
         config = sc_exp_design.config.NeuralVelocityFieldConfig(
@@ -154,6 +160,9 @@ class TestNeuralVelocityField:
             encode_source=encode_source,
             source_latent_dim=state_latent_dim,
             source_encoder_mlp_kwargs=source_encoder_mlp_kwargs(),
+            use_resnet_blocks=use_resnet_blocks,
+            resnet_normalization=resnet_normalization,
+            use_classifier_free_guidance=use_classifier_free_guidance,
         )
 
         # forward pass on velocity field
@@ -166,12 +175,14 @@ class TestNeuralVelocityField:
         expected_latent_state_dim = flow_dim
         if encode_state:
             expected_latent_state_dim = state_latent_dim
+
         # retrieve target latent time dim
         expected_latent_time_dim = 1
         if use_sinusoidal_time_features:
             expected_latent_time_dim = time_features_num_freqs
         if encode_time:
             expected_latent_time_dim = time_latent_dim
+
         # retrieve target latent condition dim
         expected_latent_condition_dim = 0
         if use_guidance:
@@ -182,13 +193,18 @@ class TestNeuralVelocityField:
             )
             if encode_conditions:
                 expected_latent_condition_dim = perturbation_latent_dim
+
         # retrieve target latent source dim
         expected_latent_source_dim = 0
         if use_source_as_condition:
             expected_latent_source_dim = flow_dim
             if encode_source:
                 expected_latent_source_dim = state_latent_dim
+
+        # retrieving the expected joint latent dim
         expected_joint_latent_dim = expected_latent_state_dim + expected_latent_time_dim + expected_latent_condition_dim + expected_latent_source_dim
+        if use_resnet_blocks:
+            expected_joint_latent_dim = expected_latent_state_dim
 
         # sanity check on velocity field output
         msg = f"The velocity field has the wrong shape. Got {vf_out[VFStepFields.VF].shape}, expected {(batch_size, flow_dim)}."

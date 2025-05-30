@@ -108,8 +108,9 @@ class FlowMatching(BaseModel):
         self.time_sampler = time_sampler
 
         if generate_from_noise:
-            msg = f""
-            assert flow_type == "rectified", msg
+            if flow_type != "rectified":
+                msg = f"When generating from noise, using the {flow_type} probability paths breaks the marginal preserving property of the generative model."
+                logger.warning(msg)
         self.generate_from_noise = generate_from_noise
         self.noise_distribution = noise_distribution
 
@@ -186,7 +187,7 @@ class FlowMatching(BaseModel):
         self,
         cvf_config: NeuralVelocityFieldConfig,
         optimizer_class: torch.optim.Optimizer = torch.optim.AdamW,
-        optimizer_kwargs: Mapping[str, Any] = {"lr": 0.001},
+        optimizer_kwargs: Mapping[str, Any] = {"lr": 0.0001},
         lr_scheduler_class: torch.optim.lr_scheduler.LRScheduler | None = None,
         lr_scheduler_kwargs: Mapping[str, Any] | None = None,
         lr_scheduler_step: Literal["grad_step", "epoch"] = "grad_step",
@@ -268,7 +269,9 @@ class FlowMatching(BaseModel):
         callbacks: BaseCallBack | None = None,
         grad_steps_log_interval: int = 100,
         num_treatments_to_load: int | None = None,
-        num_samples_per_validation_step: int | None = None
+        num_samples_per_validation_step: int | None = None,
+        cfg_prob_unconditional: float = 0.1,
+        validation_cfg_guidance_strength: float = 1.0,
     ) -> None:
         """Trains the model.
 
@@ -303,15 +306,30 @@ class FlowMatching(BaseModel):
         :param num_samples_per_validation_step: Specifies the number of samples for each observation to be generated during the validation step.
             Only used when :attr: `self.generate_from_noise` is set to `True`, defaults to `None` in which case only one sample will be generated.
         :type num_samples_per_validation_step: class: `int | None`
+
+        :param cfg_prob_unconditional: Probability of sampling the null condition token during the training of the velocitf field.
+            Only used when :attr: `self.cvf_config.use_classifier_free_guidance` is set to `True`, defaults to `0.1`.
+        :type cfg_prob_unconditional: class: `float`
+
+        :param validation_cfg_guidance_strength: Strength of the guidance term during the validation step.
+            Only used when :attr: `self.cvf_config.use_classifier_free_guidance` is set to `True`, defaults to `1.0`.
+        :type validation_cfg_guidance_strength: class: `float`
         """
         # sanity checks
         msg = "Data not initialized, run `prepare_data` before training the model"
         assert self.train_data is not None, msg
         msg = "Model not initialized, run `prepare_model` before training the model"
         assert self.velocity_field is not None, msg
+        if self.cvf_config.use_classifier_free_guidance:
+            msg = "The probability of sampling the null condition token must be less than 1 for classifier-free guidance"
+            assert cfg_prob_unconditional < 1, msg
 
         # storing state transforms as attribute
         self.state_transforms = state_transforms
+
+        # storing cfg arguments as attributes
+        self.cfg_prob_unconditional = cfg_prob_unconditional
+        self.validation_cfg_guidance_strength = validation_cfg_guidance_strength
 
         self.trainer = CFMTrainer(
             self.velocity_field,
@@ -329,6 +347,8 @@ class FlowMatching(BaseModel):
             noise_distribution=self.noise_distribution,
             device_id=self.device_id,
             num_samples_per_validation_step=num_samples_per_validation_step,
+            cfg_prob_unconditional=self.cfg_prob_unconditional,
+            validation_cfg_guidance_strength=self.validation_cfg_guidance_strength,
         )
 
         self.train_dataloader = TrainDataLoader(
@@ -368,6 +388,7 @@ class FlowMatching(BaseModel):
         batch_size: int | None = None,
         num_time_steps: int | None = None,
         solver_kwargs: dict[str, Any] | None = None,
+        cfg_guidance_strength: float = 1.0,
     ) -> dict[str, Tensor]:
         """Generates the predictions by integrating the dynamics with the learnt velocity field for a given initial condition
 
@@ -395,6 +416,10 @@ class FlowMatching(BaseModel):
             If provided, it will be used instead of :attr: `self.solver_kwargs` . Defaults to `None`.
         :type solver_kwargs: class:`dict[str, Any] | None`
 
+        :param cfg_guidance_strength: Strength of the guidance term for sampling.
+            Only used when :attr: `self.cvf_config.use_classifier_free_guidance` is set to `True`, defaults to `1.0`.
+        :type cfg_guidance_strength: class: `float`
+        
         :return: Tensor of shape `(batch_size, self.flow_dim)` if :param:`return_trajectory` is `False`, otherwise Tensor of shape `(batch_size, self.num_time_steps, self.flow_dim)`
         :rtype: class:`torch.Tensor`
         """
@@ -464,5 +489,6 @@ class FlowMatching(BaseModel):
             no_grad=no_grad,
             num_samples=num_samples,
             batch_size=batch_size,
+            cfg_guidance_strength=cfg_guidance_strength,
         )
         return predictions
