@@ -25,6 +25,7 @@ __all__ = [
 
 @dataclass(frozen=True)
 class Metrics:
+<<<<<<< HEAD
     """
 #<<<<<<< Updated upstream
     r_squared: Callable[[TensorLike, TensorLike], float] = compute_r_squared
@@ -42,6 +43,8 @@ class Metrics:
 #=======
     """
 >>>>>>> 0147fd0 (added co-clustering metrics)
+=======
+>>>>>>> 492cb82 (resolved conflicts)
     weights: TensorLike
     r_squared: Callable[[TensorLike, TensorLike], float] = field(init=False)
     energy_distance: Callable[[TensorLike, TensorLike], float] = field(init=False)
@@ -90,5 +93,8 @@ class Metrics:
 >>>>>>> 77173f4 (added more metrics and adapted the callback)
 =======
         object.__setattr__(self, 'coclustering', compute_coclustering)
+<<<<<<< HEAD
 #>>>>>>> Stashed changes
 >>>>>>> 0147fd0 (added co-clustering metrics)
+=======
+>>>>>>> 492cb82 (resolved conflicts)
