@@ -831,9 +831,8 @@ class FiLMBlock(BaseModule):
         Returns:
             torch.Tensor: Output tensor of shape (B, out_dim).
         """
-        act_fn = nn.SiLU()
         gamma_beta = self.film_generator(cond)
         gamma, beta = torch.split(gamma_beta, self.in_dim, dim=-1)  # each shape: (batch, input_dim)
         assert gamma.shape == x.shape, f"Shape mismatch: {gamma.shape} vs {x.shape}"
         assert beta.shape == x.shape, f"Shape mismatch: {gamma.shape} vs {x.shape}"
-        return act_fn(gamma * x + beta)
+        return nn.functional.silu(gamma * x + beta)
