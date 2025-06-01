@@ -189,6 +189,8 @@ def compute_weighted_min_mse(
     """Compute (weighted) min pointwise MSE between generated and observed cells"""
     if len(pred.shape) < 3:
         pred = pred.reshape((1, pred.shape[0], pred.shape[1]))
+    if len(target.shape) < 3:
+        target = target.reshape((1, target.shape[0], target.shape[1]))
     mses = np.array([np.average(torch.nn.functional.mse_loss(torch.from_numpy(pred[i, :, :]), torch.from_numpy(target[i, :, :]), reduction="none"), axis=1, weights=weights) for i in range(pred.shape[0])])
     return np.mean(np.nanmin(mses, axis=1))
 
@@ -201,6 +203,8 @@ def compute_weighted_max_mse(
     """Compute (weighted) max pointwise MSE between generated and observed cells"""
     if len(pred.shape) < 3:
         pred = pred.reshape((1, pred.shape[0], pred.shape[1]))
+    if len(target.shape) < 3:
+        target = target.reshape((1, target.shape[0], target.shape[1]))
     mses = np.array([np.average(torch.nn.functional.mse_loss(torch.from_numpy(pred[i, :, :]), torch.from_numpy(target[i, :, :]), reduction="none"), axis=1, weights=weights) for i in range(pred.shape[0])])
     return np.mean(np.nanmax(mses, axis=1))
 
@@ -380,7 +384,7 @@ def compute_coclustering(
     coclust_props = []
     
     for i in range(pred.shape[0]):
-        combined = np.concat([target[i, :, :], pred[i, :, :]])
+        combined = np.concatenate([target[i, :, :], pred[i, :, :]])
         clustering = compute_clustering(combined, k, **clustering_args)
         coclust_props.append(np.sum(clustering[:target.shape[1]] == clustering[target.shape[1]:]) / target.shape[1])
         
