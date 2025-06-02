@@ -12,8 +12,13 @@ def validate_batch(
     has_controls: bool,
     batch_size: int,
     num_genes: int,
+    num_unique_target_values: int,
+    dim_target_covariates: int,
     perturbations: str | list[str] | tuple[str, ...] | None,
     data: DataContainer,
+    load_target_covariates: bool,
+    target_covariates: dict[str, Literal["one_hot", "label", "identity"]],
+    target_covariates_in_obsm: str,
 ) -> None:
     """
     Validates the contents and shapes of a batch of data.
@@ -59,6 +64,37 @@ def validate_batch(
                 f"perturbation data keys {perturbation_data.keys()}."
             )
             assert covariate in perturbation_data, msg
+
+    # Target Data
+    if load_target_covariates:
+        # we need to have the required key
+        msg = (
+            f"When has_controls={load_target_covariates} the batch dictionary should contain the key "
+            f"{DataFields.TARGET_DATA}. Found {train_batch.keys()}."
+        )
+        assert DataFields.TARGET_DATA in train_batch.keys(), msg
+
+        # retrieving target data
+        target_data = train_batch[DataFields.TARGET_DATA]
+
+        # checking each target covariate
+        for covariate, covariate_rep in target_covariates.items():
+            if covariate_rep == "one_hot":
+                expected_shape = (batch_size, num_unique_target_values)
+            elif covariate_rep == "label":
+                expected_shape = (batch_size,)
+            elif covariate_rep == "identity":
+                if covariate == target_covariates_in_obsm:
+                    expected_shape = (batch_size, dim_target_covariates)
+                else:
+                    expected_shape = (batch_size, 1)
+            else:
+                msg = f""
+                raise TypeError(msg)
+
+            if target_data[covariate].shape != expected_shape:
+                msg = f"Target data for {covariate=} is of the wrong shape for {covariate_rep=}. Got {target_data[covariate].shape}, expected {expected_shape}"
+                raise ValueError(msg)
 
 
 def validate_parametrized_inputs(

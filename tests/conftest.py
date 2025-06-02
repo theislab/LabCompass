@@ -71,7 +71,13 @@ def num_treatments_to_load() -> int:
     """"""
     return 2
 
-    
+
+@pytest.fixture
+def num_unique_target_values() -> int:
+    """"""
+    return 7
+
+
 @pytest.fixture
 def perturbations_in_obsm() -> str:
     """"""
@@ -166,6 +172,7 @@ def adata(
     num_control_cells: int,
     num_perturbed_cells: int,
     num_genes: int,
+    num_unique_target_values: int,
     num_perturbation_feats: int,
     tot_perturbed_cells: int,
     num_cells: int,
@@ -266,9 +273,7 @@ def adata(
     )
 
     # target covariates
-    target0_num_unique_values = 7
     target0_label = "target0"
-    target1_num_unique_values = 9
     target1_label = "target1"
     target2_label = "target2"
 
@@ -287,8 +292,8 @@ def adata(
         return target_labels
 
     # retrieving target data
-    target0_data = get_target_data(target0_num_unique_values)
-    target1_data = get_target_data(target1_num_unique_values)
+    target0_data = get_target_data(num_unique_target_values)
+    target1_data = get_target_data(num_unique_target_values)
     target2_data = get_target_data(None, continuous_target=True)
 
     # shuffling target data

@@ -1,13 +1,40 @@
 import numpy as np
+import torch
 import pytest
 
-from sc_exp_design.data.data import DataContainer
+from sc_exp_design.data.container import BatchMixin, DataContainer
 
 
 
 class TestDataContainer:
     """
     """
+
+    def test_mapped_batch(
+        self,
+        num_genes: int,
+        num_cells: int,
+        num_control_cells: int,
+        num_targets: int,
+    ) -> None:
+        """"""
+        # creating data dict
+        data_dict = {
+            f"field{idx}": np.random.randn(num_cells, num_genes) for idx in range(num_targets)
+        }
+
+        # initializing mapped batch data with correct data
+        batch = BatchMixin(data_dict)
+
+        # initializing with wrong type
+        with pytest.raises(TypeError):
+            data_dict.update({"wrong_element": torch.randn((num_cells, num_genes))})
+            batch_error = BatchMixin(data_dict)
+
+        # initializing with wrong batch size
+        with pytest.raises(ValueError):
+            data_dict.update({"wrong_element": np.random.randn(num_cells - 1, num_genes)})
+            batch_error = BatchMixin(data_dict)
 
     @pytest.mark.parametrize("load_perturbation_data", [False, True])
     @pytest.mark.parametrize("load_target_data", [False, True])
@@ -26,13 +53,12 @@ class TestDataContainer:
         # setting perturbation data
         perturbation_data = None
         if load_perturbation_data:
-            perturbation_data = perturbations
+            perturbation_data = BatchMixin(perturbations)
 
         # setting target data
         target_data = None
         if load_target_data:
-            target_data = targets
-
+            target_data = BatchMixin(targets)
 
         # initializing data
         data = DataContainer(
@@ -44,15 +70,3 @@ class TestDataContainer:
         # slicing with random indices
         batch_idxs = np.random.choice(num_cells, size=batch_size)
         batch_data = data[batch_idxs]
-
-        # try methods (no axis)
-        batch_data.min()
-        batch_data.argmin()
-
-        # try methods (axis 0)
-        batch_data.min(axis=0)
-        batch_data.argmin(axis=0)
-
-        # try methods (axis 1)
-        batch_data.min(axis=1)
-        batch_data.argmin(axis=1)

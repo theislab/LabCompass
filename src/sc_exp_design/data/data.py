@@ -8,7 +8,7 @@ import anndata
 import numpy as np
 
 from sc_exp_design.constants import DataFields
-from sc_exp_design.data.container import DataContainer
+from sc_exp_design.data.container import DataContainer, BatchMixin
 from sc_exp_design.types import TensorLike
 
 __all__ = [
@@ -64,8 +64,8 @@ class AnnotatedPerturbationData:
     adata: anndata.AnnData
     control_key: str | None
     state_data: TensorLike
-    perturbation_data: dict[str, TensorLike] | None
-    target_data: dict[str, TensorLike] | None = None
+    perturbation_data: BatchMixin | None
+    target_data: BatchMixin | None = None
     seen_combinations: Sequence[Sequence[str]] | None = None
     has_controls: bool = True
     perturbations: Sequence[str] | None = None
@@ -137,10 +137,10 @@ class AnnotatedPerturbationData:
         # retrieving optional data
         perturbation_data = None
         if self.perturbation_data is not None:
-            perturbation_data = {perturbation: perturbation_covariate[idx] for perturbation, perturbation_covariate in self.perturbation_data.items()}
+            perturbation_data = self.perturbation_data[idx]
         target_data = None
         if self.target_data is not None:
-            target_data = {target: target_covariate[idx] for target, target_covariate in self.target_data.items()}
+            target_data = self.target_data[idx]
         return AnnotatedPerturbationData(
             adata,
             self.control_key,

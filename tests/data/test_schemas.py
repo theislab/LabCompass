@@ -6,7 +6,6 @@ import sc_exp_design
 class TestDataSchema:
     """"""
 
-
     @pytest.mark.parametrize("sample_rep", [None, "states", "invalid_key"])
     def test_state_data_schema_init(
         self,

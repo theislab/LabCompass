@@ -1,9 +1,177 @@
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+import logging
+from typing import Any, ClassVar, Type, Self
 
 import numpy as np
 
+from sc_exp_design.types import TensorLike
+
 __all__ = ["DataContainer"]
+
+
+class DataMixin(dict):
+    """"""
+    _required_type: ClassVar[Type[Any] | None] = None
+
+    def __init__(
+        self,
+        mapping: Mapping[str, Any] | None = None,
+        **kwargs
+    ) -> None:
+        """"""
+        # creating empty dictionary
+        if mapping is None:
+            mapping = {}
+        
+        # adding keyword arguments
+        if kwargs is not None:
+            mapping.update(kwargs)
+    
+        # verifying that the keys are strings
+        for key in mapping.keys():
+            if not isinstance(key, str):
+                msg = f""
+                raise ValueError(msg)
+
+        # calling parent constructor
+        super().__init__(mapping)
+
+        # verifying inputs
+        self._verify_inputs()
+
+    def _verify_inputs(
+        self,
+    ) -> None:
+        """"""
+        # check that the data have the same type
+        reference_type = self.data_type
+
+        # checking that we have the required type when specified
+        if self._required_type is not None:
+            if not issubclass(reference_type, self._required_type):
+                msg = f"Data is of the wrong type. Got {reference_type}, expected {self._required_type}."
+                raise TypeError(msg)
+
+        # iterating over each key to check that the type is the same
+        for key, value in self.items():
+            if not isinstance(value, reference_type):
+                msg = f"The values should share the same type. Got {type(value)} for {key}, expected {reference_type}."
+                raise TypeError(msg)
+
+    def __getattr__(
+        self,
+        name: str,
+    ) -> Callable:
+        """"""
+        # Handle array methods
+        def wrapper(*args, **kwargs):
+            return self._apply_function(lambda x: getattr(x, name)(*args, **kwargs))
+
+        # returning wrapper function
+        if all(hasattr(t, name) for t in self.values()):
+            return wrapper
+        raise AttributeError(f"'DataMixin' object has no attribute '{name}'")
+
+    def __getitem__(
+        self,
+        idx: int | slice
+    ) -> Self:
+        """"""
+        return self.__class__({key: value[idx] for key, value in self.items()})
+
+    def _apply_function(
+        self,
+        function: Callable[[Any], Any],
+        fields: None | Sequence[str] = None,
+        *args,
+        **kwargs,
+    ) -> Self:
+        """"""
+        # handling optional fields
+        if fields is None:
+            fields = self.keys()
+
+        # applying the function
+        out_dict = {}
+        for key, value in self.items():
+            if key in fields:
+                value = function(value, *args, **kwargs)
+            out_dict[key] = value
+        return self.__class__(**out_dict)
+    
+    def apply(
+        self,
+        function: Callable[[Any], Any],
+        fields: None | Sequence[str] = None,
+        *args,
+        **kwargs,
+    ) -> Self:
+        """"""
+        return self._apply_function(
+            function,
+            fields,
+            *args,
+            **kwargs
+        )
+
+    @property
+    def data_type(
+        self,
+    ) -> Type[Any]:
+        """"""
+        if len(self) == 0:
+            return self._required_type
+        return type(next(iter(self.values())))
+
+
+class ArrayMixin(DataMixin):
+    """"""
+    _required_type: ClassVar[Type[Any]] = np.ndarray | np.generic
+
+
+class BatchMixin(ArrayMixin):
+    """"""
+    _minimum_dims: ClassVar[int] = 1
+
+    def _verify_inputs(
+        self,
+    ) -> None:
+        """"""
+        # calling method of parent class for usual checks
+        super()._verify_inputs()
+
+        # iterating over the elements
+        for key, value in self.items():
+            # verifying that the required dimensions match
+            self.__verify_shape(value)
+
+    def __verify_shape(
+        self,
+        data: TensorLike,
+    ) -> None:
+        """"""
+        # we need at least self._minimum_dims + 1 dimensions
+        if data.ndim < self._minimum_dims:
+            msg = f""
+            raise ValueError(msg)
+
+        # retrieving reference dims
+        reference_dims = next(iter(self.values())).shape[:self._minimum_dims]
+
+        # iterating over the number of required dimensions
+        for dim, reference_dim in enumerate(reference_dims):
+            # raise error if does not match
+            if data.shape[dim] != reference_dims[dim]:
+                msg = f""
+                raise ValueError(msg)
+
+    @property
+    def batch_size(
+        self,
+    ) -> int:
+        """"""
+        return next(iter(self.values())).shape[0]
 
 
 @dataclass
@@ -21,9 +189,9 @@ class DataContainer:
     :param target_data: Optional target data for the current batch.
     :type target_data: class `dict[str, np.ndarray] | None`
     """
-    state_data: np.ndarray | int | float
-    perturbation_data: dict[str, np.ndarray | int | float] | None
-    target_data: dict[str, np.ndarray | int | float] | None
+    state_data: np.ndarray
+    perturbation_data: BatchMixin | None
+    target_data: BatchMixin | None
 
     def __post_init__(
         self,
@@ -32,86 +200,31 @@ class DataContainer:
 
         # check type state data
         msg = f"State data of the wrong type. Expected `np.ndarray | int | float`, found {type(self.state_data)}."
-        assert isinstance(self.state_data, np.ndarray | int | float | np.generic), msg
+        assert isinstance(self.state_data, np.ndarray), msg
 
-        # retrieving reference number of observations                
-        if isinstance(self.state_data, np.ndarray) and self.state_data.ndim != 1:
-            self.num_observations = self.state_data.shape[0]
-        else:
-            self.num_observations = 1
-
-        # check type perturbation data
+        # check perturbation data
         if self.perturbation_data is not None:
-            msg = f"Perturbation data of the wrong type. Expected `dict`, found {type(self.perturbation_data)}."
-            assert isinstance(self.perturbation_data, dict), msg
+            # check type
+            if not isinstance(self.perturbation_data, BatchMixin):
+                msg = f"Perturbation data is of the wrong type. Got {type(self.perturbation_data)}, expected `BatchMixin`"
+                raise ValueError(msg)
 
-        # check type target data
-        if self.target_data is not None:
-            msg = f"Target data of the wrong type. Expected `dict`, found {type(self.target_data)}."
-            assert isinstance(self.target_data, dict), msg
-
-        # ensuring the data is stored in an array
-        self.state_data = self._ensure_array(self.state_data)
-
-        # perturbation data
-        if self.perturbation_data is not None:
-            for perturbation_covariate, covariate_data in self.perturbation_data.items():
-                # check type
-                msg = f"Data for perturbation covariate {perturbation_covariate} of the wrong type. Expected `np.ndarray | int | float`, found {type(covariate_data)}."
-                assert isinstance(covariate_data, np.ndarray | int | float | np.generic), msg
-
-                # ensuring type
-                covariate_data = self._ensure_array(covariate_data)
-
-                # check shape
+            # raise error if shapes don't match
+            if self.perturbation_data.batch_size != self.state_data.shape[0]:
                 msg = f"Wrong batch dimension for perturbation covariate {perturbation_covariate}. Expected {self.num_observations}, found {covariate_data.shape[0]}. State data shape {self.state_data.shape}. Covariate data shape {covariate_data.shape}"
-                assert covariate_data.shape[0] == self.num_observations, msg
+                raise ValueError(msg)
 
-                # storing results
-                self.perturbation_data[perturbation_covariate] = covariate_data
-
-        # target data
+        # check target data
         if self.target_data is not None:
-            for target_covariate, covariate_data in self.target_data.items():
-                # check type
-                msg = f"Data for target covariate {target_covariate} of the wrong type. Expected `np.ndarray | int | float`, found {type(covariate_data)}."
-                assert isinstance(covariate_data, np.ndarray | int | float | np.generic), msg
+            # check type
+            if not isinstance(self.target_data, BatchMixin):
+                msg = f""
+                raise ValueError(msg)
 
-                # ensuring type
-                covariate_data = self._ensure_array(covariate_data)
-
-                # check shape
-                msg = f"Wrong batch dimension for target covariate {target_covariate}. Expected {self.num_observations}, found {covariate_data.shape[0]}. State data shape {self.state_data.shape}. Covariate data shape {covariate_data.shape}"
-                assert covariate_data.shape[0] == self.num_observations, msg
-
-                # storing results
-                self.target_data[target_covariate] = covariate_data
-
-    def _ensure_array(
-        self,
-        val: np.ndarray | int | float | np.generic,
-    ) -> np.ndarray:
-        """"""
-
-        # handling case for numpy data types
-        if isinstance(val, np.generic):
-            val = val.item()
-
-        # moving target data to numpy array in case its a scalar
-        if isinstance(val, int | float):
-            val = np.array([val])
-        
-        # when is an array we return it
-        if isinstance(val, np.ndarray):
-            # when we lose the batch dimension we need to unsqueeze
-            if val.ndim == 1:
-                if val.shape[0] != self.num_observations and self.num_observations == 1:
-                    val = val.reshape(1, -1)
-            return val
-
-        # otherwise we raise type error
-        msg = f"Unsupported data type {val}"
-        raise TypeError(msg)
+            # raise error if shapes don't match
+            if self.target_data.batch_size != self.state_data.shape[0]:
+                msg = f"Wrong batch dimension for perturbation covariate {perturbation_covariate}. Expected {self.num_observations}, found {covariate_data.shape[0]}. State data shape {self.state_data.shape}. Covariate data shape {covariate_data.shape}"
+                raise ValueError(msg)
 
     def _apply(
         self,
@@ -128,14 +241,14 @@ class DataContainer:
         # applying function on peturbation data
         perturbation_data = None
         if self.perturbation_data is not None:
-            perturbation_data = {k: function(v) for k, v in self.perturbation_data.items()}
+            perturbation_data = self.perturbation_data.apply(function)
 
         # applying function on target data
         target_data = None
         if self.target_data is not None:
-            target_data = {k: function(v) for k, v in self.target_data.items()}
+            target_data = self.target_data.apply(function)
 
-        return DataContainer(
+        return self.__class__(
             state_data,
             perturbation_data,
             target_data,
@@ -184,18 +297,25 @@ class DataContainer:
         # perturbation data  
         perturbation_data = None   
         if self.perturbation_data is not None:
-            perturbation_data = {k: v[idx] for k, v in self.perturbation_data.items()}
+            perturbation_data = self.perturbation_data[idx]
 
         # target data
         target_data = None
         if self.target_data is not None:
-            target_data = {k: v[idx] for k, v in self.target_data.items()}
-        
-        return DataContainer(
+            target_data = self.target_data[idx]
+
+        return self.__class__(
             state_data,
             perturbation_data,
             target_data,
         )
+
+    @property
+    def num_observations(
+        self,
+    ) -> int:
+        """"""
+        return self.state_data.shape[0]
 
     @property
     def perturbation_covariates(

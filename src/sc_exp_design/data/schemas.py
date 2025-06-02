@@ -8,6 +8,7 @@ import anndata
 import numpy as np
 
 from sc_exp_design.constants import DataFields
+from sc_exp_design.data.container import BatchMixin
 from sc_exp_design.transforms.utils import label_encode, one_hot_encode
 
 logger = logging.getLogger(__name__)
@@ -356,7 +357,7 @@ class PerturbationDataSchema(BaseDataSchema):
     def get_data(
         self,
         adata: anndata.AnnData | None = None,
-    ) -> dict[str, np.ndarray]:
+    ) -> BatchMixin:
         """Enforces the data schema and returns the compiled perturbation data.
         
         :param adata: Optional annotated data object on which to enforce the schema.
@@ -379,7 +380,7 @@ class PerturbationDataSchema(BaseDataSchema):
             perturbation_data = self.__get_data(perturbation, adata)
             # updating data dictionary with data for current perturbation
             data.update(perturbation_data)
-        return data 
+        return BatchMixin(data) 
 
     @property
     def allow_grouped_couplings(
@@ -524,7 +525,7 @@ class TargetDataSchema(BaseDataSchema):
     def get_data(
         self,
         adata: anndata.AnnData | None = None,
-    ) -> dict[str, np.ndarray]:
+    ) -> BatchMixin:
         """Enforces the data schema and returns the compiled perturbation data.
         
         :param adata: Optional annotated data object on which to enforce the schema.
@@ -542,4 +543,4 @@ class TargetDataSchema(BaseDataSchema):
             target_data = self.__get_data(target_covariate, adata)
             # updating data dictionary with data for current perturbation
             data[target_covariate] = target_data
-        return data
+        return BatchMixin(data)

@@ -19,6 +19,8 @@ class TestDataLoaders(BaseDataTest):
         adata: anndata.AnnData,
         batch_size: int,
         num_genes: int,
+        num_unique_target_values: int,
+        dim_target_covariates: int,
         target_covariates_in_obsm: str,
         perturbations_in_obsm: Sequence[str] | None, 
         sample_rep: None | str,
@@ -27,7 +29,7 @@ class TestDataLoaders(BaseDataTest):
         perturbation_covariates: dict[str, str | Sequence[str]] | None,
         perturbation_reps: dict[str, str | Sequence[str]] | None,
         load_target_covariates: bool,
-        target_covariates: dict[str, Literal["one_hot", "label", "identity"] | None] | None,
+        target_covariates: dict[str, Literal["one_hot", "label", "identity"]] | None,
     ) -> None:
         """"""
 
@@ -91,8 +93,13 @@ class TestDataLoaders(BaseDataTest):
             data_manager.has_controls,
             batch_size,
             num_genes,
+            num_unique_target_values,
+            dim_target_covariates,
             perturbations,
             data,
+            load_target_covariates,
+            target_covariates,
+            target_covariates_in_obsm,
         )
 
     @pytest.mark.parametrize("set_num_treatments_to_load", [True, False])
@@ -101,6 +108,8 @@ class TestDataLoaders(BaseDataTest):
         adata: anndata.AnnData,
         batch_size: int,
         num_genes: int,
+        num_unique_target_values: int,
+        dim_target_covariates: int,
         target_covariates_in_obsm: str,
         perturbations_in_obsm: Sequence[str] | None, 
         num_treatments_to_load: int,
@@ -242,6 +251,10 @@ class TestDataLoaders(BaseDataTest):
                 data_manager.has_controls,
                 batch_size,
                 num_genes,
+                num_unique_target_values,
+                dim_target_covariates,
                 perturbations,
                 data,
+                load_target_covariates,
+                target_covariates,
             )
