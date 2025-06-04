@@ -170,11 +170,7 @@ class DataManager:
         :raises ValueError: If both `adata` and `self.adata` are `None`.
         """
         # handling adata
-        if adata is None and self.adata is None:
-            msg = "Both `adata` and `self.adata` are None, you need to pass an `anndata.AnnData` object containing the data."
-            raise ValueError(msg)
-        elif adata is None:
-            adata = self.adata
+        adata = self.state_data_schema.resolve_adata(adata)
 
         # retrieving state data
         state_data = self.state_data_schema.get_data()
