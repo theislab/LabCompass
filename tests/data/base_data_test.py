@@ -53,7 +53,7 @@ from sc_exp_design.data import DataContainer
         {"target0": "label", "target1": "one_hot", "target2": "identity",},
         {"target0": "one_hot", "target1": "label", "target2": "identity",},
         {"target0": "label", "target1": "label", "target2": "identity",},
-        {"target3": None},
+        {"target3": "identity"},
     ]
 )
 class BaseDataTest:

@@ -257,4 +257,5 @@ class TestDataLoaders(BaseDataTest):
                 data,
                 load_target_covariates,
                 target_covariates,
+                target_covariates_in_obsm,
             )
