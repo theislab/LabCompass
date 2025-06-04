@@ -102,9 +102,9 @@ class AnnotatedPerturbationData:
             self.control_idxs = np.argwhere(self.adata.obs[self.control_key] == True)[:, 0]
             self.control_data = self.data[self.control_idxs]
 
-        # storing perturbation data
-        if self.has_controls:
+            # storing perturbation data
             self.treatment_idxs = np.argwhere(self.adata.obs[self.control_key] == False)[:, 0]
+
         else:
             self.treatment_idxs = np.arange(len(self.adata))
         if self.perturbations is not None and self.seen_combinations is not None:
@@ -117,10 +117,6 @@ class AnnotatedPerturbationData:
             }
         else:
             self.treatment_idxs_per_condition = {DataFields.CONDITION_VALUES: self.treatment_idxs}
-        # register state data
-        self.treatment_data = {
-            treatment: self.data[treatment_idxs] for treatment, treatment_idxs in self.treatment_idxs_per_condition.items()
-        }
 
     def __getitem__(
         self,
@@ -162,6 +158,30 @@ class AnnotatedPerturbationData:
         :rtype: class: `int`
         """
         return self.adata.shape[0]
+
+    def _get_treatments(
+        self,
+        treatments: Sequence[str] | None = None,
+    ) -> np.ndarray:
+        """"""
+        # case 0: Seen combinatorial perturbation is None. No specific treatment is to be retrieved.
+        if self.seen_combinations is None:
+            # sanity check: we should not pass the treatments
+            msg = f""
+            assert treatments is None, msg
+            treatments = DataFields.CONDITION_VALUES
+        # case 0: Seen combinatorial perturbation is not None.
+        # treatment should be either None or be appering inside self.seen_combinatorial_perturbations
+        else:
+            # when no treatment is passed
+            if treatments is None or len(treatments) == 0:
+                treatments = DataFields.CONDITION_VALUES
+            msg = f"{treatments=} not found in {self.treatment_idxs_per_condition.keys()=}"
+            assert treatments in self.treatment_idxs_per_condition.keys(), msg
+
+        # retrieving indices of current treatment and slicing data
+        treatment_idxs = self.treatment_idxs_per_condition[treatments]
+        return self.data[treatment_idxs]
 
     def get_controls(
         self,
@@ -216,23 +236,8 @@ class AnnotatedPerturbationData:
         :return: Dictionary containing treatment state and perturbation data (if available).
         :rtype: Dict[str, TensorLike]
         """
-        # case 0: Seen combinatorial perturbation is None. No specific treatment is to be retrieved.
-        if self.seen_combinations is None:
-            # sanity check: we should not pass the treatments
-            msg = f""
-            assert treatments is None, msg
-            treatments = DataFields.CONDITION_VALUES
-        # case 0: Seen combinatorial perturbation is not None.
-        # treatment should be either None or be appering inside self.seen_combinatorial_perturbations
-        else:
-            # when no treatment is passed
-            if treatments is None or len(treatments) == 0:
-                treatments = DataFields.CONDITION_VALUES
-            msg = f"{treatments=} not found in {self.treatment_idxs_per_condition.keys()=}"
-            assert treatments in self.treatment_idxs_per_condition.keys(), msg
-
         # retrieve indices
-        trtm_data = self.treatment_data[treatments]
+        trtm_data = self._get_treatments(treatments)
         
         # collect batch subset of the observations 
         if batch_size is not None:
