@@ -30,7 +30,7 @@ class BaseDataSchema(abc.ABC):
 
     adata: anndata.AnnData
 
-    def _resolve_adata(
+    def resolve_adata(
         self,
         adata: anndata.AnnData | None = None,
     ) -> anndata.AnnData:
@@ -98,7 +98,7 @@ class StateDataSchema(BaseDataSchema):
         :type adata: class: `anndata.AnnData | None`
         """
         # handling adata
-        adata = self._resolve_adata(adata)
+        adata = self.resolve_adata(adata)
         
         # retrieving the X attribute when no sample rep provided
         if self.sample_rep is None:
@@ -365,7 +365,7 @@ class PerturbationDataSchema(BaseDataSchema):
         :type adata: class: `anndata.AnnData | None`
         """
         # handling adata
-        adata = self._resolve_adata(adata)
+        adata = self.resolve_adata(adata)
         
         # raise error when we do not have perturbations
         if self.perturbations is None:
@@ -533,7 +533,7 @@ class TargetDataSchema(BaseDataSchema):
         :type adata: class: `anndata.AnnData | None`
         """
         # handling adata
-        adata = self._resolve_adata(adata)
+        adata = self.resolve_adata(adata)
         
         # otherwise retrieve the data for each perturbation
         data = {}
