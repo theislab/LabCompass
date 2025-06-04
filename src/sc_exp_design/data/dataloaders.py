@@ -29,6 +29,7 @@ class BaseDataLoader(abc.ABC):
     """
 
     def _move_to_tensor_and_slice(
+        self,
         data: np.ndarray,
         idxs: np.ndarray | None,
     ) -> torch.tensor:
