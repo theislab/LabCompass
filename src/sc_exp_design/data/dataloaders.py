@@ -89,7 +89,7 @@ class BaseCoupledDataLoader(BaseDataLoader):
             assert control_states is not None, msg
             # matching the two groups
             source_idx, target_idx = self.coupling.match_groups(control_states, trtm_states)
-            source = self._move_to_tensor_and_slice(control_states, source_idxs)
+            source = self._move_to_tensor_and_slice(control_states, source_idx)
 
         # move target to tensor and permute it
         target = self._move_to_tensor_and_slice(trtm_states, target_idx)
