@@ -111,7 +111,7 @@ class BaseCoupledDataLoader(BaseDataLoader):
         if self.data.perturbation_data is not None:
             trtm_perts = trtm_data.perturbation_data
             condition = {
-                cond: _move_to_tensor_and_permute(cond_data, target_idx)
+                cond: self._move_to_tensor_and_slice(cond_data, target_idx)
                     for cond, cond_data in trtm_perts.items()
             }
             out_dict[DataFields.PERTURBATION_DATA] = condition
@@ -120,7 +120,7 @@ class BaseCoupledDataLoader(BaseDataLoader):
         if self.data.target_data is not None:
             trtm_perts_target_rep = trtm_data.target_data
             trtm_perts_target_rep = {
-                target_covariate: _move_to_tensor_and_permute(target_covariate_data, target_idx)
+                target_covariate: self._move_to_tensor_and_slice(target_covariate_data, target_idx)
                     for target_covariate, target_covariate_data in trtm_perts_target_rep.items()
             }
             out_dict[DataFields.TARGET_DATA] = trtm_perts_target_rep
