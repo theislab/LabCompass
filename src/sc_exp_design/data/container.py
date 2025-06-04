@@ -1,7 +1,7 @@
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 import logging
-from typing import Any, ClassVar, Type, Self
+from typing import Any, ClassVar, Type
 
 import numpy as np
 
@@ -73,7 +73,7 @@ class DataMixin(dict):
     def __getitem__(
         self,
         idx: int | slice
-    ) -> Self:
+    ):
         """"""
         return self.__class__({key: value[idx] for key, value in self.items()})
 
@@ -83,7 +83,7 @@ class DataMixin(dict):
         fields: None | Sequence[str] = None,
         *args,
         **kwargs,
-    ) -> Self:
+    ):
         """"""
         # handling optional fields
         if fields is None:
@@ -103,7 +103,7 @@ class DataMixin(dict):
         fields: None | Sequence[str] = None,
         *args,
         **kwargs,
-    ) -> Self:
+    ):
         """"""
         return self._apply_function(
             function,
