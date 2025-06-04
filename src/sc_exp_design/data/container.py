@@ -44,19 +44,16 @@ class DataMixin(dict):
         self,
     ) -> None:
         """"""
-        # check that the data have the same type
-        reference_type = self.data_type
-
         # checking that we have the required type when specified
         if self._required_type is not None:
-            if not issubclass(reference_type, self._required_type):
-                msg = f"Data is of the wrong type. Got {reference_type}, expected {self._required_type}."
+            if not issubclass(self.data_type, self._required_type):
+                msg = f"Data is of the wrong type. Got {self.data_type}, expected {self._required_type}."
                 raise TypeError(msg)
 
         # iterating over each key to check that the type is the same
         for key, value in self.items():
-            if not isinstance(value, reference_type):
-                msg = f"The values should share the same type. Got {type(value)} for {key}, expected {reference_type}."
+            if not isinstance(value, self.data_type):
+                msg = f"The values should share the same type. Got {type(value)} for {key}, expected {self.data_type}."
                 raise TypeError(msg)
 
     def __getattr__(
@@ -199,8 +196,9 @@ class DataContainer:
         """Checks that all the data shares the same batch size"""
 
         # check type state data
-        msg = f"State data of the wrong type. Expected `np.ndarray | int | float`, found {type(self.state_data)}."
-        assert isinstance(self.state_data, np.ndarray), msg
+        if not isinstance(self.state_data, np.ndarray):
+            msg = f"State data of the wrong type. Expected `np.ndarray`, found {type(self.state_data)}."
+            raise TypeError(msg)
 
         # check perturbation data
         if self.perturbation_data is not None:
