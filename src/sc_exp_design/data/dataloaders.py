@@ -1,4 +1,5 @@
 import abc
+import gc
 from collections.abc import Sequence
 from typing import Literal
 import random
@@ -26,6 +27,17 @@ class BaseDataLoader(abc.ABC):
 
     Childer classes need to define the :method: `sample` method in order to be instantiated/.
     """
+
+    def _move_to_tensor_and_slice(
+        data: np.ndarray,
+        idxs: np.ndarray | None,
+    ) -> torch.tensor:
+        """"""
+        if idxs is None:
+            tensor = torch.from_numpy(data)
+        else:
+            tensor = torch.from_numpy(data[idxs])
+        return tensor.to(self.device).float()
 
     @abc.abstractmethod
     def sample(
@@ -76,22 +88,10 @@ class BaseCoupledDataLoader(BaseDataLoader):
             assert control_states is not None, msg
             # matching the two groups
             source_idx, target_idx = self.coupling.match_groups(control_states, trtm_states)
-            source = torch.from_numpy(control_states[source_idx]).to(self.device).float()
-
-        # define utility function
-        def _move_to_tensor_and_permute(
-            data: np.ndarray,
-            idxs: np.ndarray | None,
-        ) -> torch.tensor:
-            """"""
-            if idxs is None:
-                tensor = torch.from_numpy(data)
-            else:
-                tensor = torch.from_numpy(data[idxs])
-            return tensor.to(self.device).float()
+            source = self._move_to_tensor_and_slice(control_states, source_idxs)
 
         # move target to tensor and permute it
-        target = _move_to_tensor_and_permute(trtm_states, target_idx)
+        target = self._move_to_tensor_and_slice(trtm_states, target_idx)
 
         # handling transformations
         if self.state_transforms is not None:
@@ -101,8 +101,10 @@ class BaseCoupledDataLoader(BaseDataLoader):
 
         # constructing output dictionary
         out_dict = {DataFields.TARGET_STATE: target}
+        del target
         if self.has_controls:
             out_dict[DataFields.SOURCE_STATE] = source 
+            del source
 
         # handling perturbation data
         if self.data.perturbation_data is not None:
@@ -112,6 +114,7 @@ class BaseCoupledDataLoader(BaseDataLoader):
                     for cond, cond_data in trtm_perts.items()
             }
             out_dict[DataFields.PERTURBATION_DATA] = condition
+            del trtm_perts, condition
             
         if self.data.target_data is not None:
             trtm_perts_target_rep = trtm_data.target_data
@@ -120,7 +123,10 @@ class BaseCoupledDataLoader(BaseDataLoader):
                     for target_covariate, target_covariate_data in trtm_perts_target_rep.items()
             }
             out_dict[DataFields.TARGET_DATA] = trtm_perts_target_rep
+            del trtm_perts_target_rep
         
+        # garbage collection
+        gc.collect()
         return out_dict
 
 
@@ -185,14 +191,14 @@ class SequentialDataLoader(BaseDataLoader):
         if self.data.perturbation_data is not None:
             perturbation_data = {}
             for covariate, covariate_data in self.data.perturbation_data.items():
-                perturbation_data[covariate] = torch.from_numpy(covariate_data[batch_idxs]).to(self.device).float()
+                perturbation_data[covariate] = self._move_to_tensor_and_slice(covariate_data, barch_idxs)
             out[DataFields.PERTURBATION_DATA] = perturbation_data
         
         # retrieving optional target covariates
         if self.data.target_data is not None:
             target_data = {}
             for covariate, covariate_data in self.data.target_reprs.items():
-                target_data[covariate] = torch.from_numpy(covariate_data[batch_idxs]).to(self.device).float()
+                target_data[covariate] = self._move_to_tensor_and_slice(covariate_data, barch_idxs)
             out[DataFields.TARGET_CATEGORIES] = target_data
         return out
 
