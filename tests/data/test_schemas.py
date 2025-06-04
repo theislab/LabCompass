@@ -1,3 +1,5 @@
+from collections.abc import Sequence
+
 import anndata
 import numpy as np
 import pytest
