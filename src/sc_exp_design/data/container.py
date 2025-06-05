@@ -70,7 +70,7 @@ class DataMixin(dict):
             return wrapper
         raise AttributeError(f"'DataMixin' object has no attribute '{name}'")
 
-    def __getitem__(
+    def slice_arrays(
         self,
         idx: int | slice
     ):
@@ -209,7 +209,7 @@ class DataContainer:
 
             # raise error if shapes don't match
             if self.perturbation_data.batch_size != self.state_data.shape[0]:
-                msg = f"Wrong batch dimension for perturbation covariate {perturbation_covariate}. Expected {self.num_observations}, found {covariate_data.shape[0]}. State data shape {self.state_data.shape}. Covariate data shape {covariate_data.shape}"
+                msg = f"Wrong batch dimension for perturbation covariate. Expected {self.num_observations}."
                 raise ValueError(msg)
 
         # check target data
@@ -221,7 +221,7 @@ class DataContainer:
 
             # raise error if shapes don't match
             if self.target_data.batch_size != self.state_data.shape[0]:
-                msg = f"Wrong batch dimension for perturbation covariate {perturbation_covariate}. Expected {self.num_observations}, found {covariate_data.shape[0]}. State data shape {self.state_data.shape}. Covariate data shape {covariate_data.shape}"
+                msg = f"Wrong batch dimension for perturbation covariate. Expected {self.num_observations}."
                 raise ValueError(msg)
 
     def _apply(
@@ -295,12 +295,12 @@ class DataContainer:
         # perturbation data  
         perturbation_data = None   
         if self.perturbation_data is not None:
-            perturbation_data = self.perturbation_data[idx]
+            perturbation_data = self.perturbation_data.slice_arrays(idx)
 
         # target data
         target_data = None
         if self.target_data is not None:
-            target_data = self.target_data[idx]
+            target_data = self.target_data.slice_arrays(idx)
 
         return self.__class__(
             state_data,
