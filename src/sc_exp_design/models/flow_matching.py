@@ -165,7 +165,6 @@ class FlowMatching(BaseModel):
 
         self.data_manager = data_manager
         self.train_data = train_data
-        self.has_controls = has_controls
 
     def prepare_validation_data(
         self,
@@ -222,7 +221,7 @@ class FlowMatching(BaseModel):
         :param solver_kwargs: Dictionary containining the keyword arguments used to initialize the :param:`solver_class`, defaults to `None`.
         :type solver_kwargs: class:`dict[str, Any] | None`
         """
-        if not self.has_controls:
+        if not self.data_manager.has_controls:
             msg = f""
             assert not cvf_config.use_source_as_condition, msg
         else:
@@ -339,7 +338,7 @@ class FlowMatching(BaseModel):
             grad_steps_log_interval=grad_steps_log_interval,
             num_time_steps=self.num_time_steps,
             solver_kwargs=self.solver_kwargs,
-            has_controls=self.has_controls,
+            has_controls=self.data_manager.has_controls,
             generate_from_noise=self.generate_from_noise,
             noise_distribution=self.noise_distribution,
             device_id=self.device_id,
@@ -422,7 +421,7 @@ class FlowMatching(BaseModel):
         """
         # handling source
         source = None
-        if self.has_controls:
+        if self.data_manager.has_controls:
             source = batch[DataFields.SOURCE_STATE]
 
         # handling conditions
