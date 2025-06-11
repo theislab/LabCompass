@@ -5,7 +5,7 @@ import pytest
 import anndata
 import numpy as np
 
-from sc_exp_design.sym import get_dummy_data
+from sc_exp_design.sym import get_dummy_adata
 
 
 @pytest.fixture
