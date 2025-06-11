@@ -185,7 +185,7 @@ def adata(
     perturbations_in_obsm: str,
 ) -> anndata.AnnData:
     """"""
-    return get_dummy_data(
+    return get_dummy_adata(
         num_unique_treatments,
         num_unique_groups,
         num_control_cells,
