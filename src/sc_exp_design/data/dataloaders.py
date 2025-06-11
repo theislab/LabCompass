@@ -125,9 +125,7 @@ class BaseCoupledDataLoader(BaseDataLoader):
             }
             out_dict[DataFields.TARGET_DATA] = trtm_perts_target_rep
             del trtm_perts_target_rep
-        
-        # garbage collection
-        gc.collect()
+
         return out_dict
 
 
