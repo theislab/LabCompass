@@ -13,6 +13,32 @@ from .utils import validate_batch, validate_parametrized_inputs
 
 class TestDataManager(BaseDataTest):
     """"""
+
+    def get_expected_num_perturbation_features(
+        self,
+        condition: str,
+        perturbations_in_obsm: Sequence[str] | None, 
+        num_perturbation_feats: int,
+    ) -> int:
+        # check whether the data is a representation or covariates
+        is_repr = "repr" in condition
+        if not is_repr:
+            msg = f""
+            assert "cov" in condition, msg
+        # collect expected number of perturbation features
+        expected_num_perturbation_features = 1
+        if is_repr:
+            # check whether we have perturbations in obsm
+            if perturbations_in_obsm is not None:
+                # check that the perturbation is in obsm
+                is_pert_in_obsm = False
+                for perturbation in perturbations_in_obsm:
+                    if perturbation in condition:
+                        is_pert_in_obsm = True
+                if is_pert_in_obsm:
+                    expected_num_perturbation_features = num_perturbation_feats
+        return expected_num_perturbation_features
+
     @pytest.mark.parametrize("batch_data", [False, True])
     @pytest.mark.parametrize("treatments", [None, ]) # TODO: Add othe option to test
     def test_data_manager(
@@ -103,7 +129,7 @@ class TestDataManager(BaseDataTest):
                 if perturbations_in_obsm is not None:
                     if perturbation in perturbations_in_obsm:
                         msg = f""
-                        assert f"cov_{perturbation}_{reps}" in perturbation_data.keys(), msg
+                        assert f"repr_{perturbation}_{reps}" in perturbation_data.keys(), msg
                         continue
                 else:    
                     for rep in reps:
@@ -157,19 +183,12 @@ class TestDataManager(BaseDataTest):
             
             # check shapes
             for condition, condition_data in treatment_data.perturbation_data.items():
-                # check whether the data is a representation or covariates
-                is_repr = "repr" in condition
-                if not is_repr:
-                    msg = f""
-                    assert "cov" in condition, msg
-
                 # collect expected number of perturbation features
-                expected_num_perturbation_features = 1
-                if not is_repr:
-                    # check whether the current condition is in obsm
-                    if perturbations_in_obsm is not None:
-                        expected_num_perturbation_features = num_perturbation_feats
-
+                expected_num_perturbation_features = self.get_expected_num_perturbation_features(
+                    condition,
+                    perturbations_in_obsm,
+                    num_perturbation_feats
+                )
                 # define expected shape for treatment perturbation data
                 expected_shape = (expected_num_cells, expected_num_perturbation_features)
 
@@ -209,19 +228,12 @@ class TestDataManager(BaseDataTest):
 
                 # check shapes
                 for condition, condition_data in control_data.perturbation_data.items():
-                    # check whether the data is a representation or covariates
-                    is_repr = "repr" in condition
-                    if not is_repr:
-                        msg = f""
-                        assert "cov" in condition, msg
-
                     # collect expected number of perturbation features
-                    expected_num_perturbation_features = 1
-                    if not is_repr:
-                        # check whether the current condition is in obsm
-                        if perturbations_in_obsm is not None:
-                            expected_num_perturbation_features = num_perturbation_feats
-
+                    expected_num_perturbation_features = self.get_expected_num_perturbation_features(
+                        condition,
+                        perturbations_in_obsm,
+                        num_perturbation_feats
+                    )
                     # define expected shape for treatment perturbation data
                     expected_shape = (expected_num_cells, expected_num_perturbation_features)
 
