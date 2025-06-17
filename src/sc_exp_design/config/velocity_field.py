@@ -220,7 +220,7 @@ class NeuralVelocityFieldConfig:
             msg = f"You must encode the state when using the {self.conditioning_type} conditioning."
             assert self.encode_state, msg
 
-        elif self.condioning_type != "concatenation":
+        elif self.conditioning_type != "concatenation":
             msg = f"Conditioning type {self.conditioning_type} is not supported. Possible values are [\"concatenation\", \"resnet\", \"film\"]"
             raise ValueError(msg)
 
