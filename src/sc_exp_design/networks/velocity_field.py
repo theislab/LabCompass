@@ -307,7 +307,7 @@ class NeuralVelocityField(BaseModule):
                 vf = vf_unguided + cfg_guidance_strength * (vf_guided - vf_unguided)
                 return vf
             # when not using cfg
-            return self.vf(t, xt, cond=cond, source=source)
+            return self.forward(t, xt, cond=cond, source=source)
 
         return vf_fn
 
