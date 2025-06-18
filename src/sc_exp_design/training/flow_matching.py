@@ -113,8 +113,7 @@ class CFMTrainer(BaseTrainer):
         ut = self.flow.compute_u_t(t, latent, target, xt)
 
         # forward pass on the neural vf
-        vt_step = self.velocity_field(t, xt, condition, source=source)
-        vt = vt_step[VFStepFields.VF]
+        vt = self.velocity_field(t, xt, condition, source=source)
 
         # computing losses
         loss = torch.nn.functional.mse_loss(vt, ut)
