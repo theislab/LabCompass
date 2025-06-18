@@ -8,31 +8,16 @@ import anndata
 import numpy as np
 
 from sc_exp_design.constants import DataFields
+from sc_exp_design.data.container import DataContainer, BatchMixin
 from sc_exp_design.types import TensorLike
 
 __all__ = [
-    "BaseDataStruct",
     "AnnotatedPerturbationData",
 ]
 
 
-class BaseDataStruct(abc.ABC):
-    """
-    Abstract base class for data structures used in modeling perturbations and controls.
-    """
-    
-    @abc.abstractmethod
-    def get_controls(
-        self,
-        *args,
-        **kwargs,
-    ) -> Any:
-        """"""
-        raise NotImplementedError
-
-
 @dataclass
-class AnnotatedPerturbationData(BaseDataStruct):
+class AnnotatedPerturbationData:
     """
     Data structure for annotated perturbation data.
     
@@ -55,16 +40,16 @@ class AnnotatedPerturbationData(BaseDataStruct):
         of such covariates for a given observation/cell.
     :type perturbation_data: class: `dict[str, TensorLike] | None`
 
-    :param target_reprs: Optional dictionary mapping target covariates to be loaded in the case of inverse modeling
+    :param target_data: Optional dictionary mapping target covariates to be loaded in the case of inverse modeling
         to their representation. This will represent the quantities that we want to optimize for by choosing the perturbations, defaults to `None`.
-    :type target_reprs:
+    :type target_data:
 
-    :param perturbations_with_reps: Optional dictionary mapping each perturbation covariate to its uniqua values. This is needed in the
+    :param perturbations_with_rep: Optional dictionary mapping each perturbation covariate to its uniqua values. This is needed in the
         case of Optimal Transport couplings as we want to be able to sample a unique perturbation for each batch of target data, defaults to `None`.
         In the cases when :param: `perturbation_data` is `None`, it should be set to `None`. Similarly, it should be `None` in the case where it is not
         possible to use OT coupling, like for example when the perturbations are given by dense and continuous vectors of features (i.e.: when :param: `perturbations_in_obsm` is not `None`).
         Defaults to `None`.
-    :type perturbations_with_reps: class: `dict[str, Sequence[str]] | None`
+    :type perturbations_with_rep: class: `dict[str, Sequence[str]] | None`
 
     :param has_controls: Flag indicating whether a notion of control states applies to the current data.
         When this is the case, the :param: `control_key` needs to be properly set. Defaults to `True`.
@@ -79,38 +64,129 @@ class AnnotatedPerturbationData(BaseDataStruct):
     adata: anndata.AnnData
     control_key: str | None
     state_data: TensorLike
-    perturbation_data: dict[str, TensorLike] | None
-    target_reprs: dict[str, TensorLike] | None = None
-    perturbations_with_rep: dict[str, Sequence[str]] | None = None
+    perturbation_data: BatchMixin | None
+    target_data: BatchMixin | None = None
+    seen_combinations: Sequence[Sequence[str]] | None = None
     has_controls: bool = True
-    perturbations_in_obsm: Sequence[str] | None = None
-    
-    @property
-    def seen_combinatorial_perturbations(
+    perturbations: Sequence[str] | None = None
+
+    def __post_init__(
         self,
-    ) -> Sequence[Sequence[str]] | None:
+    ) -> None:
         """
-        Returns the list of unique perturbations present in the dataset.
-
-        These will be computed by using the keys of :attr:`AnnotatedPerturbationData.perturbations_with_rep` to retrieve the unique combinations
-        from the :attr: `obs` attribute of the :attr: `AnnotatedPerturbationData.adata` object. This is needed to sample unique conditions in the case of
-        Optimal Transport couplings.
-        It returns `None` in the following three cases:
-            * No perturbation data is provided.
-            * No perturbation representation is provided.
-            * There is at least one perturbation passed in :attr:`AnnotatedPerturbationData.perturbations_in_obsm`, in which case no OT coupling can be done.
-
-        :rtype: class: `Sequence[Sequence[str]] | None`
+        Registers the indices of control and treatment data for more efficient dataloading.
         """
-        # no perturbation data is passed to the AnnotatedPerturbationData object or no perturbation with associated representation
-        if (self.perturbation_data is None) or (self.perturbations_with_rep is None) or (len(self.perturbations_in_obsm) == 0):
-            return None 
-        return self.adata.obs[[pert for pert in self.perturbations_with_rep.keys()]].drop_duplicates().values.tolist()
+
+        # pre-allocating attributes        
+        self.control_idxs = None
+        self.control_data = None
+
+        self.treatment_idxs = None
+        self.treatment_idxs_per_condition = None
+        self.treatment_data = None
+
+        # initializing data container
+        self.data = DataContainer(
+            self.state_data,
+            self.perturbation_data,
+            self.target_data,
+        )
+
+        # storing control data
+        if self.has_controls:
+            # sanity check
+            msg = f""
+            assert self.control_key is not None, msg
+
+            # register indices and state data
+            self.control_idxs = np.argwhere(self.adata.obs[self.control_key] == True)[:, 0]
+            self.control_data = self.data[self.control_idxs]
+
+            # storing perturbation data
+            self.treatment_idxs = np.argwhere(self.adata.obs[self.control_key] == False)[:, 0]
+
+        else:
+            self.treatment_idxs = np.arange(len(self.adata))
+        if self.perturbations is not None and self.seen_combinations is not None:
+            self.treatment_idxs_per_condition = {
+                DataFields.CONDITION_VALUES: self.treatment_idxs,
+                **{
+                    treatment: np.argwhere(self.adata.obs[[pert for pert in self.perturbations]] == treatment)[:, 0] 
+                        for treatment in self.seen_combinations
+                }
+            }
+        else:
+            self.treatment_idxs_per_condition = {DataFields.CONDITION_VALUES: self.treatment_idxs}
+
+    def __getitem__(
+        self,
+        idx: int | slice,
+    ) -> "AnnotatedPerturbationData":
+        """
+        Durden method needed to slice the :class: `AnnotatedPerturbationData` object.
+
+        Retrieves all the data from the original instance and returns a new instance of :class: `AnnotatedPerturbationData`.
+        """
+        # retrieving adata and states
+        adata = self.adata[idx]
+        state_data = self.state_data[idx]
+        # retrieving optional data
+        perturbation_data = None
+        if self.perturbation_data is not None:
+            perturbation_data = self.perturbation_data[idx]
+        target_data = None
+        if self.target_data is not None:
+            target_data = self.target_data[idx]
+        return AnnotatedPerturbationData(
+            adata,
+            self.control_key,
+            state_data,
+            perturbation_data=perturbation_data,
+            target_data=target_data,
+            seen_combinations=self.seen_combinations,
+            perturbations_with_rep=self.perturbations_with_rep,
+            has_controls=self.has_controls,
+            perturbations=self.perturbations
+        )
+    
+    def __len__(
+        self,
+    ) -> int:
+        """
+        Returns the number of observations present in the data.
+
+        :rtype: class: `int`
+        """
+        return self.adata.shape[0]
+
+    def _get_treatments(
+        self,
+        treatments: Sequence[str] | None = None,
+    ) -> np.ndarray:
+        """"""
+        # case 0: Seen combinatorial perturbation is None. No specific treatment is to be retrieved.
+        if self.seen_combinations is None:
+            # sanity check: we should not pass the treatments
+            msg = f""
+            assert treatments is None, msg
+            treatments = DataFields.CONDITION_VALUES
+        # case 0: Seen combinatorial perturbation is not None.
+        # treatment should be either None or be appering inside self.seen_combinatorial_perturbations
+        else:
+            # when no treatment is passed
+            if treatments is None or len(treatments) == 0:
+                treatments = DataFields.CONDITION_VALUES
+            msg = f"{treatments=} not found in {self.treatment_idxs_per_condition.keys()=}"
+            assert treatments in self.treatment_idxs_per_condition.keys(), msg
+
+        # retrieving indices of current treatment and slicing data
+        treatment_idxs = self.treatment_idxs_per_condition[treatments]
+        return self.data[treatment_idxs]
 
     def get_controls(
         self,
         batch_size: int | None = None,
-    ) -> dict[str, TensorLike]:
+    ) -> DataContainer:
         """
         Retrieve control group data.
         
@@ -132,39 +208,21 @@ class AnnotatedPerturbationData(BaseDataStruct):
             raise ValueError(msg)
         
         # collect control ids and features
-        ctrl_obs_idx = np.argwhere(self.adata.obs[self.control_key] == True)[:, 0]
-        ctrl_state_data = self.state_data[ctrl_obs_idx]
-
-        # collect control annotations from perturbation data 
-        if self.perturbation_data is not None:
-            ctrl_perturbation_data = {key: val[ctrl_obs_idx] for key, val in self.perturbation_data.items()}
-        if self.target_reprs is not None:
-            ctrl_pert_repr = {key: val[ctrl_obs_idx] for key, val in self.target_reprs.items()}
+        ctrl_data = self.control_data
 
         # collect batch subset of the observations 
         if batch_size is not None:
-            batch_idxs = np.random.choice(ctrl_obs_idx.shape[0], size=batch_size)
+            batch_idxs = np.random.choice(np.arange(len(ctrl_data)), size=batch_size)
 
-            ctrl_state_data = ctrl_state_data[batch_idxs]
+            ctrl_data = ctrl_data[batch_idxs]
 
-            if self.perturbation_data is not None:
-                ctrl_perturbation_data = {key: val[batch_idxs] for key, val in ctrl_perturbation_data.items()}
-            if self.target_reprs is not None:
-                ctrl_pert_repr = {key: val[batch_idxs] for key, val in ctrl_pert_repr.items()}
-
-        # Dictionary of controls 
-        output_dict = {DataFields.STATE_DATA: ctrl_state_data,}        
-        if self.perturbation_data is not None:
-            output_dict[DataFields.PERTURBATION_DATA] = ctrl_perturbation_data
-        if self.target_reprs is not None:
-            output_dict[DataFields.TARGET_DATA] = ctrl_pert_repr
-        return output_dict
+        return ctrl_data
 
     def get_treatments(
         self,
         batch_size: int | None = None,
         treatments: Sequence[str] | None = None,
-    ) -> tuple[TensorLike, TensorLike]:
+    ) -> DataContainer:
         """
         Retrieve treatment group data.
 
@@ -178,76 +236,22 @@ class AnnotatedPerturbationData(BaseDataStruct):
         :return: Dictionary containing treatment state and perturbation data (if available).
         :rtype: Dict[str, TensorLike]
         """
-        # collect treatment ids and features
-        if self.has_controls:
-            trtm_obs_idx = np.argwhere(self.adata.obs[self.control_key] == False)[:, 0]
-        else:
-            trtm_obs_idx = np.arange(len(self.adata))
-        # optionally selecting only the current treatment (used in case of OT couplings) 
-        if treatments is not None:
-            trtm_obs_idx = np.argwhere(self.adata.obs[[pert for pert in self.perturbations_with_rep.keys()]] == treatments)[:, 0]
-        trtm_state_data = self.state_data[trtm_obs_idx]
-
-        # collect treatment annotations from perturbation data 
-        if self.perturbation_data is not None:
-            trtm_perturbation_data = {key: val[trtm_obs_idx] for key, val in self.perturbation_data.items()}
-        if self.target_reprs is not None:
-            trtm_pert_repr = {key: val[trtm_obs_idx] for key, val in self.target_reprs.items()}
+        # retrieve indices
+        trtm_data = self._get_treatments(treatments)
         
         # collect batch subset of the observations 
         if batch_size is not None:
-            batch_idxs = np.random.choice(trtm_obs_idx.shape[0], size=batch_size)
+            batch_idxs = np.random.choice(np.arange(len(trtm_data)), size=batch_size)
 
-            trtm_state_data = trtm_state_data[batch_idxs]
-            
-            if self.perturbation_data is not None:
-                trtm_perturbation_data = {key: val[batch_idxs] for key, val in trtm_perturbation_data.items()}
-            if self.target_reprs is not None:
-                trtm_pert_repr = {key: val[batch_idxs] for key, val in trtm_pert_repr.items()}
+            trtm_data = trtm_data[batch_idxs]
 
-        # dictionary of treatments 
-        output_dict = {DataFields.STATE_DATA: trtm_state_data,}
-        if self.perturbation_data is not None:
-            output_dict[DataFields.PERTURBATION_DATA] = trtm_perturbation_data
-        if self.target_reprs is not None:
-            output_dict[DataFields.TARGET_DATA] = trtm_pert_repr
-        return output_dict
+        return trtm_data
 
-    def __getitem__(
+    @property
+    def allow_grouped_couplings(
         self,
-        idx: int,
-    ) -> "AnnotatedPerturbationData":
-        """
-        Durden method needed to slice the :class: `AnnotatedPerturbationData` object.
-
-        Retrieves all the data from the original instance and returns a new instance of :class: `AnnotatedPerturbationData`.
-        """
-        # retrieving adata and states
-        adata = self.adata[idx]
-        state_data = self.state_data[idx]
-        # retrieving optional data
-        perturbation_data = None
-        if self.perturbation_data is not None:
-            perturbation_data = {perturbation: perturbation_data[idx] for perturbation, perturbation_data in self.perturbation_data.items()}
-        target_reprs = None
-        if self.target_reprs is not None:
-            target_reprs = {target: target_data[idx] for target, target_data in self.target_reprs.items()}
-        return AnnotatedPerturbationData(
-            adata,
-            self.control_key,
-            state_data,
-            perturbation_data=perturbation_data,
-            target_reprs=target_reprs,
-            perturbations_with_rep=self.perturbations_with_rep,
-            perturbations_in_obsm=self.perturbations_in_obsm
-        )
-    
-    def __len__(
-        self,
-    ) -> int:
-        """
-        Returns the number of observations present in the data.
-
-        :rtype: class: `int`
-        """
-        return self.adata.shape[0]
+    ) -> bool:
+        """"""
+        if self.seen_combinations is None or self.perturbations is None:
+            return False
+        return True

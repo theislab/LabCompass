@@ -131,7 +131,7 @@ class FlowMatching(BaseModel):
         perturbation_covariates: dict[str, str | Sequence[str]] | None = None,
         perturbation_reps: dict[str, str | Sequence[str]] | None = None,
         load_target_covariates: bool = False,
-        target_covariates: dict[str, Literal["one_hot", "label", "identity"]] | None = None,
+        target_covariates: dict[str, Literal["one_hot", "label", "identity"] | None] | None = None,
         target_covariates_in_obsm: dict[str, bool] | None = None,
         target_covariates_kwargs: dict[str, Any] | None = None,
     ) -> None:
@@ -143,8 +143,6 @@ class FlowMatching(BaseModel):
         Once initialized the :class: `DataManager` class, it calls the :method: `DataManager.get_data` method to
         retrieve a structured representation of the analyzed dataset.
         """
-        has_controls = (control_key is not None)
-        
         # sanity check when considering perturbation in .obsm 
         if isinstance(self.coupling, OTCoupling) and perturbations_in_obsm is not None:
             msg = "With perturbations in obsm the coupling must be independent"
@@ -162,13 +160,11 @@ class FlowMatching(BaseModel):
             target_covariates=target_covariates,
             target_covariates_in_obsm=target_covariates_in_obsm,
             target_covariates_kwargs=target_covariates_kwargs,
-            has_controls=has_controls,
         )
         train_data = data_manager.get_data(train_adata)
 
         self.data_manager = data_manager
         self.train_data = train_data
-        self.has_controls = has_controls
 
     def prepare_validation_data(
         self,
@@ -225,7 +221,7 @@ class FlowMatching(BaseModel):
         :param solver_kwargs: Dictionary containining the keyword arguments used to initialize the :param:`solver_class`, defaults to `None`.
         :type solver_kwargs: class:`dict[str, Any] | None`
         """
-        if not self.has_controls:
+        if not self.data_manager.has_controls:
             msg = f""
             assert not cvf_config.use_source_as_condition, msg
         else:
@@ -342,7 +338,7 @@ class FlowMatching(BaseModel):
             grad_steps_log_interval=grad_steps_log_interval,
             num_time_steps=self.num_time_steps,
             solver_kwargs=self.solver_kwargs,
-            has_controls=self.has_controls,
+            has_controls=self.data_manager.has_controls,
             generate_from_noise=self.generate_from_noise,
             noise_distribution=self.noise_distribution,
             device_id=self.device_id,
@@ -357,7 +353,7 @@ class FlowMatching(BaseModel):
             train_batch_size,
             state_transforms=self.state_transforms,
             device_id=self.device_id,
-            has_controls=self.has_controls,
+            has_controls=self.data_manager.has_controls,
         )
 
         self.validation_dataloader = None
@@ -368,7 +364,7 @@ class FlowMatching(BaseModel):
                 validation_batch_size,
                 state_transforms=state_transforms,
                 device_id=self.device_id,
-                has_controls=self.has_controls,
+                has_controls=self.data_manager.has_controls,
                 num_treatments_to_load=num_treatments_to_load
             )
 
@@ -425,7 +421,7 @@ class FlowMatching(BaseModel):
         """
         # handling source
         source = None
-        if self.has_controls:
+        if self.data_manager.has_controls:
             source = batch[DataFields.SOURCE_STATE]
 
         # handling conditions
