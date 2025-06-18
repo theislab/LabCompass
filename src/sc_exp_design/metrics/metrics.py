@@ -227,7 +227,7 @@ def compute_cell_props(
     if len(target.shape) == 3:
         target = target[rand_batch_sample, :, :].squeeze()
     else:
-	cell_ids = np.arange(0, pred.shape[0])
+        cell_ids = np.arange(0, pred.shape[0])
         
     if graph is None:
         graph = kneighbors_graph(np.vstack([target, pred]), n_neighbors=k, mode='connectivity')
