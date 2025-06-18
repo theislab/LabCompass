@@ -56,20 +56,6 @@ class DataMixin(dict):
                 msg = f"The values should share the same type. Got {type(value)} for {key}, expected {self.data_type}."
                 raise TypeError(msg)
 
-    def __getattr__(
-        self,
-        name: str,
-    ) -> Callable:
-        """"""
-        # Handle array methods
-        def wrapper(*args, **kwargs):
-            return self._apply_function(lambda x: getattr(x, name)(*args, **kwargs))
-
-        # returning wrapper function
-        if all(hasattr(t, name) for t in self.values()):
-            return wrapper
-        raise AttributeError(f"'DataMixin' object has no attribute '{name}'")
-
     def slice_arrays(
         self,
         idx: int | slice
@@ -251,28 +237,6 @@ class DataContainer:
             perturbation_data,
             target_data,
         )
-
-    def __getattr__(
-        self,
-        name: str,
-    ) -> Callable:
-        """"""
-
-        # Handle array methods
-        def wrapper(*args, **kwargs):
-            return self._apply(lambda x: getattr(x, name)(*args, **kwargs))
-        
-        # retrieving array data
-        data = [self.state_data]
-        if self.perturbation_data is not None:
-            data.extend(self.perturbation_data.values())
-        if self.target_data is not None:
-            data.extend(self.target_data.values())
-        
-        # returning wrapper function
-        if all(hasattr(t, name) for t in data):
-            return wrapper
-        raise AttributeError(f"'DataContainer' object has no attribute '{name}'")
 
     def __len__(
         self,
