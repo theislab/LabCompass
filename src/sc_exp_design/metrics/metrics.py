@@ -226,8 +226,6 @@ def compute_cell_props(
         pred = pred[rand_batch_sample, :, :].squeeze()
     if len(target.shape) == 3:
         target = target[rand_batch_sample, :, :].squeeze()
-    else:
-        cell_ids = np.arange(0, pred.shape[0])
         
     if graph is None:
         graph = kneighbors_graph(np.vstack([target, pred]), n_neighbors=k, mode='connectivity')
@@ -299,6 +297,8 @@ def compute_n_gen_knn_cell_props(
     if len(pred.shape) == 3:
         cell_ids = np.tile(np.arange(0, pred.shape[1]), pred.shape[0])
         pred = np.vstack(pred)
+    else:
+        cell_ids = np.arange(0, pred.shape[0])
         
     if len(target.shape) == 3:
         rand_batch_sample = np.random.choice(np.arange(0, target.shape[0]), size=1, replace=False)
