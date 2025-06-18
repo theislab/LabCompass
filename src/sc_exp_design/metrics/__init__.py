@@ -25,26 +25,6 @@ __all__ = [
 
 @dataclass(frozen=True)
 class Metrics:
-<<<<<<< HEAD
-    """
-#<<<<<<< Updated upstream
-    r_squared: Callable[[TensorLike, TensorLike], float] = compute_r_squared
-    energy_distance: Callable[[TensorLike, TensorLike], float] = compute_e_distance
-    maximum_mean_discrepancy: Callable[[TensorLike, TensorLike], float] = compute_mmd
-    wasserstein_distance: Callable[[TensorLike, TensorLike], float] = compute_wasserstein_distance
-    sinkhorn_divergence: Callable[[TensorLike, TensorLike], float] = partial(compute_wasserstein_distance, method="sinkhorn")
-<<<<<<< HEAD
-<<<<<<< HEAD
-    min_max_mse: Callable[[TensorLike, TensorLike], float] = compute_min_max_mse
-    cell_props: Callable[[TensorLike, TensorLike], float] = compute_cell_props
-=======
-=======
-=======
-#=======
-    """
->>>>>>> 0147fd0 (added co-clustering metrics)
-=======
->>>>>>> 492cb82 (resolved conflicts)
     weights: TensorLike
     r_squared: Callable[[TensorLike, TensorLike], float] = field(init=False)
     energy_distance: Callable[[TensorLike, TensorLike], float] = field(init=False)
@@ -88,13 +68,4 @@ class Metrics:
                            partial(compute_marginal_e_distance, weights=self.weights))
 
         object.__setattr__(self, 'generational_homogeneity', compute_n_gen_knn_cell_props)
-<<<<<<< HEAD
->>>>>>> Stashed changes
->>>>>>> 77173f4 (added more metrics and adapted the callback)
-=======
         object.__setattr__(self, 'coclustering', compute_coclustering)
-<<<<<<< HEAD
-#>>>>>>> Stashed changes
->>>>>>> 0147fd0 (added co-clustering metrics)
-=======
->>>>>>> 492cb82 (resolved conflicts)
