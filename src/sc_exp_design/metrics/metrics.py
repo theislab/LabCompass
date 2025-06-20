@@ -226,6 +226,8 @@ def compute_cell_props(
         pred = pred[rand_batch_sample, :, :].squeeze()
     if len(target.shape) == 3:
         target = target[rand_batch_sample, :, :].squeeze()
+    
+    k = np.min([k, int(pred.shape[0] / 2)])
         
     if graph is None:
         graph = kneighbors_graph(np.vstack([target, pred]), n_neighbors=k, mode='connectivity')
@@ -288,7 +290,7 @@ def compute_n_gen_knn_cell_props(
     elif graph is not None:
         k = graph.shape[0]
     else:
-        k=50
+        k=np.min([50, int(pred.shape[0] / 2)])
     if isinstance(pred, torch.Tensor):
         pred = pred.numpy()
     if isinstance(target, torch.Tensor):
