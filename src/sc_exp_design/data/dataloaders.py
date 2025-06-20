@@ -399,7 +399,7 @@ class ValidationDataLoader(BaseCoupledDataLoader):
         """
         # retrieving the perturbations to validate on for the current batch
         treatments = self.__sample_perturbation_id()
-
+        
         # control states
         control_states = None
         if self.has_controls:

@@ -92,6 +92,7 @@ class MetricsCallBack(ComputationalCallBack):
     def run_on_valid_step(
         self,
         predictions_dict: dict[str, dict[str, TensorLike]],
+        val_id: str,
     ) -> dict[str, float]:
         """"""
         # defining output dictionary
@@ -107,11 +108,18 @@ class MetricsCallBack(ComputationalCallBack):
             perturbation_metrics = self._run_on_valid_step(predictions, targets)
 
             # updating the metrics 
-            metrics.update(
-                {
-                    f"{perturbation}_{metric_id}": metric_value for metric_id, metric_value in perturbation_metrics.items()
-                }
-            )
+            if self.state_transforms is not None:
+                metrics.update(
+                    {
+                        f"{perturbation}_{metric_id}_{val_id}_{self.state_transforms.__class__.__name__}": metric_value for metric_id, metric_value in perturbation_metrics.items()
+                    }
+                )
+            else:
+                metrics.update(
+                    {
+                        f"{perturbation}_{metric_id}_{val_id}": metric_value for metric_id, metric_value in perturbation_metrics.items()
+                    }
+                )
         return metrics
 
 
@@ -230,12 +238,13 @@ class TrainingCallBacks(BaseCallBack):
     def run_on_valid_step(
         self,
         prediction_dict: dict[str, dict[str, TensorLike]],
+        val_id: str = None,
     ) -> dict[str, Any]:
         """"""
         # run computational callbacks first
         callback_out = {}
         for callback in self.computational_callbacks:
-            callback_metrics = callback.run_on_valid_step(prediction_dict)
+            callback_metrics = callback.run_on_valid_step(prediction_dict, val_id)
             callback_out.update(callback_metrics)
         # then log the results
         for callback in self.logging_callbacks:
