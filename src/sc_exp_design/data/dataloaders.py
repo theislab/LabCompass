@@ -196,7 +196,7 @@ class SequentialDataLoader(BaseDataLoader):
         # retrieving optional target covariates
         if self.data.target_data is not None:
             target_data = {}
-            for covariate, covariate_data in self.data.target_reprs.items():
+            for covariate, covariate_data in self.data.target_data.items():
                 target_data[covariate] = self._move_to_tensor_and_slice(covariate_data, batch_idxs)
             out[DataFields.TARGET_CATEGORIES] = target_data
         return out
