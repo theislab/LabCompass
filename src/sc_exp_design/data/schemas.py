@@ -759,10 +759,15 @@ class TargetDataSchema(BaseDataSchema):
         for target_covariate in self.target_covariates.keys():
             # when the target is in obsm
             if target_covariate in self.target_covariates_in_obsm:
-                self._validate_covariates_metadata(adata, target_covariate, "obsm")
+                if not target_covariate in adata.obsm.keys():
+                    msg = f"{target_covariate} not found in `adata.obsm.keys()`"
+                    raise KeyError(msg)
+
             # otherwise we should find it in obs
             else:
-                self._validate_covariates_metadata(adata, target_covariate, "obs")
+                if target_covariate not in adata.obs.keys():
+                    msg = f"{target_covariate} not found in `adata.obs.columns`"
+                    raise KeyError(msg)
 
     def _get_data(
         self,
