@@ -122,6 +122,21 @@ class BaseDataSchema(abc.ABC):
             adata = self.adata
         return adata
 
+    @abc.abstractmethod
+    def _validate_adata(
+        self,
+        adata: anndata.AnnData,
+    ) -> None:
+        """"""
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def get_data(
+        self,
+    ) -> Any:
+        """Enforces the data schema and returned the compiled data."""
+        raise NotImplementedError
+
 
 @dataclass
 class StateDataSchema(BaseDataSchema):
@@ -159,6 +174,12 @@ class StateDataSchema(BaseDataSchema):
         :param adata: The input annotated data to verify.
         :type adata: class: `anndata.AnnData`
         """
+        self._validate_adata(self.adata)
+
+    def _validate_adata(
+        self,
+        adata: anndata.AnnData,
+    ) -> None:
         # when we provide the sample rep key it should appear in `self.adata.obsm`
         if self.sample_rep is not None:
             if self.sample_rep not in adata.obsm.keys():
@@ -240,18 +261,120 @@ class PerturbationDataSchema(BaseDataSchema):
     def __post_init__(
         self,
     ) -> None:
-        """Validates the arguments and :attr: `self.adata`.
-        """
+        """"""
         # validate args
         self._validate_args()
         # validate adata
         self._validate_adata(self.adata)
 
-    def _validate_perturbation_args(
+    def _validate_args(
         self,
-        perturbation: str,
     ) -> None:
-        """Validates the arguments associated to a given perturbation.
+        """Performs sanity checks on the configurations and the annotated data object."""
+        # sanity check perturbations_in_obsm
+        # when not provided, initialize empty sequence
+        if self.perturbations_in_obsm is None:
+            self.perturbations_in_obsm = ()
+
+        # when only one perturbation is passed create a sequence with only one element
+        if isinstance(self.perturbations_in_obsm, str):
+            msg = f"Only one element provided in {self.perturbations_in_obsm=}. Setting it to a sequence."
+            logger.info(msg)
+            self.perturbations_in_obsm = (self.perturbations_in_obsm, )
+
+        # we should check that it is a sequence of string identifiers
+        if not isinstance(self.perturbations_in_obsm, Sequence):
+            msg = f"`perturbations_in_obsm` should be a sequence of string perturbation identifiers, found {type(self.perturbations_in_obsm)}"
+            raise TypeError(msg)
+
+        # when only one perturbation is passed create a sequence with only one element
+        if isinstance(self.perturbations, str):
+            msg = f"Only one element provided in {self.perturbations=}. Setting it to a sequence."
+            logger.info(msg)
+            self.perturbations = (self.perturbations,)
+
+        # we should check that it is a sequence of string identifiers
+        if not isinstance(self.perturbations, Sequence):
+            msg = f"`perturbations` should be a sequence of string perturbation identifiers, found {type(self.perturbations)}"
+            raise TypeError(msg)
+
+        # when we pass the perturbations we should pass their representations as well
+        if self.perturbation_reps is None:
+            msg = f"When passing perturbations, you need to provide their representation in `self.perturbation_reps`."
+            raise ValueError(msg)
+
+        # check each perturbation individually
+        for perturbation in self.perturbations:
+            # check that each perturbation identifiers is of the expected type    
+            if not isinstance(perturbation, str):
+                msg = f"Perturbation {perturbation} is expected to be a string, found {type(perturbation)}"
+                raise TypeError(msg)
+
+            # check that it appears in the rep dictionary                    
+            if not perturbation in self.perturbation_reps.keys():
+                msg = f"Perturbation {perturbation} not found in `self.perturbation_reps`."
+                raise KeyError(msg)
+
+            # retrieving the representations for the current perturbation
+            reps = self.perturbation_reps[perturbation]
+
+            # configuring covariate metadata
+            if perturbation in self.perturbations_in_obsm:
+                # check if perturbation is in obsm
+                reps = self.__configure_covariate_metadata(reps, allow_only_one_element=True)
+            else:
+                # sanity check on the input AnnData
+                if perturbation not in self.adata.obs.keys():
+                    msg = f"{perturbation} not found in `adata.obs.keys()`"
+                    raise ValueError(msg)
+
+                # finally retrieve the representation
+                reps = self.__configure_covariate_metadata(reps)
+            # store the parsed representations back in perturbation_reps
+            self.perturbation_reps[perturbation] = reps
+
+            # optionally retrieving the covariates for the current perturbation
+            if self.perturbation_covariates is not None:
+                if perturbation in self.perturbation_covariates.keys():
+                    # retrieving the covariates for the current perturbation
+                    covariates = self.perturbation_covariates[perturbation]
+                    covariates = self.__configure_covariate_metadata(covariates)
+                # otherwise initialize with empty sequence
+                else:
+                    covariates = ()
+                # store the parsed covariates back in the perturbation reps
+                self.perturbation_covariates[perturbation] = covariates
+
+    def __configure_covariate_metadata(
+        self,
+        identifiers: Sequence[str] | str,
+        allow_only_one_element: bool = False
+    ) -> Sequence[str]:
+        """Configures the covariates metadata and performs some additional sanity checks
+        
+        :param identifiers: Sequence of covariate identifiers for the current perturbation.
+        :type identifiers: class: `Sequence[str] | str`
+
+        :param adata_field_key: Key indicating the field in the annotated data object 
+            where such identifiers are to be found.
+        :type adata_field_key: class `Literal["uns", "obsm"]`
+
+        :param allow_only_one_element: Whether to allow for only one identifier to be passed.
+            This is needed for all the perturbations is :attr: `self.perturbations_in_obsm`.
+        :type allow_only_one_element: class: `bool`
+        """
+        # when only one identifier is passed create a sequence with only one element
+        if isinstance(identifiers, str):
+            msg = f"Only one element provided in {identifiers=}. Setting it to a sequence."
+            logger.info(msg)
+            identifiers = (identifiers, )
+        
+        # optionally check that we only have one identifier
+        if allow_only_one_element:
+            if isinstance(identifiers, Sequence):
+                if len(identifiers) != 1:
+                    msg = "When a perturbation is in .obsm, there should be only one representation."
+                    raise ValueError(identifiers)
 
         For a given perturbation, it performs the following checks:
             * Checks that :param: `perturbation` is a string.
@@ -275,11 +398,54 @@ class PerturbationDataSchema(BaseDataSchema):
         if not isinstance(perturbation, str):
             msg = f"Perturbation {perturbation} is expected to be a string, found {type(perturbation)}"
             raise TypeError(msg)
+        return identifiers
 
-        # check that it appears in the rep dictionary                    
-        if not perturbation in self.perturbation_reps.keys():
-            msg = f"Perturbation {perturbation} not found in `self.perturbation_reps`."
-            raise KeyError(msg)
+    def __validate_covariate_metadata(
+        self,
+        adata: anndata.AnnData,
+        identifiers: Sequence[str] | str,
+        adata_field_key: Literal["uns", "obsm"],
+    ) -> None:
+        """"""
+        # retrieving adata field
+        adata_field = getattr(adata, adata_field_key)
+        # checking that the representations are found in adata_field_key
+        for identifier in identifiers:
+            if identifier not in adata_field:
+                msg = f"Representation {identifier} not found in `adata.{adata_field_key}.keys()`."
+                raise KeyError(msg)
+
+    def _validate_adata(
+        self,
+        adata: anndata.AnnData,
+    ) -> None:
+        """"""
+        # check each perturbation individually
+        for perturbation in self.perturbations:
+            # retrieving the representations for the current perturbation
+            reps = self.perturbation_reps[perturbation]
+            # configuring covariate metadata
+            if perturbation in self.perturbations_in_obsm:
+                self.__validate_covariate_metadata(adata, reps, "obsm")
+            else:
+                # sanity check on the input AnnData
+                if perturbation not in adata.obs.keys():
+                    msg = f"{perturbation} not found in `adata.obs.keys()`"
+                    raise ValueError(msg)
+                # require that we have the same keys across all the representations of a given perturbation
+                reference_keys = list(adata.uns[reps[0]].keys())
+                for rep in reps:
+                    keys = list(adata.uns[rep].keys())
+                    if reference_keys != keys:
+                        msg = f""
+                        raise ValueError(msg)
+                self.__validate_covariate_metadata(adata, reps, "uns")
+            # optionally retrieving the covariates for the current perturbation
+            if self.perturbation_covariates is not None:
+                if perturbation in self.perturbation_covariates.keys():
+                    # retrieving the covariates for the current perturbation
+                    covariates = self.perturbation_covariates[perturbation]
+                    self.__validate_covariate_metadata(adata, covariates, "obsm")
 
         # retrieving the representations for the current perturbation
         reps = self.perturbation_reps[perturbation]
@@ -399,6 +565,7 @@ class PerturbationDataSchema(BaseDataSchema):
             # retrieving the only representation
             reps = reps[0]
             # storing data
+            reps = reps[0]
             covariate_feats_key = f"{DataFields.CONDITION_FEATS}_{perturbation}_{reps}" 
             perturbation_data[covariate_feats_key] = adata.obsm[reps]
             return perturbation_data
@@ -521,6 +688,17 @@ class PerturbationDataSchema(BaseDataSchema):
             return False
         return True
 
+    def get_seen_combinations(
+        self,
+        adata: anndata.AnnData,
+    ) -> Sequence[Sequence[str]] | None:
+        """Returns a sequence of unique perturbation combinations appearing in the data."""
+        # no perturbation to group over
+        if not self.allow_grouped_couplings:
+            return None
+        combs = adata.obs[[pert for pert in self.perturbations]].drop_duplicates().values.tolist()
+        return [tuple(comb) for comb in combs]
+
 
 @dataclass
 class TargetDataSchema(BaseDataSchema):
@@ -551,8 +729,7 @@ class TargetDataSchema(BaseDataSchema):
     def __post_init__(
         self,
     ) -> None:
-        """Validates the arguments and :attr: `self.adata`.
-        """
+        """"""
         # validate args
         self._validate_args()
         # validate adata
@@ -561,8 +738,7 @@ class TargetDataSchema(BaseDataSchema):
     def _validate_args(
         self,
     ) -> None:
-        """Performs sanity checks on the configurations and updates the attributes for a valid configuration.
-        """
+        """"""
 
         # handling optional covariate keywargs
         if self.target_covariates_kwargs is None:
@@ -578,11 +754,7 @@ class TargetDataSchema(BaseDataSchema):
             self,
             adata: anndata.AnnData,
         ) -> None:
-        """Validates the input annotated data.
 
-        :param adata: The input annotated data to verify.
-        :type adata: class: `anndata.AnnData`
-        """
         # checking that each target covariate appears in the anndata object
         for target_covariate in self.target_covariates.keys():
             # when the target is in obsm
