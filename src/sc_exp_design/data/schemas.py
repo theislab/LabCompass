@@ -13,7 +13,7 @@ from sc_exp_design.utils import coerce_string_to_sequence
 
 __all__ = [
     "StateDataSchema",
-    "PerturbationDataModel",
+    "PerturbationDataSchema",
     "TargetDataSchema",
 ]
 
@@ -44,7 +44,7 @@ class BaseDataSchema(abc.ABC):
     def get_data(
         self,
     ) -> Any:
-        """Enforces the data schema and returned the compiled data."""
+        """Enforces the data schema and returnes the compiled data."""
         raise NotImplementedError
 
     def __validate_covariates_metadata(
@@ -53,7 +53,19 @@ class BaseDataSchema(abc.ABC):
         identifier: str,
         adata_field_key: Literal["obs", "uns", "obsm"],
     ) -> None:
-        """"""
+        """Checks that a given key is present in a selected attribute of the input annotated data.
+
+        When such key is not found in the target field, it raises a :class: `KeyError`.
+        
+        :param adata: The input annotated data to verify.
+        :type adata: class: `anndata.AnnData`
+
+        :param identifier: The string identifier for the key to be searched in :param: `adata`.
+        :type identifier: class: `str`
+
+        :param adata_field: The attribute of :param: `adata` checked.
+        :type adata_field: class: `Literal["obs", "uns", "obsm"]`
+        """
         # retrieving adata field
         adata_field = getattr(adata, adata_field_key)
         # checking that the representation is found in adata_field_key
@@ -67,7 +79,21 @@ class BaseDataSchema(abc.ABC):
         identifiers: Sequence[str] | str,
         adata_field_key: Literal["obs", "uns", "obsm"],
     ) -> None:
-        """"""
+        """Checks that a sequence of keys is present in a selected attribute of the input annotated data.
+
+        When a key is not found in the target field, it raises a :class: `KeyError`. Coerces single string
+        to sequences then calls :method: `self.__validate_covariates_metadata` while iterating over them.
+        
+        :param adata: The input annotated data to verify.
+        :type adata: class: `anndata.AnnData`
+
+        :param identifiers: A sequence of string identifiers for the key to be searched in :param: `adata`.
+            When a single string identifier, it will be coerced to a sequence.
+        :type identifiers: class: `Sequence[str] | str`
+
+        :param adata_field: The attribute of :param: `adata` checked.
+        :type adata_field: class: `Literal["obs", "uns", "obsm"]`
+        """
         # handling the case when identifier is a single string
         if isinstance(identifiers, str):
             identifiers = (identifiers, )
@@ -219,7 +245,11 @@ class PerturbationDataSchema(BaseDataSchema):
         self,
         perturbation: str,
     ) -> None:
-        """"""
+        """Validates the arguments associated to a given perturbation.
+
+        :param perturbation: The string identifier for the perturbation whose arguments to verify.
+        :type perturbation: class: `str`
+        """
         # check that each perturbation identifiers is of the expected type    
         if not isinstance(perturbation, str):
             msg = f"Perturbation {perturbation} is expected to be a string, found {type(perturbation)}"
@@ -344,7 +374,6 @@ class PerturbationDataSchema(BaseDataSchema):
 
     def _validate_args(
         self,
-        perturbation: str,
     ) -> None:
         """Performs sanity checks on the configurations and updates the attributes for a valid configuration.
         """
@@ -365,7 +394,7 @@ class PerturbationDataSchema(BaseDataSchema):
         """"""
         # check each perturbation individually
         for perturbation in self.perturbations:
-            self.__validate_perturbation_adata(adata, perturbation)
+            self._validate_perturbation_adata(adata, perturbation)
 
     def get_data(
         self,
