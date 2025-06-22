@@ -143,9 +143,9 @@ class DataManager:
             self.perturbation_data_schema = PerturbationDataSchema(
                 self.adata,
                 self.perturbations,
+                self.perturbation_reps,
                 self.perturbations_in_obsm,
                 self.perturbation_covariates,
-                self.perturbation_reps,
             )
 
         # target data schema
