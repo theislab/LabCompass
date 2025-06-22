@@ -151,7 +151,7 @@ def coerce_string_to_sequence(
         if allow_none:
             return ()
         msg = f"When {allow_none=}, an identifier should be passed. Found `None`."
-        rasie ValueError(msg)
+        raise ValueError(msg)
 
     # when only one identifier is passed create a sequence with only one element
     if isinstance(identifiers, str):
