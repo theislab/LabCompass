@@ -57,6 +57,7 @@ class BaseTrainer(abc.ABC):
     def __validation_step(
         self,
         batch: dict[str, Tensor],
+        val_id: str,
     ) -> dict[str, TensorLike]:
         """"""
         self.model.eval()
@@ -68,7 +69,7 @@ class BaseTrainer(abc.ABC):
         # running callbacks
         metrics = {}
         if self.callbacks is not None:
-            metrics = self.callbacks.run_on_valid_step(prediction_dict)
+            metrics = self.callbacks.run_on_valid_step(prediction_dict, val_id)
         return metrics
 
     def __update_logs(
@@ -85,7 +86,7 @@ class BaseTrainer(abc.ABC):
         self,
         num_training_steps: int,
         train_dataloader: BaseDataLoader,
-        validation_dataloader: BaseDataLoader | None = None,
+        validation_dataloaders: dict | None = None,
         valid_freq: int | None = None,
     ) -> None:
         """"""
@@ -95,7 +96,7 @@ class BaseTrainer(abc.ABC):
         iterator = range(num_training_steps)
         prog_bar = tqdm(iterator)
 
-        do_validation = validation_dataloader is not None
+        do_validation = validation_dataloaders is not None
         if do_validation and valid_freq is None:
             valid_freq = num_training_steps
 
@@ -125,13 +126,17 @@ class BaseTrainer(abc.ABC):
         
             # validation step
             if do_validation:
+                batch = {}
                 if (grad_step + 1) % valid_freq == 0 and grad_step > 0:
                     # skipping if no dataloader provided
-                    if validation_dataloader is None:
+                    if validation_dataloaders is None:
                         continue
-
-                    batch = validation_dataloader.sample()
-                    metrics = self.__validation_step(batch)
+                    if (grad_step + 1) // valid_freq == 1:
+                        for val_id, validation_dataloader in validation_dataloaders.items():
+                            batch[val_id] = validation_dataloader.sample()
+                    metrics = {}
+                    for val_id, validation_dataloader in validation_dataloaders.items():
+                        metrics = metrics | self.__validation_step(batch[val_id], val_id)
                     self.__update_logs(metrics)
 
                 # running callbacks
