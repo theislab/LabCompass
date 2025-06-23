@@ -128,14 +128,17 @@ class BaseTrainer(abc.ABC):
         
             # validation step
             if do_validation:
+                batch = {}
                 if (grad_step + 1) % valid_freq == 0 and grad_step > 0:
                     # skipping if no dataloader provided
                     if validation_dataloaders is None:
                         continue
+                    if (grad_step + 1) // valid_freq == 1:
+                        for val_id, validation_dataloader in validation_dataloaders.items():
+                            batch[val_id] = validation_dataloader.sample()
                     metrics = {}
                     for val_id, validation_dataloader in validation_dataloaders.items():
-                        batch = validation_dataloader.sample()
-                        metrics = metrics | self.__validation_step(batch, val_id)
+                        metrics = metrics | self.__validation_step(batch[val_id], val_id)
                     self.__update_logs(metrics)
 
                 # running callbacks
