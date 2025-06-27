@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+import logging
 import random
 from typing import Any
 
@@ -6,6 +7,8 @@ import numpy as np
 import math
 import torch
 from torch import Tensor
+
+logger = logging.getLogger(__name__)
 
 __all__ = [
     "match_shapes",
@@ -124,3 +127,47 @@ def sinusoidal_time_features(t: torch.Tensor,
     if num_freqs % 2:
         embedding = torch.cat([embedding, torch.zeros_like(embedding[:, :1])], dim=-1)
     return embedding
+
+def coerce_string_to_sequence(
+    identifiers: Sequence[str] | str | None,
+    allow_only_one_element: bool = False,
+    allow_none: bool = False,
+) -> Sequence[str]:
+    """Configures the covariates metadata and performs some additional sanity checks
+    
+    :param identifiers: Sequence of covariate identifiers for the current perturbation.
+    :type identifiers: class: `Sequence[str] | str`
+
+    :param adata_field_key: Key indicating the field in the annotated data object 
+        where such identifiers are to be found.
+    :type adata_field_key: class `Literal["uns", "obsm"]`
+
+    :param allow_only_one_element: Whether to allow for only one identifier to be passed.
+        This is needed for all the perturbations is :attr: `self.perturbations_in_obsm`.
+    :type allow_only_one_element: class: `bool`
+    """
+    # when we allow none we return an empty sequence
+    if identifiers is None:
+        if allow_none:
+            return ()
+        msg = f"When {allow_none=}, an identifier should be passed. Found `None`."
+        raise ValueError(msg)
+
+    # when only one identifier is passed create a sequence with only one element
+    if isinstance(identifiers, str):
+        msg = f"Only one element provided in {identifiers=}. Setting it to a sequence."
+        logger.info(msg)
+        identifiers = (identifiers, )
+    
+    # optionally check that we only have one identifier
+    if allow_only_one_element:
+        if isinstance(identifiers, Sequence):
+            if len(identifiers) != 1:
+                msg = "When a perturbation is in .obsm, there should be only one representation."
+                raise ValueError(identifiers)
+
+    # checking that the representations are of the correct type
+    if not isinstance(identifiers, Sequence):
+        msg = f"{identifiers=} should be a string representation identifier, found {type(identifiers)}."
+        raise TypeError(msg)
+    return identifiers

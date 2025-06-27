@@ -218,6 +218,10 @@ class NeuralVelocityField(BaseModule):
             assert cond is not None, msg
             cond_values = [val for key, val in cond.items() if key in self.config.perturbation_layers_before_pooling]
             condition_latent = torch.concatenate(cond_values, dim=-1)
+
+        condition_latent = nn.functional.dropout(condition_latent,
+                                                 p=self.config.perturbation_output_dropout)
+
         
         # encoding states
         xt_latent = xt
@@ -307,7 +311,7 @@ class NeuralVelocityField(BaseModule):
                 vf = vf_unguided + cfg_guidance_strength * (vf_guided - vf_unguided)
                 return vf
             # when not using cfg
-            return self.vf(t, xt, cond=cond, source=source)
+            return self.forward(t, xt, cond=cond, source=source)
 
         return vf_fn
 

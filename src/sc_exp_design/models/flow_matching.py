@@ -2,6 +2,7 @@ import logging
 import os
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any, Literal
+import numpy as np
 
 import torch
 from anndata import AnnData
@@ -25,6 +26,7 @@ from sc_exp_design.networks import NeuralVelocityField
 from sc_exp_design.ode import push_forward
 from sc_exp_design.training import BaseCallBack, CFMTrainer
 from sc_exp_design.transforms import Transform
+from sc_exp_design.types import TensorLike
 
 logger = logging.getLogger(__name__)
 
@@ -131,7 +133,7 @@ class FlowMatching(BaseModel):
         perturbation_covariates: dict[str, str | Sequence[str]] | None = None,
         perturbation_reps: dict[str, str | Sequence[str]] | None = None,
         load_target_covariates: bool = False,
-        target_covariates: dict[str, Literal["one_hot", "label", "identity"]] | None = None,
+        target_covariates: dict[str, Literal["one_hot", "label", "identity"] | None] | None = None,
         target_covariates_in_obsm: dict[str, bool] | None = None,
         target_covariates_kwargs: dict[str, Any] | None = None,
     ) -> None:
@@ -143,8 +145,6 @@ class FlowMatching(BaseModel):
         Once initialized the :class: `DataManager` class, it calls the :method: `DataManager.get_data` method to
         retrieve a structured representation of the analyzed dataset.
         """
-        has_controls = (control_key is not None)
-        
         # sanity check when considering perturbation in .obsm 
         if isinstance(self.coupling, OTCoupling) and perturbations_in_obsm is not None:
             msg = "With perturbations in obsm the coupling must be independent"
@@ -162,17 +162,16 @@ class FlowMatching(BaseModel):
             target_covariates=target_covariates,
             target_covariates_in_obsm=target_covariates_in_obsm,
             target_covariates_kwargs=target_covariates_kwargs,
-            has_controls=has_controls,
         )
         train_data = data_manager.get_data(train_adata)
 
         self.data_manager = data_manager
         self.train_data = train_data
-        self.has_controls = has_controls
 
     def prepare_validation_data(
         self,
-        validation_adata: AnnData,
+        validation_adatas: TensorLike | AnnData,
+        adatas_ids: TensorLike = None
     ) -> None:
         """Prepares the data for validation and initializs the :attr:`FlowMatching.validation_data` attribute of the model.
 
@@ -180,7 +179,14 @@ class FlowMatching(BaseModel):
             It should satisfy the same requirements as the one used to construct the training data.
         :type validation_adata: class:`AnnData`
         """
-        validation_data = self.data_manager.get_data(validation_adata)
+        if isinstance(validation_adatas, AnnData):
+            validation_adatas = (validation_adatas, )
+        if adatas_ids is None:
+            adatas_ids = np.arange(0, len(validation_adatas))
+        validation_data = {}
+        for (adatas_id, validation_adata) in zip(adatas_ids, validation_adatas):
+            validation_data[adatas_id] = self.data_manager.get_data(validation_adata)
+            
         self.validation_data = validation_data
 
     def prepare_model(
@@ -225,7 +231,7 @@ class FlowMatching(BaseModel):
         :param solver_kwargs: Dictionary containining the keyword arguments used to initialize the :param:`solver_class`, defaults to `None`.
         :type solver_kwargs: class:`dict[str, Any] | None`
         """
-        if not self.has_controls:
+        if not self.data_manager.has_controls:
             msg = f""
             assert not cvf_config.use_source_as_condition, msg
         else:
@@ -268,7 +274,7 @@ class FlowMatching(BaseModel):
         state_transforms: Transform | None = None,
         callbacks: BaseCallBack | None = None,
         grad_steps_log_interval: int = 100,
-        num_treatments_to_load: int | None = None,
+        num_treatments_to_load: dict | int | None = None,
         num_samples_per_validation_step: int | None = None,
         cfg_prob_unconditional: float = 0.1,
         validation_cfg_guidance_strength: float = 1.0,
@@ -342,7 +348,7 @@ class FlowMatching(BaseModel):
             grad_steps_log_interval=grad_steps_log_interval,
             num_time_steps=self.num_time_steps,
             solver_kwargs=self.solver_kwargs,
-            has_controls=self.has_controls,
+            has_controls=self.data_manager.has_controls,
             generate_from_noise=self.generate_from_noise,
             noise_distribution=self.noise_distribution,
             device_id=self.device_id,
@@ -357,25 +363,33 @@ class FlowMatching(BaseModel):
             train_batch_size,
             state_transforms=self.state_transforms,
             device_id=self.device_id,
-            has_controls=self.has_controls,
+            has_controls=self.data_manager.has_controls,
         )
 
-        self.validation_dataloader = None
+        self.validation_dataloaders = None
+        if not isinstance(num_treatments_to_load, dict):
+            num_treatments_to_load_dict = {val_id: num_treatments_to_load 
+                                           for val_id, validation_data in self.validation_data.items()}
+        else:
+            msg = f"Keys of validation_data do not match keys of num_treatments_to_load"
+            assert self.validation_data.keys() == num_treatments_to_load.keys(), msg
+            num_treatments_to_load_dict = num_treatments_to_load
+        
         if self.validation_data is not None:
-            self.validation_dataloader = ValidationDataLoader(
-                self.validation_data,
+            self.validation_dataloaders = {val_id: ValidationDataLoader(
+                validation_data,
                 self.coupling,
                 validation_batch_size,
                 state_transforms=state_transforms,
                 device_id=self.device_id,
-                has_controls=self.has_controls,
-                num_treatments_to_load=num_treatments_to_load
-            )
+                has_controls=self.data_manager.has_controls,
+                num_treatments_to_load=num_treatments_to_load_dict[val_id],
+            ) for val_id, validation_data in self.validation_data.items()}
 
         self.trainer.fit(
             num_training_steps,
             self.train_dataloader,
-            self.validation_dataloader,
+            self.validation_dataloaders,
             valid_freq,
         )
 
@@ -425,7 +439,7 @@ class FlowMatching(BaseModel):
         """
         # handling source
         source = None
-        if self.has_controls:
+        if self.data_manager.has_controls:
             source = batch[DataFields.SOURCE_STATE]
 
         # handling conditions
@@ -462,8 +476,8 @@ class FlowMatching(BaseModel):
             if batch_size is None:
                 # if it exists, infer it from validation dataloader
                 # otherwise uses the train dataloader.
-                if self.validation_dataloader is not None:
-                    batch_size = self.validation_dataloader.batch_size
+                if self.validation_dataloaders is not None:
+                    batch_size = self.validation_dataloaders[validation_dataloaders.keys()[0]].batch_size
                 else:
                     batch_size = self.train_dataloader.batch_size
 

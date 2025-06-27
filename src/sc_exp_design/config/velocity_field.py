@@ -176,6 +176,7 @@ class NeuralVelocityFieldConfig:
     perturbation_pooling: Literal["mean", "sum", "self_attention"] = "mean"
     perturbation_pooling_kwargs: dict[str, Any] | None = None
     perturbation_layers_after_pooling: dict[str, Any] | None = None
+    perturbation_output_dropout: float = 0.0
     decoder_mlp_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
     use_source_as_condition: bool = False
     encode_source: bool = False
@@ -220,7 +221,7 @@ class NeuralVelocityFieldConfig:
             msg = f"You must encode the state when using the {self.conditioning_type} conditioning."
             assert self.encode_state, msg
 
-        elif self.condioning_type != "concatenation":
+        elif self.conditioning_type != "concatenation":
             msg = f"Conditioning type {self.conditioning_type} is not supported. Possible values are [\"concatenation\", \"resnet\", \"film\"]"
             raise ValueError(msg)
 
