@@ -268,6 +268,7 @@ class FlowMatching(BaseModel):
         num_samples_per_validation_step: int | None = None,
         cfg_prob_unconditional: float = 0.1,
         validation_cfg_guidance_strength: float = 1.0,
+        num_grad_accumulation_steps: int = 1,
     ) -> None:
         """Trains the model.
 
@@ -310,6 +311,9 @@ class FlowMatching(BaseModel):
         :param validation_cfg_guidance_strength: Strength of the guidance term during the validation step.
             Only used when :attr: `self.cvf_config.use_classifier_free_guidance` is set to `True`, defaults to `1.0`.
         :type validation_cfg_guidance_strength: class: `float`
+
+        :param num_grad_accumulation_steps: The number of gradient steps which to accumulate the gradients over, defaults to `1`.
+        :type num_grad_accumulation_steps: class:`int`
         """
         # sanity checks
         msg = "Data not initialized, run `prepare_data` before training the model"
@@ -345,6 +349,7 @@ class FlowMatching(BaseModel):
             num_samples_per_validation_step=num_samples_per_validation_step,
             cfg_prob_unconditional=self.cfg_prob_unconditional,
             validation_cfg_guidance_strength=self.validation_cfg_guidance_strength,
+            num_grad_accumulation_steps=num_grad_accumulation_steps,
         )
 
         self.train_dataloader = TrainDataLoader(
