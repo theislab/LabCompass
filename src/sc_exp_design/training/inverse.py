@@ -25,7 +25,8 @@ class TargetPredictionTrainer(BaseTrainer):
         lr_scheduler: torch.optim.lr_scheduler.LRScheduler | None = None,
         lr_scheduler_step: Literal["grad_step", "valid_step"] = "grad_step",
         callbacks: BaseCallBack | None = None,
-        grad_steps_log_interval: int | None = None
+        grad_steps_log_interval: int | None = None,
+        num_grad_accumulation_steps: int = 1,
     ) -> None:
         """"""
         self.target_prediction_model = target_prediction_model
@@ -34,6 +35,7 @@ class TargetPredictionTrainer(BaseTrainer):
         self.lr_scheduler_step = lr_scheduler_step
         self.callbacks = callbacks
         self.grad_steps_log_interval = grad_steps_log_interval
+        self.num_grad_accumulation_steps = num_grad_accumulation_steps 
 
     @property
     def model(
@@ -99,6 +101,7 @@ class InverseModelTrainer(BaseTrainer):
         lr_scheduler_step: Literal["grad_step", "valid_step"] = "grad_step",
         callbacks: BaseCallBack | None = None,
         grad_steps_log_interval: int | None = None,
+        num_grad_accumulation_steps: int = 1,
     ) -> None:
         """"""
         super().__init__()
@@ -110,7 +113,8 @@ class InverseModelTrainer(BaseTrainer):
         self.lr_scheduler = lr_scheduler
         self.lr_scheduler_step = lr_scheduler_step
         self.callbacks = callbacks
-        self.grad_steps_log_interval = grad_steps_log_interval 
+        self.grad_steps_log_interval = grad_steps_log_interval
+        self.num_grad_accumulation_steps = num_grad_accumulation_steps 
 
     @property
     def model(

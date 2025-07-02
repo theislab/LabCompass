@@ -45,10 +45,12 @@ class BaseTrainer(abc.ABC):
         """"""
         # optimizations step
         self.model.train()
-        self.optimizer.zero_grad()
         loss, log_dict = self._train_step(step_idx, batch)
+        loss = loss/self.num_grad_accumulation_steps
         loss.backward()
-        self.optimizer.step()
+        if (step_idx + 1)%self.num_grad_accumulation_steps == 0:
+            self.optimizer.step()
+            self.optimizer.zero_grad()
         # learning rate scheduler step
         if self.lr_scheduler_step == "grad_step" and self.lr_scheduler is not None:
             self.lr_scheduler.step()

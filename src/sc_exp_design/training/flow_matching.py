@@ -48,6 +48,7 @@ class CFMTrainer(BaseTrainer):
         num_samples_per_validation_step: int | None = None,
         cfg_prob_unconditional: float = 0.1,
         validation_cfg_guidance_strength: float = 1.0,
+        num_grad_accumulation_steps: int = 1,
     ) -> None:
         """"""
         self.velocity_field = velocity_field
@@ -68,6 +69,7 @@ class CFMTrainer(BaseTrainer):
         self.num_samples_per_validation_step = num_samples_per_validation_step
         self.cfg_prob_unconditional = cfg_prob_unconditional
         self.validation_cfg_guidance_strength = validation_cfg_guidance_strength
+        self.num_grad_accumulation_steps = num_grad_accumulation_steps 
 
     @property
     def model(
