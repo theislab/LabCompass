@@ -17,26 +17,15 @@ class TestDataManager(BaseDataTest):
     def get_expected_num_perturbation_features(
         self,
         condition: str,
-        perturbations_in_obsm: Sequence[str] | None, 
         num_perturbation_feats: int,
     ) -> int:
         # check whether the data is a representation or covariates
-        is_repr = "repr" in condition
-        if not is_repr:
-            msg = f""
-            assert "cov" in condition, msg
+        is_feat = "feats" in condition
         # collect expected number of perturbation features
         expected_num_perturbation_features = 1
-        if is_repr:
-            # check whether we have perturbations in obsm
-            if perturbations_in_obsm is not None:
-                # check that the perturbation is in obsm
-                is_pert_in_obsm = False
-                for perturbation in perturbations_in_obsm:
-                    if perturbation in condition:
-                        is_pert_in_obsm = True
-                if is_pert_in_obsm:
-                    expected_num_perturbation_features = num_perturbation_feats
+        if is_feat:
+            # check that the perturbation is in obsm
+            expected_num_perturbation_features = num_perturbation_feats        
         return expected_num_perturbation_features
 
     @pytest.mark.parametrize("batch_data", [False, True])
@@ -128,8 +117,9 @@ class TestDataManager(BaseDataTest):
                 reps = perturbation_reps[perturbation]
                 if perturbations_in_obsm is not None:
                     if perturbation in perturbations_in_obsm:
+                        reps = reps[0]
                         msg = f""
-                        assert f"repr_{perturbation}_{reps}" in perturbation_data.keys(), msg
+                        assert f"feats_{perturbation}_{reps}" in perturbation_data.keys(), msg
                         continue
                 else:    
                     for rep in reps:
@@ -186,7 +176,6 @@ class TestDataManager(BaseDataTest):
                 # collect expected number of perturbation features
                 expected_num_perturbation_features = self.get_expected_num_perturbation_features(
                     condition,
-                    perturbations_in_obsm,
                     num_perturbation_feats
                 )
                 # define expected shape for treatment perturbation data
@@ -231,7 +220,6 @@ class TestDataManager(BaseDataTest):
                     # collect expected number of perturbation features
                     expected_num_perturbation_features = self.get_expected_num_perturbation_features(
                         condition,
-                        perturbations_in_obsm,
                         num_perturbation_feats
                     )
                     # define expected shape for treatment perturbation data

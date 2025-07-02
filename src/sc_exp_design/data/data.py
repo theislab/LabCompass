@@ -252,6 +252,6 @@ class AnnotatedPerturbationData:
         self,
     ) -> bool:
         """"""
-        if self.seen_combinations is None or self.perturbations is None:
+        if self.seen_combinations is None:
             return False
         return True

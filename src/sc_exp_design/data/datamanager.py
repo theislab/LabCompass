@@ -134,13 +134,19 @@ class DataManager:
         )
 
         # perturbation data schema
-        self.perturbation_data_schema = PerturbationDataSchema(
-            self.adata,
-            self.perturbations,
-            self.perturbations_in_obsm,
-            self.perturbation_covariates,
-            self.perturbation_reps,
-        )
+        self.perturbation_data_schema = None
+        if self.perturbations is not None:
+            # sanity check
+            if self.perturbation_reps is None:
+                msg = f"When modeling perturbations you need to specify the reprs in `perturbation_reps`, `None` found."
+                raise ValueError(msg)
+            self.perturbation_data_schema = PerturbationDataSchema(
+                self.adata,
+                self.perturbations,
+                self.perturbation_reps,
+                self.perturbations_in_obsm,
+                self.perturbation_covariates,
+            )
 
         # target data schema
         self.target_data_schema = None
@@ -177,8 +183,11 @@ class DataManager:
 
         # retrieving perturbation data
         perturbation_data = None
+        seen_combinations = None
         if self.perturbations is not None:
             perturbation_data = self.perturbation_data_schema.get_data()
+            # retrieving seen combinations
+            seen_combinations = self.perturbation_data_schema.get_seen_combinations(adata)
 
         # condition target representation
         target_data = None
@@ -192,7 +201,7 @@ class DataManager:
             state_data,
             perturbation_data,
             target_data=target_data,
-            seen_combinations=self.perturbation_data_schema.seen_combinations, 
+            seen_combinations=seen_combinations,
             has_controls=self.has_controls,
             perturbations=self.perturbations,
         )
