@@ -62,7 +62,7 @@ def push_forward(
     # handling latent state
     initial_state = source
     if generate_from_noise:
-        initial_state = noise_distribution((num_samples, *batch_size, velocity_field.config.flow_dim)).squeeze().to(device)
+        initial_state = noise_distribution((num_samples, *batch_size, velocity_field.config.flow_dim)).squeeze(dim=0).to(device)
     msg = f""
     assert initial_state is not None, msg
 
