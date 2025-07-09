@@ -237,13 +237,12 @@ class NeuralVelocityFieldConfig:
             assert self.perturbation_layers_after_pooling is not None, msg
             self._verify_perturbation_layers_after_pooling()
         else:
+            # sanity check on use classifier free guidance
+            msg = f"With {self.use_classifier_free_guidance=} you need to instantiate a guided flow, but found {self.use_guidance=}."
+            assert not self.use_classifier_free_guidance, msg
+
             msg = f"With {self.use_guidance=} an unguided flow model will be initialized, thus the settings for the condition encoder will be ignored."
             logger.warning(msg)
-        
-        # sanity check on use classifier free guidance
-        if self.use_classifier_free_guidance:
-            msg = f"With {self.use_classifier_free_guidance=} you need to instantiate a guided flow, but found {self.use_guidance=}."
-            assert self.use_guidance, msg
 
     def _verify_perturbation_layers_before_pooling(
         self,
