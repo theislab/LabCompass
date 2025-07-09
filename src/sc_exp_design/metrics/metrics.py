@@ -153,6 +153,11 @@ def compute_min_max_mse(
     target: TensorLike
 ) -> float:
     """Compute min and max pointwise MSE between generated and observed cells"""
+    # moving to torch tensors in case inputs are arrays
+    if isinstance(pred, np.ndarray):
+        pred = torch.from_numpy(pred)
+    if isinstance(target, np.ndarray):
+        target = torch.from_numpy(target)
     mses = np.array([torch.nn.functional.mse_loss(torch.from_numpy(pred[i, :, :]), target, reduction="none").mean(dim=1) for i in range(pred.shape[0])])
     return np.nanmin(mses, axis=1), np.nanmax(mses, axis=1)
 
