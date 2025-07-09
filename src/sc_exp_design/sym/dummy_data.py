@@ -141,10 +141,14 @@ def get_dummy_adata(
     target1_data = target1_data[shuffled_indices]
 
     # defining mappings for uns
+    def get_one_hot(label_id, num_labels):
+        arr = np.zeros((num_labels))
+        arr[label_id] = 1
+        return arr
     uns = {
-        f"{treatment0_label}_label": {label: np.array([label_id]) for label, label_id in label_to_id_map.items()},
+        f"{treatment0_label}_label": {label: get_one_hot(label_id-1, num_unique_treatments) for label, label_id in label_to_id_map.items()},
         f"{treatment0_label}_group": {label: np.array([group_id]) for label, group_id in pert_to_group_map.items()},
-        f"{treatment1_label}_label": {label: np.array([label_id]) for label, label_id in label_to_id_map.items()},
+        f"{treatment1_label}_label": {label: get_one_hot(label_id-1, num_unique_treatments) for label, label_id in label_to_id_map.items()},
         f"{treatment1_label}_group": {label: np.array([group_id]) for label, group_id in pert_to_group_map.items()},
     }
 

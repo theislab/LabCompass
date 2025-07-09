@@ -469,4 +469,4 @@ class EncodingDecodingFlow(BaseFlow):
         mu_dot = alpha_dot * mask * source + beta_dot * (1 - mask) * target
         if self.sigma == 0:
             return mu_dot
-        return mu_dot + (sigma_dot / sigma)(xt - mu)
+        return mu_dot + (sigma_dot / sigma) * (xt - mu)

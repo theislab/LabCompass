@@ -221,13 +221,15 @@ class FlowMatching(BaseModel):
         :param solver_kwargs: Dictionary containining the keyword arguments used to initialize the :param:`solver_class`, defaults to `None`.
         :type solver_kwargs: class:`dict[str, Any] | None`
         """
-        if not self.data_manager.has_controls:
-            msg = f""
-            assert not cvf_config.use_source_as_condition, msg
-        else:
-            if self.generate_from_noise:
-                msg = f""
-                assert cvf_config.use_source_as_condition, msg
+        if (not self.data_manager.has_controls) and cvf_config.use_source_as_condition:
+            msg = "When no controls are available use_source_as_condition should be False."
+            raise ValueError(msg)
+        elif self.data_manager.has_controls and self.generate_from_noise and (not cvf_config.use_source_as_condition):
+            msg = "When generating from noise you need to use source as conditions."
+            raise ValueError(msg)
+        elif (not self.data_manager.has_controls) and (not self.generate_from_noise):
+            msg = f"When no controls are available you need to generate from noise."
+            raise ValueError(msg)
 
         self.cvf_config = cvf_config
         

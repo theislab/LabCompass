@@ -175,7 +175,7 @@ class NeuralVelocityFieldConfig:
     perturbation_covariates_not_pooled: Sequence[str] | None = None
     perturbation_pooling: Literal["mean", "sum", "self_attention"] = "mean"
     perturbation_pooling_kwargs: dict[str, Any] | None = None
-    perturbation_layers_after_pooling: dict[str, Any] | None = None
+    perturbation_layers_after_pooling: dict[str, Any] | None = dc_field(default_factory=lambda: {})
     perturbation_output_dropout: float = 0.0
     decoder_mlp_kwargs: dict[str, Any] = dc_field(default_factory=lambda: {})
     use_source_as_condition: bool = False
