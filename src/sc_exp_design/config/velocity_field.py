@@ -245,13 +245,11 @@ class NeuralVelocityFieldConfig:
         """"""
 
         for condition, layers_dict in self.perturbation_layers_before_pooling.items():
+            msg = f"`layers_dict` for covariate {condition} is expected to be an instance of `dict`, found {type(layers_dict)}"
+            assert isinstance(layers_dict, dict), msg
             if self.encode_conditions:
-                msg = f"`layers_dict` for covariate {condition} is expected to be an instance of `dict`, found {type(layers_dict)}"
-                assert isinstance(layers_dict, dict), msg
                 MLPConfigFields.verify_keys(layers_dict)
             else:
-                msg = f"`layers_dict` for covariate {condition} is expected to be an instance of `dict`, found {type(layers_dict)}"
-                assert isinstance(layers_dict, dict), msg
                 msg = f"`layers_dict` for covariate {condition} is expected to contain the \"input_dim\" key, which was not found."
                 assert "input_dim" in layers_dict.keys(), msg
                 msg = f"`layers_dict[\"input_dim\"] for covariate {condition} is expected to be an `int`, found {type(layers_dict['input_dim'])}"
