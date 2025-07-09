@@ -212,6 +212,10 @@ class NeuralVelocityField(BaseModule):
             msg = f""
             assert cond is not None, msg
             condition_latent = self.condition_encoder(cond)
+            condition_latent = nn.functional.dropout(
+                condition_latent,
+                p=self.config.perturbation_output_dropout
+            )
         elif self.config.use_guidance and (not self.config.encode_conditions):
             # sanity check (condition should be not None)
             msg = f""
@@ -219,8 +223,6 @@ class NeuralVelocityField(BaseModule):
             cond_values = [val for key, val in cond.items() if key in self.config.perturbation_layers_before_pooling]
             condition_latent = torch.concatenate(cond_values, dim=-1)
 
-        condition_latent = nn.functional.dropout(condition_latent,
-                                                 p=self.config.perturbation_output_dropout)
 
         
         # encoding states
