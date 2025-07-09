@@ -202,15 +202,10 @@ class NeuralVelocityFieldConfig:
 
         """
         # sanity check on mlp configurations
-        self._mlp_kwargs_verifier = partial(
-            MLPConfigFields.verify_keys, 
-            require_input_dim_key=False,
-            require_output_dim_key=False,
-        )
-        self._mlp_kwargs_verifier(self.state_encoder_mlp_kwargs)
-        self._mlp_kwargs_verifier(self.time_encoder_mlp_kwargs)
-        self._mlp_kwargs_verifier(self.decoder_mlp_kwargs)
-        self._mlp_kwargs_verifier(self.source_encoder_mlp_kwargs)
+        MLPConfigFields.verify_keys(self.state_encoder_mlp_kwargs, require_input_dim_key=False, require_output_dim_key=False)
+        MLPConfigFields.verify_keys(self.time_encoder_mlp_kwargs, require_input_dim_key=False, require_output_dim_key=False)
+        MLPConfigFields.verify_keys(self.decoder_mlp_kwargs, require_input_dim_key=False, require_output_dim_key=False)
+        MLPConfigFields.verify_keys(self.source_encoder_mlp_kwargs, require_input_dim_key=False, require_output_dim_key=False)
 
         # sanity check conditioning block
         if self.conditioning_type == "film":
@@ -269,7 +264,7 @@ class NeuralVelocityFieldConfig:
 
         msg = f"`self.perturbation_layers_after_pooling` is expected to be an instance of `dict`, found {type(self.perturbation_layers_after_pooling)}"
         assert isinstance(self.perturbation_layers_after_pooling, dict), msg
-        self._mlp_kwargs_verifier(self.perturbation_layers_after_pooling)
+        MLPConfigFields.verify_keys(self.perturbation_layers_after_pooling, require_input_dim_key=False, require_output_dim_key=False)
         self.perturbation_layers_after_pooling["input_dim"] = self.perturbation_layers_after_pooling_input_dim
         self.perturbation_layers_after_pooling["output_dim"] = self.perturbation_encoder_output_dim
 
