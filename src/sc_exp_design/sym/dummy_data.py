@@ -147,9 +147,9 @@ def get_dummy_adata(
         return arr
     uns = {
         f"{treatment0_label}_label": {label: get_one_hot(label_id-1, num_unique_treatments) for label, label_id in label_to_id_map.items()},
-        f"{treatment0_label}_group": {label: np.array([group_id]) for label, group_id in pert_to_group_map.items()},
+        f"{treatment0_label}_group": {label: get_one_hot(group_id-1, num_unique_groups) for label, group_id in pert_to_group_map.items()},
         f"{treatment1_label}_label": {label: get_one_hot(label_id-1, num_unique_treatments) for label, label_id in label_to_id_map.items()},
-        f"{treatment1_label}_group": {label: np.array([group_id]) for label, group_id in pert_to_group_map.items()},
+        f"{treatment1_label}_group": {label: get_one_hot(group_id-1, num_unique_groups) for label, group_id in pert_to_group_map.items()},
     }
 
     # definig mappings for obs
