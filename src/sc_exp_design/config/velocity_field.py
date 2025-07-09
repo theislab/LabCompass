@@ -202,15 +202,15 @@ class NeuralVelocityFieldConfig:
 
         """
         # sanity check on mlp configurations
-        mlp_kwargs_verifier = partial(
+        self._mlp_kwargs_verifier = partial(
             MLPConfigFields.verify_keys, 
             require_input_dim_key=False,
             require_output_dim_key=False,
         )
-        mlp_kwargs_verifier(self.state_encoder_mlp_kwargs)
-        mlp_kwargs_verifier(self.time_encoder_mlp_kwargs)
-        mlp_kwargs_verifier(self.decoder_mlp_kwargs)
-        mlp_kwargs_verifier(self.source_encoder_mlp_kwargs)
+        self._mlp_kwargs_verifier(self.state_encoder_mlp_kwargs)
+        self._mlp_kwargs_verifier(self.time_encoder_mlp_kwargs)
+        self._mlp_kwargs_verifier(self.decoder_mlp_kwargs)
+        self._mlp_kwargs_verifier(self.source_encoder_mlp_kwargs)
 
         # sanity check conditioning block
         if self.conditioning_type == "film":
@@ -227,29 +227,15 @@ class NeuralVelocityFieldConfig:
 
         # sanity check on condition encoder
         if self.use_guidance:
+            # layers before pooling
             msg = f"With {self.use_guidance=} you need to pass a dictionary in the proper format as the `self.perturbation_layers_before_pooling` attribute, found `None`"
-            assert self.perturbation_layers_before_pooling is not None, msg
-            if self.encode_conditions:
-                for condition, layers_dict in self.perturbation_layers_before_pooling.items():
-                    msg = f"`layers_dict` is expected to be an instance of `dict`, found {type(layers_dict)}"
-                    assert isinstance(layers_dict, dict), msg
-                    MLPConfigFields.verify_keys(layers_dict)
-                    self.perturbation_layers_before_pooling[condition] = layers_dict
-                msg = f"With {self.encode_conditions=} you need to pass a dictionary in the proper format as the `self.perturbation_layers_after_pooling` attribute, found `None`"
-                assert self.perturbation_layers_after_pooling is not None, msg
-                msg = f"`self.perturbation_layers_after_pooling` is expected to be an instance of `dict`, found {type(self.perturbation_layers_after_pooling)}"
-                assert isinstance(self.perturbation_layers_after_pooling, dict), msg
-                mlp_kwargs_verifier(self.perturbation_layers_after_pooling)
-                self.perturbation_layers_after_pooling["input_dim"] = self.perturbation_layers_after_pooling_input_dim
-                self.perturbation_layers_after_pooling["output_dim"] = self.perturbation_encoder_output_dim
-            else:
-                for condition, layers_dict in self.perturbation_layers_before_pooling.items():
-                    msg = f"`layers_dict` is expected to be an instance of `dict`, found {type(layers_dict)}"
-                    assert isinstance(layers_dict, dict), msg
-                    msg = f"`layers_dict` is expected to contain the \"input_dim\" key, which was not found."
-                    assert "input_dim" in layers_dict.keys(), msg
-                    msg = f"`layers_dict[\"input_dim\"] is expected to be an `int`, found {type(layers_dict['input_dim'])}"
-                    assert isinstance(layers_dict["input_dim"], int), msg          
+            assert self.perturbation_layers_before_pooling is not None, msg 
+            self._verify_perturbation_layers_before_pooling()
+
+            # layers after pooling
+            msg = f"With {self.encode_conditions=} you need to pass a dictionary in the proper format as the `self.perturbation_layers_after_pooling` attribute, found `None`"
+            assert self.perturbation_layers_after_pooling is not None, msg
+            self._verify_perturbation_layers_after_pooling()
         else:
             msg = f"With {self.use_guidance=} an unguided flow model will be initialized, thus the settings for the condition encoder will be ignored."
             logger.warning(msg)
@@ -258,6 +244,35 @@ class NeuralVelocityFieldConfig:
         if self.use_classifier_free_guidance:
             msg = f"With {self.use_classifier_free_guidance=} you need to instantiate a guided flow, but found {self.use_guidance=}."
             assert self.use_guidance, msg
+
+    def _verify_perturbation_layers_before_pooling(
+        self,
+    ) -> None:
+        """"""
+
+        for condition, layers_dict in self.perturbation_layers_before_pooling.items():
+            if self.encode_conditions:
+                msg = f"`layers_dict` for covariate {condition} is expected to be an instance of `dict`, found {type(layers_dict)}"
+                assert isinstance(layers_dict, dict), msg
+                MLPConfigFields.verify_keys(layers_dict)
+            else:
+                msg = f"`layers_dict` for covariate {condition} is expected to be an instance of `dict`, found {type(layers_dict)}"
+                assert isinstance(layers_dict, dict), msg
+                msg = f"`layers_dict` for covariate {condition} is expected to contain the \"input_dim\" key, which was not found."
+                assert "input_dim" in layers_dict.keys(), msg
+                msg = f"`layers_dict[\"input_dim\"] for covariate {condition} is expected to be an `int`, found {type(layers_dict['input_dim'])}"
+                assert isinstance(layers_dict["input_dim"], int), msg 
+
+    def _verify_perturbation_layers_after_pooling(
+        self,
+    ) -> None:
+        """"""
+
+        msg = f"`self.perturbation_layers_after_pooling` is expected to be an instance of `dict`, found {type(self.perturbation_layers_after_pooling)}"
+        assert isinstance(self.perturbation_layers_after_pooling, dict), msg
+        self._mlp_kwargs_verifier(self.perturbation_layers_after_pooling)
+        self.perturbation_layers_after_pooling["input_dim"] = self.perturbation_layers_after_pooling_input_dim
+        self.perturbation_layers_after_pooling["output_dim"] = self.perturbation_encoder_output_dim
 
     @property
     def time_encoder_input_dim(
