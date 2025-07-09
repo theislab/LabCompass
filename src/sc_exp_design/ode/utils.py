@@ -57,7 +57,7 @@ def push_forward(
             for condition_covariate, condition_data in condition.items()
         }
     if source is not None:
-        source = source.repeat(num_samples, *(1 for _ in source.shape)).squeeze()
+        source = source.repeat(num_samples, *(1 for _ in source.shape)).squeeze(dim=0)
 
     # handling latent state
     initial_state = source
