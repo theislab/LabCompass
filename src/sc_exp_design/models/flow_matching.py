@@ -57,7 +57,7 @@ class FlowMatching(BaseModel):
     :type device_id: class:`Literal["cuda", "cpu"]`
     
     :param generate_from_noise: Controls if the source samples are Gaussian (True) or control cells (False).
-    :type num_training_steps: class:`bool`
+    :type generate_from_noise: class:`bool`
 
     :param noise_distribution: Function used to sample initial states when generating from noise.
         Only used when :param: `generate_from_noise` is set to `True`. Defaults to `torch.randn` (i.e.: Standard Gaussian).
