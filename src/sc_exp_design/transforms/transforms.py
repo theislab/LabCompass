@@ -163,7 +163,7 @@ class VAETransform(abc.ABC, nn.Module):
         condition: TensorLike = None
     ) -> Tensor:
         """"""
-        return self.vae.decode_latent_samples(input_tensor, cat_values=np.array(["R0"] * input_tensor.shape[0]), map_cat_values=True)
+        return self.vae.decode_latent_samples(input_tensor, cat_values=np.vstack([np.array(["10x"] * input_tensor.shape[0]), np.array(["H.A"] * input_tensor.shape[0])]).T, map_cat_values=True)
 
     def forward(
         self,
