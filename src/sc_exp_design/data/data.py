@@ -159,7 +159,7 @@ class AnnotatedPerturbationData:
         """
         return self.adata.shape[0]
 
-    def _get_treatment_idxs(
+    def _get_treatments(
         self,
         treatments: Sequence[str] | None = None,
     ) -> np.ndarray:
@@ -181,7 +181,7 @@ class AnnotatedPerturbationData:
 
         # retrieving indices of current treatment and slicing data
         treatment_idxs = self.treatment_idxs_per_condition[treatments]
-        return treatment_idxs
+        return self.data[treatment_idxs]
 
     def get_controls(
         self,
@@ -208,10 +208,15 @@ class AnnotatedPerturbationData:
             raise ValueError(msg)
         
         # collect control ids and features
-        batch_idxs = self.control_idxs
+        ctrl_data = self.control_data
+
+        # collect batch subset of the observations 
         if batch_size is not None:
-            batch_idxs = np.random.choice(batch_idxs, size=batch_size)
-        return self.control_data[batch_idxs]
+            batch_idxs = np.random.choice(np.arange(len(ctrl_data)), size=batch_size)
+
+            ctrl_data = ctrl_data[batch_idxs]
+
+        return self.data[batch_idxs]
 
     def get_treatments(
         self,
@@ -232,12 +237,14 @@ class AnnotatedPerturbationData:
         :rtype: Dict[str, TensorLike]
         """
         # retrieve indices
-        idxs = self._get_treatment_idxs(treatments)        
-        if batch_size is not None:
-            idxs = np.random.choice(idxs, size=batch_size)
+        trtm_data = self._get_treatments(treatments)
         
-        # slice data
-        trtm_data = self.data[idxs]
+        # collect batch subset of the observations 
+        if batch_size is not None:
+            batch_idxs = np.random.choice(np.arange(len(trtm_data)), size=batch_size)
+
+            trtm_data = trtm_data[batch_idxs]
+
         return trtm_data
 
     @property
