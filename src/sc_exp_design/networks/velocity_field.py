@@ -351,5 +351,5 @@ class NeuralVelocityField(BaseModule):
         # of the dictionary with a null condition token
         cond_copy = {}
         for key, val in cond.items():
-            cond_copy[key] = torch.ones_like(val)*self.config.null_condition_token
+            cond_copy[key] = torch.ones_like(val)*self.config.cfg_null_condition_token
         return cond_copy

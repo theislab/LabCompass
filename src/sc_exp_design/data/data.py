@@ -79,7 +79,7 @@ class AnnotatedPerturbationData:
 
         # pre-allocating attributes        
         self.control_idxs = None
-        self.control_data = None
+        #self.control_data = None
 
         self.treatment_idxs = None
         self.treatment_idxs_per_condition = None
@@ -100,7 +100,7 @@ class AnnotatedPerturbationData:
 
             # register indices and state data
             self.control_idxs = np.argwhere(self.adata.obs[self.control_key] == True)[:, 0]
-            self.control_data = self.data[self.control_idxs]
+            #self.control_data = self.data[self.control_idxs]
 
             # storing perturbation data
             self.treatment_idxs = np.argwhere(self.adata.obs[self.control_key] == False)[:, 0]
@@ -208,13 +208,13 @@ class AnnotatedPerturbationData:
             raise ValueError(msg)
         
         # collect control ids and features
-        ctrl_data = self.control_data
+        #ctrl_data = self.control_data
 
         # collect batch subset of the observations 
         if batch_size is not None:
-            batch_idxs = np.random.choice(np.arange(len(ctrl_data)), size=batch_size)
+            batch_idxs = np.random.choice(np.arange(len(self.control_idxs)), size=batch_size)
 
-            ctrl_data = ctrl_data[batch_idxs]
+            #ctrl_data = ctrl_data[batch_idxs]
 
         return self.data[batch_idxs]
 
