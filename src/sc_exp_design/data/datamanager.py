@@ -179,20 +179,20 @@ class DataManager:
         adata = self.state_data_schema.resolve_adata(adata)
 
         # retrieving state data
-        state_data = self.state_data_schema.get_data()
+        state_data = self.state_data_schema.get_data(adata)
 
         # retrieving perturbation data
         perturbation_data = None
         seen_combinations = None
         if self.perturbations is not None:
-            perturbation_data = self.perturbation_data_schema.get_data()
+            perturbation_data = self.perturbation_data_schema.get_data(adata)
             # retrieving seen combinations
             seen_combinations = self.perturbation_data_schema.get_seen_combinations(adata)
 
         # condition target representation
         target_data = None
         if self.load_target_covariates:
-            target_data = self.target_data_schema.get_data()
+            target_data = self.target_data_schema.get_data(adata)
         
         # constructing data object
         return AnnotatedPerturbationData(
