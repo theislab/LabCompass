@@ -266,9 +266,13 @@ class NeuralVelocityField(BaseModule):
             
         # ResNet 
         if self.config.conditioning_type == "resnet":
+            latent_initial_shape = latent_concat.shape
+            condition_initial_shape = condition_concat.shape
+            latent_concat = latent_concat.reshape(-1, latent_initial_shape[-1])
+            condition_concat = condition_concat.reshape(-1, condition_initial_shape[-1])
             for block in self.resnet_blocks:
                 latent_concat = block(latent_concat, condition_concat)
-
+            latent_concat = latent_concat.reshape(*latent_initial_shape)
         # FiLM
         elif self.config.conditioning_type == "film":
             latent_concat = self.film_block(latent_concat, condition_concat)
