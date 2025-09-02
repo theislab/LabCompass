@@ -390,6 +390,7 @@ class FlowMatching(BaseModel):
         num_samples: int | None = None,
         batch_size: int | None = None,
         num_time_steps: int | None = None,
+        fix_noise: bool = False, 
         solver_kwargs: dict[str, Any] | None = None,
         cfg_guidance_strength: float = 1.0,
     ) -> dict[str, Tensor]:
@@ -414,6 +415,9 @@ class FlowMatching(BaseModel):
         :param num_time_steps: Number of time steps which to integrate the dynamics over during inference.
             If provided, it will be used instead of :attr: `self.num_time_steps` . Defaults to `None`.
         :type num_time_steps: class:`int | None`
+        
+        :param fix_noise: Whether the noise  for the prediction is fixed and present in the batch as a source.
+        :type fix_noise: class: `bool`
 
         :param solver_kwargs: Dictionary containining the keyword arguments used to initialize the :param:`solver_class`.
             If provided, it will be used instead of :attr: `self.solver_kwargs` . Defaults to `None`.
@@ -428,7 +432,7 @@ class FlowMatching(BaseModel):
         """
         # handling source
         source = None
-        if self.data_manager.has_controls:
+        if self.data_manager.has_controls or fix_noise: 
             source = batch[DataFields.SOURCE_STATE]
 
         # handling conditions
