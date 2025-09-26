@@ -325,9 +325,10 @@ class SelfAttentionBlock(BaseModule):
     ) -> None:
         """Initializes the modules"""
         # feature embedder
+        modules = {}
         self.feature_embedder = None
         if self.embed_features:
-            self.feature_embedder = CategoricalEmbedder(
+            modules["feature_embedder"] = CategoricalEmbedder(
                 num_embeddings=self.num_embeddings,
                 embedding_dim=self.embedding_dim,
                 padding_idx=self.padding_idx,
@@ -337,21 +338,18 @@ class SelfAttentionBlock(BaseModule):
                 sparse=self.sparse,
             )
 
-        modules = []
-
         for block_idx in range(self.num_blocks):
             embed_dim = self.embed_dim[block_idx]
             num_heads = self.num_heads[block_idx]
 
-            mha = nn.MultiheadAttention(
+            modules[f"mha_{block_idx}"] = nn.MultiheadAttention(
                 embed_dim,
                 num_heads,
                 dropout=self.dropout_rate,
                 batch_first=True,
             )
-            modules.append(mha)
 
-        self.net = nn.ModuleList(modules)
+        self.net = nn.ModuleDict(modules)
 
     def forward(
         self,
@@ -369,9 +367,9 @@ class SelfAttentionBlock(BaseModule):
         """
         x = input_tensor
         if self.embed_features:
-            x = self.feature_embedder(x)
-        for layer in self.net:
-            x = layer(
+            x = self.net["feature_embedder"](x)
+        for block_idx in range(self.num_blocks):
+            x = self.net[f"mha_{block_idx}"](
                 x,
                 x,
                 x,
@@ -544,65 +542,15 @@ class ConditionEncoder(BaseModule):
             self.covariates_not_pooled
         )
 
-    def to(
-        self,
-        device: torch.device,
-    ) -> nn.Module:
-        """Moves the module to the target device
-
-        :param device: The device which to perform the computations on.
-        :type device: class:`torch.device`
-        """
-        self = super().to(device)
-        before_pooling = {}
-        for covariate_id, cov_before_pooling in self.before_pooling.items():
-            before_pooling[covariate_id] = cov_before_pooling.to(device)
-        self.before_pooling = before_pooling
-        return self
-
-    def parameters(
-        self,
-    ) -> Iterator[nn.Parameter]:
-        """Returns an iterator with the parameters of each module"""
-        parameters = [super().parameters()]
-        for covariate_id, cov_before_pooling in self.before_pooling.items():
-            parameters.append(cov_before_pooling.parameters())
-        parameters = itertools.chain(*parameters)
-        return parameters
-
-    def train(self, train: bool = True) -> None:
-        """Whether the forward pass should be computed in training (stochastic) or in evaluation (deterministic) mode
-
-        :param train: Whether the computations are computed in the training/stochastic mode.
-        :type train: class:`bool`
-        """
-        self = super().train(train)
-        before_pooling = {}
-        for covariate_id, cov_before_pooling in self.before_pooling.items():
-            before_pooling[covariate_id] = cov_before_pooling.train(train)
-        self.before_pooling = before_pooling
-        return self
-
-    def eval(
-        self,
-    ) -> None:
-        """Sets the computation to the deterministic/evaluation mode."""
-        self = super().eval()
-        before_pooling = {}
-        for covariate_id, cov_before_pooling in self.before_pooling.items():
-            before_pooling[covariate_id] = cov_before_pooling.eval()
-        self.before_pooling = before_pooling
-        return self
-
     def _init_modules(
         self,
     ) -> None:
         """Initializes the modules."""
         # initializing the layers before pooling
-        self.before_pooling = {}
+        modules = {}
         for covariate, layers_dict in self.layers_before_pooling.items():
             covariate_layers = MLPBlock(**layers_dict)
-            self.before_pooling[covariate] = covariate_layers
+            modules[covariate] = covariate_layers
 
         # pooling modules
         if self.pooling == "mean":
@@ -617,7 +565,8 @@ class ConditionEncoder(BaseModule):
             raise ValueError(msg)
 
         # layers after pooling
-        self.after_pooling = MLPBlock(**self.layers_after_pooling)
+        modules["after_pooling"] = MLPBlock(**self.layers_after_pooling)
+        self.modules_dict = nn.ModuleDict(modules)
 
     def __get_mask(
         self,
@@ -642,9 +591,9 @@ class ConditionEncoder(BaseModule):
         # layers before pooling
         encoded_covariates = {}
         for covariate, covariate_data in conditions.items():
-            if covariate not in self.layers_before_pooling:
+            if covariate not in self.modules_dict:
                 continue
-            before_pooling = self.before_pooling[covariate]
+            before_pooling = self.modules_dict[covariate]
             encoded_covariate = before_pooling(covariate_data)
             encoded_covariates[covariate] = encoded_covariate
 
@@ -683,7 +632,7 @@ class ConditionEncoder(BaseModule):
             z = encoded_covariates_not_pooled
         
         # layers after pooling
-        z = self.after_pooling(z)
+        z = self.modules_dict["after_pooling"](z)
         return z
 
 

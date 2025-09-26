@@ -40,97 +40,34 @@ class NeuralVelocityField(BaseModule):
         # initializing modules
         self._init_modules()
 
-    def to(
-        self,
-        device: torch.device,
-    ) -> nn.Module:
-        """
-        Moves the model and its components to the specified device.
-        
-        Args:
-            device (torch.device): The target device (CPU/GPU).
-        
-        Returns:
-            nn.Module: The model moved to the specified device.
-        """
-        self = super().to(device)
-        if self.condition_encoder is not None:
-            self.condition_encoder = self.condition_encoder.to(device)
-        return self
-
-    def parameters(
-        self,
-    ) -> Iterator[nn.Parameter]:
-        """
-        Returns an iterator over the model's parameters, including submodules.
-        
-        Returns:
-            Iterator[nn.Parameter]: Model parameters.
-        """
-        parameters = [super().parameters()]
-        if self.condition_encoder is not None:
-            parameters.append(self.condition_encoder.parameters())
-        parameters = itertools.chain(*parameters)
-        return parameters
-
-    def train(
-        self,
-        mode: bool = True
-    ) -> nn.Module:
-        """
-        Sets the model to training mode.
-        
-        Args:
-            mode (bool, optional): Whether to enable training mode. Defaults to True.
-        
-        Returns:
-            nn.Module: The model in training mode.
-        """
-        self = super().train(mode)
-        if self.condition_encoder is not None:
-            self.condition_encoder = self.condition_encoder.train(mode)
-        return self
-
-    def eval(
-        self,
-    ) -> nn.Module:
-        """
-        Sets the model to evaluation mode.
-        
-        Returns:
-            nn.Module: The model in evaluation mode.
-        """
-        self = super().eval()
-        if self.condition_encoder is not None:
-            self.condition_encoder = self.condition_encoder.eval()
-        return self
-
     def _init_modules(
         self,
     ) -> None:
         """
         Initializes all necessary neural network modules including encoders, decoders, and inference models.
         """
-        # state encoder 
-        self.x_encoder = None
+        # state encoder
+        modules = {} 
         if self.config.encode_state:
-            self.x_encoder = MLPBlock(
+            modules["x_encoder"] = MLPBlock(
                 self.config.flow_dim,
                 self.config.state_encoder_output_dim,
                 **self.config.state_encoder_mlp_kwargs,
             )
+        else:
+            modules["x_encoder"] = torch.nn.Identity()
         # time encoder
-        self.time_encoder = None
         if self.config.encode_time:
-            self.time_encoder = MLPBlock(
+            modules["time_encoder"] = MLPBlock(
                 self.config.time_encoder_input_dim,
                 self.config.time_encoder_output_dim,
                 **self.config.time_encoder_mlp_kwargs,
             )
+        else:
+            modules["time_encoder"] = torch.nn.Identity()
         # condition encoder
-        self.condition_encoder = None
         if self.config.use_guidance and self.config.encode_conditions:
-            self.condition_encoder = ConditionEncoder(
+            modules["condition_encoder"] = ConditionEncoder(
                 latent_dim=self.config.perturbation_latent_dim,
                 layers_before_pooling=self.config.perturbation_layers_before_pooling,
                 covariates_not_pooled=self.config.perturbation_covariates_not_pooled,
@@ -140,7 +77,7 @@ class NeuralVelocityField(BaseModule):
             )
         # optional source encoder
         if self.config.initialize_source_encoder:
-            self.source_encoder = MLPBlock(
+            modules["source_encoder"] = MLPBlock(
                 self.config.flow_dim,
                 self.config.source_latent_dim,
                 **self.config.source_encoder_mlp_kwargs,
@@ -159,19 +96,19 @@ class NeuralVelocityField(BaseModule):
                         normalization=self.config.resnet_normalization
                     )
                 ) 
-            self.resnet_blocks = nn.ModuleList(resnet_blocks)   
+            modules["resnet_blocks"] = nn.ModuleList(resnet_blocks)   
         #FiLM
-        self.film_block = None
         if self.config.conditioning_type == "film":
-            self.film_block = FiLMBlock(
+            modules["film_block"] = FiLMBlock(
                 in_dim=(self.config.state_latent_dim + self.config.time_latent_dim),
                 cond_dim=(self.config.perturbation_latent_dim + self.config.source_latent_dim))
         # Decoder
-        self.decoder = MLPBlock(
+        modules["decoder"] = MLPBlock(
             self.config.decoder_input_dim,
             self.config.flow_dim,
             **self.config.decoder_mlp_kwargs
         )
+        self.vf_modules = torch.nn.ModuleDict(modules)
         
     def forward(
         self,
@@ -203,7 +140,7 @@ class NeuralVelocityField(BaseModule):
                 max_period=self.config.time_features_max_periods
             )
         if self.config.encode_time:
-            t_latent = self.time_encoder(t_latent)
+            t_latent = self.vf_modules["time_encoder"](t_latent)
             
         # encoding conditions
         condition_latent = cond
@@ -211,7 +148,7 @@ class NeuralVelocityField(BaseModule):
             # sanity check (condition should be not None)
             msg = f""
             assert cond is not None, msg
-            condition_latent = self.condition_encoder(cond)
+            condition_latent = self.vf_modules["condition_encoder"](cond)
             condition_latent = nn.functional.dropout(
                 condition_latent,
                 p=self.config.perturbation_output_dropout
@@ -228,7 +165,7 @@ class NeuralVelocityField(BaseModule):
         # encoding states
         xt_latent = xt
         if self.config.encode_state:
-            xt_latent = self.x_encoder(xt)
+            xt_latent = self.vf_modules["x_encoder"](xt)
 
         # concatenating original and latent representations
         if self.config.conditioning_type == "concatenation":
@@ -257,7 +194,7 @@ class NeuralVelocityField(BaseModule):
             assert source is not None, msg
             source_latent = source
             if self.config.encode_source:
-                source_latent = self.source_encoder(source)
+                source_latent = self.vf_modules["source_encoder"](source)
             if self.config.conditioning_type == "concatenation":
                 # concatenating to the input for the decoder
                 latent_concat = torch.cat([latent_concat, source_latent], dim=-1)
@@ -270,15 +207,15 @@ class NeuralVelocityField(BaseModule):
             condition_initial_shape = condition_concat.shape
             latent_concat = latent_concat.reshape(-1, latent_initial_shape[-1])
             condition_concat = condition_concat.reshape(-1, condition_initial_shape[-1])
-            for block in self.resnet_blocks:
+            for block in self.vf_modules["resnet_blocks"]:
                 latent_concat = block(latent_concat, condition_concat)
             latent_concat = latent_concat.reshape(*latent_initial_shape)
         # FiLM
         elif self.config.conditioning_type == "film":
-            latent_concat = self.film_block(latent_concat, condition_concat)
+            latent_concat = self.vf_modules["film_block"](latent_concat, condition_concat)
 
         # forward pass on neural velocity field
-        return self.decoder(latent_concat)
+        return self.vf_modules["decoder"](latent_concat)
 
     def get_vf_fn(
         self,
@@ -340,7 +277,7 @@ class NeuralVelocityField(BaseModule):
         msg = f"The velocity field is in the unguided mode (i.e.: {self.config.use_guidance=})"
         assert self.config.use_guidance, msg
         # forward pass on condition encoder
-        condition_latent = self.condition_encoder(cond)
+        condition_latent = self.vf_modules["condition_encoder"](cond)
         return condition_latent
 
     def get_null_condition_token(

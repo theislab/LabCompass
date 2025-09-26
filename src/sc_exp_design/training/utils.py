@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Literal
+from typing import Any, Literal
 
 import numpy as np
 import torch
@@ -62,10 +62,12 @@ def neg_bin_rec_loss(
 def binary_classification_loss(
     params: Tensor,
     target: Tensor,
+    loss_fn_kwargs: dict[str, Any] | None,
 ) -> Tensor:
     """"""
+    loss_fn_kwargs = {} if loss_fn_kwargs is None else loss_fn_kwargs
     target = target.long()
-    loss = nn.functional.cross_entropy(params, target)
+    loss = nn.functional.cross_entropy(params, target, **loss_fn_kwargs)
     return loss
 
 
@@ -74,7 +76,8 @@ def reconstruction_loss_noise_model(
     samples: Tensor,
     noise_model: Literal["gaussian", "neg_bin"] | None,
     cov_estimation_mode: Literal["isotropic", "anisotropic"] | None = None,
-    allow_noise_model_to_be_none: bool = True
+    allow_noise_model_to_be_none: bool = True,
+    loss_fn_kwargs: dict[str, Any] | None = None
 ) -> Tensor:
     """"""
     # loss on the source posterior
@@ -95,6 +98,7 @@ def reconstruction_loss_noise_model(
     loss = loss_fn(
         params,
         samples,
+        loss_fn_kwargs,
     )
     return loss
 
@@ -105,6 +109,7 @@ def compute_pert_inference_loss(
     pert_cov_estimation_modes: dict[str, str] | None = None,
     add_loss: bool = True,
     allow_noise_model_to_be_none: bool = True,
+    loss_fn_kwargs=None
 ) -> tuple[Tensor, dict[str, Tensor]]:
     """"""
     loss = torch.zeros((), requires_grad=True)
@@ -121,6 +126,7 @@ def compute_pert_inference_loss(
             noise_model,
             cov_estimation_mode=cov_estimation_mode,
             allow_noise_model_to_be_none=allow_noise_model_to_be_none,
+            loss_fn_kwargs={} if loss_fn_kwargs is None else loss_fn_kwargs,
         )
 
         # adding loss

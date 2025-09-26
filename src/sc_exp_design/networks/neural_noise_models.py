@@ -89,7 +89,7 @@ class MLPGaussianNoiseModel(BaseModule):
         input_dim: int,
         output_dim: int,
         latent_dim: int = 1024,
-        use_shared_representation: bool = False,
+        use_shared_representation: bool = True,
         cov_estimation_mode: Literal["isotropic", "anisotropic"] = "isotropic",
         encoder_mlp_kwargs: dict[str, Any] | None = None,
         mean_mlp_kwargs: dict[str, Any] | None = None,
@@ -153,22 +153,24 @@ class MLPGaussianNoiseModel(BaseModule):
         This method initializes the encoder, mean, and covariance networks using the 
         specified parameters for architecture, batch normalization, dropout, and activation functions.
         """
+        modules = {}
         if self.use_shared_representation:
-            self.encoder = MLPBlock(
+            modules["encoder"] = MLPBlock(
                 self.input_dim,
                 self.latent_dim,
                 **self.encoder_mlp_kwargs,
             )
-        self.mean_net = MLPBlock(
+        modules["mean_net"] = MLPBlock(
             self.decoder_input_dim,
             self.output_dim,
             **self.mean_mlp_kwargs,
         )
-        self.cov_net = MLPBlock(
+        modules["cov_net"] = MLPBlock(
             self.decoder_input_dim,
             self.cov_output_dim,
             **self.cov_mlp_kwargs,
         )
+        self.model_modules = nn.ModuleDict(modules)
 
     def forward(self, input_tensor: Tensor) -> dict[str, Tensor]:
         """
@@ -182,7 +184,7 @@ class MLPGaussianNoiseModel(BaseModule):
         :rtype: dict[str, Tensor]
         """
         if self.use_shared_representation:
-            input_tensor = self.encoder(input_tensor)
-        mean_hat = self.mean_net(input_tensor)
-        cov_hat = self.cov_net(input_tensor)
+            input_tensor = self.model_modules["encoder"](input_tensor)
+        mean_hat = self.model_modules["mean_net"](input_tensor)
+        cov_hat = self.model_modules["cov_net"](input_tensor)
         return {ParamsFields.MEAN: mean_hat, ParamsFields.COVARIANCE: cov_hat}
