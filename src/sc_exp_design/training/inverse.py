@@ -27,6 +27,7 @@ class TargetPredictionTrainer(BaseTrainer):
         callbacks: BaseCallBack | None = None,
         grad_steps_log_interval: int | None = None,
         num_grad_accumulation_steps: int = 1,
+        loss_fn_kwargs: dict[str, Any] | None = None
     ) -> None:
         """"""
         self.target_prediction_model = target_prediction_model
@@ -36,6 +37,7 @@ class TargetPredictionTrainer(BaseTrainer):
         self.callbacks = callbacks
         self.grad_steps_log_interval = grad_steps_log_interval
         self.num_grad_accumulation_steps = num_grad_accumulation_steps 
+        self.loss_fn_kwargs = {} if loss_fn_kwargs is None else loss_fn_kwargs
 
     @property
     def model(
@@ -75,6 +77,7 @@ class TargetPredictionTrainer(BaseTrainer):
             self.target_prediction_model.noise_models,
             pert_cov_estimation_modes=self.pert_cov_estimation_modes, # TODO: we dont need it for the moment but we will need to pass it at some point.
             allow_noise_model_to_be_none=True,
+            loss_fn_kwargs=self.loss_fn_kwargs
         )
         return loss, {LossFields.LOSS: loss.item(), **log_dict}
     

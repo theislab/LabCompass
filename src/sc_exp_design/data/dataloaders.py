@@ -38,7 +38,7 @@ class BaseDataLoader(abc.ABC):
             tensor = torch.from_numpy(data)
         else:
             tensor = torch.from_numpy(data[idxs])
-        return tensor.to(self.device).float()
+        return tensor.type(torch.float32).to(self.device)
 
     @abc.abstractmethod
     def sample(

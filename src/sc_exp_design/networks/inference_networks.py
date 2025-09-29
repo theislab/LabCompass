@@ -149,13 +149,13 @@ class PerturbationApproximatePosterior(BaseApproximatePosterior):
         Raises:
             KeyError: If a covariate ID in `target_output_dims` does not have a corresponding noise model or configuration.
         """
+        modules = {}
         if self.use_shared_representation:
-            self.encoder = MLPBlock(
+            modules["encoder"] = MLPBlock(
                 self.input_dim,
                 self.latent_dim,
                 **self.encoder_mlp_kwargs,
             )
-        pert_approximate_posterior = {}
         for covariate_id, output_dim in self.target_output_dims.items():
             # retrieving configuration for target covariates
             pert_covariate_noise_model = self.noise_models[covariate_id]
@@ -169,81 +169,8 @@ class PerturbationApproximatePosterior(BaseApproximatePosterior):
                 output_dim,
                 **pert_covariate_approximate_posterior_kwargs,
             )
-            pert_approximate_posterior[covariate_id] = cov_pert_approximate_posterior
-        self.pert_approximate_posterior = pert_approximate_posterior
-
-    def to(
-        self,
-        device: torch.device,
-    ) -> nn.Module:
-        """
-        Moves the model and its components to the specified device.
-
-        Args:
-            device (torch.device): The device to move the model to (e.g., "cuda" or "cpu").
-
-        Returns:
-            nn.Module: The model after being moved to the specified device.
-        """
-        self = super().to(device)
-        pert_approximate_posterior = {}
-        for pert_target_covariate_id, cov_pert_approximate_posterior in self.pert_approximate_posterior.items():
-            pert_approximate_posterior[pert_target_covariate_id] = cov_pert_approximate_posterior.to(device)
-        self.pert_approximate_posterior = pert_approximate_posterior
-        return self
-
-    def parameters(
-        self,
-    ) -> Iterator[nn.Parameter]:
-        """
-        Returns an iterator over the model parameters.
-
-        This includes both the parameters from the base class and those from the perturbation approximate posteriors.
-
-        Returns:
-            Iterator[nn.Parameter]: An iterator over the model's parameters.
-        """
-        parameters = [super().parameters()]
-        for cov_decoder in self.pert_approximate_posterior.values():
-            parameters.append(cov_decoder.parameters())
-        parameters = itertools.chain(*parameters)
-        return parameters
-
-    def train(
-        self,
-        mode: bool = True
-    ) -> nn.Module:
-        """
-        Puts the model into training mode, including its perturbation components.
-
-        Args:
-            mode (bool, optional): Whether to set the model to training mode. Defaults to True.
-
-        Returns:
-            nn.Module: The model after being set to training mode.
-        """
-        self = super().train(mode)
-        pert_approximate_posterior = {}
-        for pert_target_covariate_id, cov_pert_approximate_posterior in self.pert_approximate_posterior.items():
-            pert_approximate_posterior[pert_target_covariate_id] = cov_pert_approximate_posterior.train(mode)
-        self.pert_approximate_posterior = pert_approximate_posterior
-        return self
-
-    def eval(
-        self,
-    ) -> nn.Module:
-        """
-        Puts the model into evaluation mode, including its perturbation components.
-
-        Returns:
-            nn.Module: The model after being set to evaluation mode.
-        """
-        self = super().eval()
-        pert_approximate_posterior = {}
-        for pert_target_covariate_id, cov_pert_approximate_posterior in self.pert_approximate_posterior.items():
-            pert_approximate_posterior[pert_target_covariate_id] = cov_pert_approximate_posterior.eval()
-        self.pert_approximate_posterior = pert_approximate_posterior
-        return self
+            modules[covariate_id] = cov_pert_approximate_posterior
+        self.pert_approximate_posterior = nn.ModuleDict(modules)
 
     def forward(
         self,
