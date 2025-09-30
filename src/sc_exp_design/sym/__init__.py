@@ -4,5 +4,6 @@ from sc_exp_design.sym.dummy_data import get_dummy_adata
 
 __all__ = [
     "GaussianMixtureModel",
-    "get_annotated_perturbation_data"
+    "get_annotated_perturbation_data",
+    "get_dummy_adata"
 ]

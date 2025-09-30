@@ -156,11 +156,12 @@ class CFMTrainer(BaseTrainer):
             return predictions, target
         # handling number of samples
         if self.num_samples_per_validation_step is not None:
-            num_samples = self.num_samples_per_validation_step
             if not self.generate_from_noise:
                 msg = f""
                 logger.warning(msg)
                 num_samples = 1
+            else:
+                num_samples = self.num_samples_per_validation_step
         else:
             num_samples = 1
         msg = f""

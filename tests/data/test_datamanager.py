@@ -22,13 +22,14 @@ class TestDataManager(BaseDataTest):
         num_unique_groups: int,
         num_cov_feats: int = 1,
     ) -> int:
-        if condition.startswith("feats"):
-            return num_perturbation_feats
-        elif condition.startswith("cov"):
-            return num_cov_feats
-        elif "group" in condition:
-            return num_unique_groups
-        return num_unique_treatments
+        # check whether the data is a representation or covariates
+        is_feat = "feats" in condition
+        # collect expected number of perturbation features
+        expected_num_perturbation_features = 1
+        if is_feat:
+            # check that the perturbation is in obsm
+            expected_num_perturbation_features = num_perturbation_feats        
+        return expected_num_perturbation_features
 
     @pytest.mark.parametrize("batch_data", [False, True])
     @pytest.mark.parametrize("treatments", [None, ]) # TODO: Add othe option to test
@@ -180,9 +181,7 @@ class TestDataManager(BaseDataTest):
                 # collect expected number of perturbation features
                 expected_num_perturbation_features = self.get_expected_num_perturbation_features(
                     condition,
-                    num_perturbation_feats,
-                    num_unique_treatments,
-                    num_unique_groups,
+                    num_perturbation_feats
                 )
                 # define expected shape for treatment perturbation data
                 expected_shape = (expected_num_cells, expected_num_perturbation_features)
@@ -226,9 +225,7 @@ class TestDataManager(BaseDataTest):
                     # collect expected number of perturbation features
                     expected_num_perturbation_features = self.get_expected_num_perturbation_features(
                         condition,
-                        num_perturbation_feats,
-                        num_unique_treatments,
-                        num_unique_groups,
+                        num_perturbation_feats
                     )
                     # define expected shape for treatment perturbation data
                     expected_shape = (expected_num_cells, expected_num_perturbation_features)

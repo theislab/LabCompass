@@ -283,14 +283,34 @@ class NeuralVelocityField(BaseModule):
     def get_null_condition_token(
         self,
         cond: dict[str, Tensor] | None,
-    ) -> Tensor:
+    ) -> dict[str, Tensor]:
         """"""
         # when condition is None we simply return None
         if cond is None:
             return None
         # otherwise we need to replace each value 
         # of the dictionary with a null condition token
+
+        cfg_null_token = self.config.cfg_null_condition_token
+        if isinstance(cfg_null_token, (int, float)):
+            # already scalar, wrap scalar into a tensor for consistency
+            cfg_null_token = torch.tensor(cfg_null_token, dtype=torch.float32)
+        elif isinstance(cfg_null_token, (list, tuple, Tensor)):
+            cfg_null_token = torch.as_tensor(cfg_null_token, dtype=torch.float32)
+            if cfg_null_token.ndim != 1:
+                raise ValueError(
+                    f"cfg_null_condition_token must be scalar or 1D, got shape {cfg_null_token.shape}"
+                )
+        else:
+            try:
+                cfg_null_token = torch.as_tensor(list(cfg_null_token), dtype=torch.float32)
+            except Exception as e:
+                raise TypeError(
+                f"Unsupported type for cfg_null_condition_token: {type(cfg_null_token)}"
+                )
+
         cond_copy = {}
         for key, val in cond.items():
-            cond_copy[key] = torch.ones_like(val)*self.config.null_condition_token
+            cfg_null_token = cfg_null_token.to(val.device, dtype=torch.float32)
+            cond_copy[key] = torch.ones_like(val, dtype=torch.float32) * cfg_null_token
         return cond_copy

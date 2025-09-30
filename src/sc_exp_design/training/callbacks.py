@@ -8,6 +8,7 @@ from sc_exp_design.constants import DataFields, PredictionFields
 from sc_exp_design.metrics import Metrics
 from sc_exp_design.transforms import Transform
 from sc_exp_design.types import TensorLike
+import numpy as np
 
 
 __all__ = [
@@ -69,29 +70,33 @@ class MetricsCallBack(ComputationalCallBack):
         self,
         metric_ids: Sequence[str],
         state_transforms: Transform | None = None,
+        weights: TensorLike = None
     ) -> None:
         """"""
         self.metric_ids = metric_ids
         self.state_transforms = state_transforms
+        self.weights = weights
 
     def _run_on_valid_step(
             self,
             preds: TensorLike,
             target: TensorLike,
+            condition: str = None
         ) -> dict[str, float]:
         """"""
         metrics = {}
         if self.state_transforms is not None:
-            preds = self.state_transforms(preds)
-            target = self.state_transforms(target)
+            preds = self.state_transforms(preds, np.array([condition] * preds.shape[0]))
+            target = self.state_transforms(target, np.array([condition] * preds.shape[0]))
         for metric_id in self.metric_ids:
-            metric = vars(Metrics())[metric_id]
+            metric = vars(Metrics(self.weights))[metric_id]
             metrics[metric_id] = metric(preds, target)
         return metrics
     
     def run_on_valid_step(
         self,
         predictions_dict: dict[str, dict[str, TensorLike]],
+        val_id: str,
     ) -> dict[str, float]:
         """"""
         # defining output dictionary
@@ -104,14 +109,21 @@ class MetricsCallBack(ComputationalCallBack):
             targets = perturbation_prediction_data[DataFields.TARGET_STATE]
             
             # computing the metrics for the current perturbation
-            perturbation_metrics = self._run_on_valid_step(predictions, targets)
-
+            perturbation_metrics = self._run_on_valid_step(predictions, targets, perturbation)
+            
             # updating the metrics 
-            metrics.update(
-                {
-                    f"{perturbation}_{metric_id}": metric_value for metric_id, metric_value in perturbation_metrics.items()
-                }
-            )
+            if self.state_transforms is not None:
+                metrics.update(
+                    {
+                        f"{perturbation}_{metric_id}_{val_id}_{self.state_transforms.__class__.__name__}": metric_value for metric_id, metric_value in perturbation_metrics.items()
+                    }
+                )
+            else:
+                metrics.update(
+                    {
+                        f"{perturbation}_{metric_id}_{val_id}": metric_value for metric_id, metric_value in perturbation_metrics.items()
+                    }
+                )
         return metrics
 
 
@@ -230,12 +242,13 @@ class TrainingCallBacks(BaseCallBack):
     def run_on_valid_step(
         self,
         prediction_dict: dict[str, dict[str, TensorLike]],
+        val_id: str = None,
     ) -> dict[str, Any]:
         """"""
         # run computational callbacks first
         callback_out = {}
         for callback in self.computational_callbacks:
-            callback_metrics = callback.run_on_valid_step(prediction_dict)
+            callback_metrics = callback.run_on_valid_step(prediction_dict, val_id)
             callback_out.update(callback_metrics)
         # then log the results
         for callback in self.logging_callbacks:
