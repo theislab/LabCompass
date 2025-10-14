@@ -161,7 +161,10 @@ class MLPBlock(BaseModule):
         :return: Tensor of shape `(batch_size, self.output_dim)`
         :rtype: class:`torch.Tensor`
         """
-        return self.net(input_tensor)
+        original_shape = input_tensor.shape
+        input_tensor = input_tensor.reshape(-1, original_shape[-1])
+        out = self.net(input_tensor)
+        return out.reshape(*original_shape[:-1], -1)
 
 
 class CategoricalEmbedder(BaseModule):
@@ -521,6 +524,7 @@ class ConditionEncoder(BaseModule):
         pooling: Literal["mean", "sum", "self_attention"] = "mean",
         pooling_kwargs: dict[str, Any] | None = None,
         layers_after_pooling: MLPConfigFields | None = None,
+        perturbation_output_dropout: float = 0.0,
     ) -> None:
         super().__init__()
         self.latent_dim = latent_dim
@@ -529,6 +533,7 @@ class ConditionEncoder(BaseModule):
         self.pooling = pooling
         self.pooling_kwargs = pooling_kwargs
         self.layers_after_pooling = layers_after_pooling
+        self.perturbation_output_dropout = perturbation_output_dropout
         # initializing modules
         self._init_modules()
 
@@ -566,6 +571,7 @@ class ConditionEncoder(BaseModule):
 
         # layers after pooling
         modules["after_pooling"] = MLPBlock(**self.layers_after_pooling)
+        modules["perturbation_output_dropout"] = nn.Dropout(p=self.perturbation_output_dropout)
         self.modules_dict = nn.ModuleDict(modules)
 
     def __get_mask(
