@@ -74,6 +74,7 @@ class NeuralVelocityField(BaseModule):
                 pooling=self.config.perturbation_pooling,
                 pooling_kwargs=self.config.perturbation_pooling_kwargs,
                 layers_after_pooling=self.config.perturbation_layers_after_pooling,
+                perturbation_output_dropout=self.config.perturbation_output_dropout, 
             )
         # optional source encoder
         if self.config.initialize_source_encoder:
@@ -149,10 +150,6 @@ class NeuralVelocityField(BaseModule):
             msg = f""
             assert cond is not None, msg
             condition_latent = self.vf_modules["condition_encoder"](cond)
-            condition_latent = nn.functional.dropout(
-                condition_latent,
-                p=self.config.perturbation_output_dropout
-            )
         elif self.config.use_guidance and (not self.config.encode_conditions):
             # sanity check (condition should be not None)
             msg = f""
