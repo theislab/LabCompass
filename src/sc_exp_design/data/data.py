@@ -99,8 +99,9 @@ class AnnotatedPerturbationData:
             assert self.control_key is not None, msg
 
             # register indices and state data
-            self.control_idxs = np.argwhere(self.adata.obs[self.control_key] == True)[:, 0]
-            self.control_data = self.data[self.control_idxs]
+            control_idxs = np.argwhere(self.adata.obs[self.control_key] == True)[:, 0]
+            self.control_data = self.data[control_idxs]
+            self.control_idxs = np.arange(len(self.control_data))
 
             # storing perturbation data
             self.treatment_idxs = np.argwhere(self.adata.obs[self.control_key] == False)[:, 0]

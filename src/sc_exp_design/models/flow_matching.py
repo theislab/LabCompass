@@ -271,6 +271,7 @@ class FlowMatching(BaseModel):
         cfg_prob_unconditional: float = 0.1,
         validation_cfg_guidance_strength: float = 1.0,
         num_grad_accumulation_steps: int = 1,
+        close_wandb_connection: bool = True,
     ) -> None:
         """Trains the model.
 
@@ -380,6 +381,7 @@ class FlowMatching(BaseModel):
             self.train_dataloader,
             self.validation_dataloader,
             valid_freq,
+            close_wandb_connection=close_wandb_connection
         )
 
     def predict(
