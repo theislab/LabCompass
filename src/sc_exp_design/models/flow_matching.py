@@ -119,7 +119,7 @@ class FlowMatching(BaseModel):
 
         self.data_manager = None
         self.train_data = None
-        self.validation_data = None
+        self.validation_data = {}
 
     def prepare_train_data(
         self,
@@ -168,6 +168,7 @@ class FlowMatching(BaseModel):
 
     def prepare_validation_data(
         self,
+        name: str,
         validation_adata: AnnData,
     ) -> None:
         """Prepares the data for validation and initializs the :attr:`FlowMatching.validation_data` attribute of the model.
@@ -177,7 +178,7 @@ class FlowMatching(BaseModel):
         :type validation_adata: class:`AnnData`
         """
         validation_data = self.data_manager.get_data(validation_adata)
-        self.validation_data = validation_data
+        self.validation_data[name] = validation_data
 
     def prepare_model(
         self,
@@ -246,6 +247,7 @@ class FlowMatching(BaseModel):
             **optimizer_kwargs,
         )
 
+        # initialize scheduler
         self.lr_scheduler = None
         self.lr_scheduler_step = None
         if lr_scheduler_kwargs is None:
