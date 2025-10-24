@@ -172,7 +172,7 @@ class TestDataLoaders(BaseDataTest):
 
         # initializing validation data loader
         validation_dataloader = sc_exp_design.data.ValidationDataLoader(
-            data,
+            {"test": data},
             coupling,
             batch_size if use_batch_size else None,
             state_transforms,

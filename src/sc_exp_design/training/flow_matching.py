@@ -8,6 +8,7 @@ from torch import Tensor
 
 from sc_exp_design.constants import DataFields, LossFields, PredictionFields, VFStepFields
 from sc_exp_design.data import (
+    BaseDataLoader,
     TrainDataLoader,
     ValidationDataLoader,
 )

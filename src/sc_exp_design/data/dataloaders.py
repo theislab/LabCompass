@@ -293,7 +293,7 @@ class ValidationDataLoader(BaseCoupledDataLoader):
 
     def __init__(
         self,
-        data: AnnotatedPerturbationData,
+        data: dict[str, AnnotatedPerturbationData],
         coupling: Coupling,
         batch_size: int | None,
         state_transforms: Transform | None = None,
@@ -332,12 +332,13 @@ class ValidationDataLoader(BaseCoupledDataLoader):
 
         self.samples = self._pre_sample()
 
-    def _pre_sample(
+    def _pre_sample_data(
         self,
+        data: AnnotatedPerturbationData,
     ):
         
         # retrieving the perturbations to validate on for the current batch
-        treatments = self.__sample_perturbation_id()
+        treatments = self.__sample_perturbation_id(data)
 
         # defining dictionary of results
         data_dict = {}
@@ -348,7 +349,7 @@ class ValidationDataLoader(BaseCoupledDataLoader):
             trtm_dict = {}
 
             # retrieving target data
-            trtm_data = self.data.get_treatments(treatments=treatment)
+            trtm_data = data.get_treatments(treatments=treatment)
             trtm_idxs = len(trtm_data)
             if self.batch_size is not None:
                 trtm_idxs = np.random.choice(trtm_idxs, size=self.batch_size)
@@ -357,7 +358,7 @@ class ValidationDataLoader(BaseCoupledDataLoader):
             trtm_dict[DataFields.TARGET_STATE] = trtm_data.state_data
 
             # retrieving perturbation data
-            if self.data.perturbation_data is not None:
+            if data.perturbation_data is not None:
                 trtm_perts = DataMixin(trtm_data.perturbation_data)
                 # using same indices as before
                 condition = trtm_perts.apply(lambda e: self._move_to_tensor_and_slice(e, trtm_idxs))
@@ -365,7 +366,7 @@ class ValidationDataLoader(BaseCoupledDataLoader):
 
             # sampling control cells
             if self.has_controls:
-                control_data = self.data.get_treatments(treatments=treatment)
+                control_data = data.get_treatments(treatments=treatment)
                 ctrl_idxs = len(control_data)
                 if self.batch_size is not None:
                     ctrl_idxs = np.random.choice(ctrl_idxs, size=self.batch_size)
@@ -375,8 +376,19 @@ class ValidationDataLoader(BaseCoupledDataLoader):
             data_dict[treatment] = trtm_dict
         return data_dict
 
+    def _pre_sample(
+        self,
+    ):
+        return {
+            f"{name}_{self._parse_perturbation_id(data, pert)}": sample_dict 
+                for name, data in self.data.items()
+                    for pert, sample_dict in self._pre_sample_data(data).items()
+        }
+            
+
     def __sample_perturbation_id(
         self,
+        data,
     ) -> Sequence[str | None]:
         """
         Samples the treatment for the current batch when using Optimal Transport couplings.
@@ -388,32 +400,33 @@ class ValidationDataLoader(BaseCoupledDataLoader):
         :rtype: class: `Sequence[str | None]`
         """
         # no perturbation data is passed to the AnnotatedPerturbationData object
-        if not self.data.allow_grouped_couplings:
+        if not data.allow_grouped_couplings:
             return (None, )
         # returning all the treaments otherwise
-        return self.data.seen_combinations
+        return data.seen_combinations
 
     def _parse_perturbation_id(
         self,
+        data,
         treatment: Sequence[str] | None,
     ) -> str:
         """"""
         if treatment is None:
             # unconditional generation
-            if self.data.perturbations is None:
+            if data.perturbations is None:
                 return "unconditional"
             else:
                 # concatenate perturbation names
-                if not self.data.allow_grouped_couplings:            
+                if not data.allow_grouped_couplings:            
                     # concatenate perturbation names
-                    treatment = [perturbation for perturbation in self.data.perturbations]
+                    treatment = [perturbation for perturbation in data.perturbations]
                     return "_".join(treatment)
 
                 else:
                     msg = f"When `self.data.seen_combinations` is provided `treatment` should not be None."
                     raise ValueError(msg)
         else:
-            msg = f""
+            msg = f"{treatment}"
             assert isinstance(treatment, Sequence), msg
             return "_".join(treatment)
 
