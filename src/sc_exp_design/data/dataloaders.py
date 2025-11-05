@@ -295,7 +295,7 @@ class ValidationDataLoader(BaseCoupledDataLoader):
         self,
         data: dict[str, AnnotatedPerturbationData],
         coupling: Coupling,
-        batch_size: int | None,
+        batch_size: int | None = None,
         state_transforms: Transform | None = None,
         device_id: Literal["cuda", "cpu"] = "cuda",
         has_controls: bool = True,
@@ -350,12 +350,15 @@ class ValidationDataLoader(BaseCoupledDataLoader):
 
             # retrieving target data
             trtm_data = data.get_treatments(treatments=treatment)
-            trtm_idxs = len(trtm_data)
             if self.batch_size is not None:
+                print("retrieving indices")
+                trtm_idxs = len(trtm_data)
                 trtm_idxs = np.random.choice(trtm_idxs, size=self.batch_size)
+            else:
+                trtm_idxs = None
             trtm_states = trtm_data.state_data
             trtm_states = self._move_to_tensor_and_slice(trtm_states, trtm_idxs)
-            trtm_dict[DataFields.TARGET_STATE] = trtm_data.state_data
+            trtm_dict[DataFields.TARGET_STATE] = trtm_states
 
             # retrieving perturbation data
             if data.perturbation_data is not None:
@@ -367,12 +370,14 @@ class ValidationDataLoader(BaseCoupledDataLoader):
             # sampling control cells
             if self.has_controls:
                 control_data = data.get_treatments(treatments=treatment)
-                ctrl_idxs = len(control_data)
                 if self.batch_size is not None:
+                    ctrl_idxs = len(control_data)
                     ctrl_idxs = np.random.choice(ctrl_idxs, size=self.batch_size)
+                else:
+                    ctrl_idxs = None
                 control_states = control_data.state_data
-                self._move_to_tensor_and_slice(control_states, ctrl_idxs)
-                trtm_dict[DataFields.SOURCE_STATE] = control_data.state_data
+                control_states = self._move_to_tensor_and_slice(control_states, ctrl_idxs)
+                trtm_dict[DataFields.SOURCE_STATE] = control_states
             data_dict[treatment] = trtm_dict
         return data_dict
 
@@ -426,6 +431,7 @@ class ValidationDataLoader(BaseCoupledDataLoader):
                     msg = f"When `self.data.seen_combinations` is provided `treatment` should not be None."
                     raise ValueError(msg)
         else:
+            treatment = [str(e) for e in treatment]
             msg = f"{treatment}"
             assert isinstance(treatment, Sequence), msg
             return "_".join(treatment)

@@ -375,7 +375,6 @@ class FlowMatching(BaseModel):
                 state_transforms=state_transforms,
                 device_id=self.device_id,
                 has_controls=self.data_manager.has_controls,
-                num_treatments_to_load=num_treatments_to_load
             )
 
         self.trainer.fit(

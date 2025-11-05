@@ -167,8 +167,9 @@ class CFMTrainer(BaseTrainer):
         msg = f""
         assert isinstance(num_samples, int), msg
         # handling the shape of the target when we sample multiple predictions
+        target = target.unsqueeze(0)
         target = target.repeat(num_samples, *(1 for _ in predictions.shape[1:]))
-        return predictions, target
+        return predictions.reshape(-1, predictions.shape[-1]), target.reshape(-1, target.shape[-1])
 
     def _validation_step(
         self,
