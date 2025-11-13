@@ -213,14 +213,16 @@ class TargetPredictionModel(BaseModel):
     def predict(
         self,
         control_states: torch.Tensor,
-        return_loss: bool = False,
+        no_grad: bool = True,
     ) -> dict[str, torch.Tensor] | tuple[torch.Tensor, dict[str, torch.Tensor]]:
         """"""
-        loss, out_dict = self.inverse_model(control_states)
-        if return_loss:
-            return loss, out_dict
-        return out_dict
-        
+        self.target_prediction_model.eval()
+        if no_grad:
+            with torch.no_grad():
+                return self.target_prediction_model(control_states)
+        else:
+            return self.target_prediction_model(control_states)
+
     @property
     def state_dim(self):
         return self.train_data.state_data.shape[-1]
