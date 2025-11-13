@@ -193,12 +193,13 @@ class PerturbationApproximatePosterior(BaseApproximatePosterior):
         
         # optional encoder
         if self.use_shared_representation:
-            input_pert_posterior = self.encoder(input_pert_posterior)
+            input_pert_posterior = self.pert_approximate_posterior["encoder"](input_pert_posterior)
 
         # decoder for each target covariate
-        pert_output_dict = {}
         pert_posterior_params_dict = {}
         for cov_id, cov_decoder in self.pert_approximate_posterior.items():
+            if cov_id == "encoder":
+                continue
             # forward pass on nn and storing the results
             pert_posterior_params = cov_decoder(input_pert_posterior)
             pert_posterior_params_dict[cov_id] = pert_posterior_params

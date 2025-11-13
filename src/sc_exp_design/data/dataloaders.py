@@ -197,6 +197,68 @@ class SequentialDataLoader(BaseDataLoader):
         return out
 
 
+class SequentialValDataLoader(BaseDataLoader):
+
+    def __init__(
+        self,
+        data: AnnotatedPerturbationData,
+        batch_size: int | None = None,
+        state_transforms: Transform | None = None,
+        device_id: Literal["cuda", "cpu"] = "cuda"
+    ) -> None:
+        self.data = data
+        self.batch_size = batch_size
+        self.state_transforms = state_transforms
+        self.device_id = device_id
+        self.device = torch.device(self.device_id)
+
+        self.samples = self._pre_sample()
+
+    def _pre_sample(
+        self,
+    ):
+        # handling batch size
+        n_obs = len(self.data)
+        if self.batch_size is not None:
+            batch_idxs = np.arange(n_obs)
+        else:
+            batch_idxs = np.random.choice(n_obs, size=self.batch_size)
+
+        # slicing the state data
+        states = self.data.state_data[batch_idxs]
+
+        # moving states to torch tensors
+        states = torch.from_numpy(states).to(self.device).float()
+        # handling transformations
+        if self.state_transforms is not None:
+            states = self.state_transforms.transform(states)
+
+        # constructing output dictionary
+        out = {
+            DataFields.STATE_DATA: states,
+        }
+
+        # retrieving optional petrurbation data
+        if self.data.perturbation_data is not None:
+            perturbation_data = {}
+            for covariate, covariate_data in self.data.perturbation_data.items():
+                perturbation_data[covariate] = self._move_to_tensor_and_slice(covariate_data, batch_idxs)
+            out[DataFields.PERTURBATION_DATA] = perturbation_data
+        
+        # retrieving optional target covariates
+        if self.data.target_data is not None:
+            target_data = {}
+            for covariate, covariate_data in self.data.target_data.items():
+                target_data[covariate] = self._move_to_tensor_and_slice(covariate_data, batch_idxs)
+            out[DataFields.TARGET_CATEGORIES] = target_data
+        return out
+
+    def sample(
+        self,
+    ):
+        return self.samples
+
+
 class TrainDataLoader(BaseCoupledDataLoader):
     """
     Data loader for training that samples matched control and perturbed cell states.

@@ -12,6 +12,13 @@ from sc_exp_design.metrics.metrics import (
     compute_min_max_mse,
     compute_cell_props
 )
+from sc_exp_design.metrics.classification_metrics import (
+    compute_accuracy,
+    compute_f1,
+    compute_precision,
+    compute_recall,
+    compute_roc_auc
+)
 from sc_exp_design.types import TensorLike
 
 __all__ = [
@@ -28,3 +35,15 @@ class Metrics:
     sinkhorn_divergence: Callable[[TensorLike, TensorLike], float] = partial(compute_wasserstein_distance, method="sinkhorn")
     min_max_mse: Callable[[TensorLike, TensorLike], float] = compute_min_max_mse
     cell_props: Callable[[TensorLike, TensorLike], float] = compute_cell_props
+    accuracy: Callable[[TensorLike, TensorLike], float] = compute_accuracy
+    micro_f1_score: Callable[[TensorLike, TensorLike], float] = partial(compute_f1, average="micro")
+    micro_precision: Callable[[TensorLike, TensorLike], float] = partial(compute_precision, average="micro")
+    micro_recall: Callable[[TensorLike, TensorLike], float] = partial(compute_recall, average="micro")
+    macro_f1_score: Callable[[TensorLike, TensorLike], float] = partial(compute_f1, average="macro")
+    macro_precision: Callable[[TensorLike, TensorLike], float] = partial(compute_precision, average="macro")
+    macro_recall: Callable[[TensorLike, TensorLike], float] = partial(compute_recall, average="macro")
+    weighted_f1_score: Callable[[TensorLike, TensorLike], float] = partial(compute_f1, average="weighted")
+    weighted_precision: Callable[[TensorLike, TensorLike], float] = partial(compute_precision, average="weighted")
+    weighted_recall: Callable[[TensorLike, TensorLike], float] = partial(compute_recall, average="weighted")
+    micro_roc_auc: Callable[[TensorLike, TensorLike], float] = partial(compute_roc_auc, average="micro")
+    macro_roc_auc: Callable[[TensorLike, TensorLike], float] = partial(compute_roc_auc, average="macro")
