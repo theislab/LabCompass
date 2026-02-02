@@ -128,6 +128,5 @@ class KKTConditions:
             loss, x1, create_graph=True,
             grad_outputs=grad_outputs
         )[0]
-        print(rhs)
         active_lambdas = self._solve_least_squares(lhs, rhs, vector=True)
         return active_lambdas
