@@ -87,7 +87,6 @@ class KKTConditions:
             ])
             ineq_grads_active.append(padded)  # shape [batch, max_active, x_dim]
 
-
         # Dimensions of constraints (per function)
         ineq_constraints_dims = [e[1].shape[-1] for e in ineq_constraints_and_grads]
 
@@ -163,16 +162,17 @@ class KKTConditions:
 
         # Fill full multipliers, respecting per-sample, per-dimension activity
         full_lambdas = torch.zeros((batch_size, total_dim), device=x1.device)
+        active_idx = torch.zeros(batch_size, dtype=torch.long, device=x1.device)
 
         start_full = 0
         for dim, active in zip(ineq_constraints_dims, active_ineq_constraints):
             for b in range(batch_size):
-                start_active = 0  # ✅ reset per batch
                 for d in range(dim):
                     if active[b, d]:
-                        full_lambdas[b, start_full + d] = active_lambdas[b, start_active]
-                        start_active += 1
+                        full_lambdas[b, start_full + d] = active_lambdas[b, active_idx[b]]
+                        active_idx[b] += 1
             start_full += dim
+
 
         full_lambdas_list = []
         start = 0
