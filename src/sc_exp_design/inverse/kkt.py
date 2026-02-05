@@ -45,7 +45,7 @@ class KKTConditions:
     def compute_lagrangian(self, x1, ineq_mul):
         loss = self.loss_fn(x1)
         for idx, fn in enumerate(self.ineq_constraints):
-            loss = loss + ineq_mul[idx]*fn(x1)
+            loss = loss + torch.einsum("bn,bn->b", ineq_mul[idx], fn(x1))
         return loss
 
     def _get_lhs_block_diagonal_matrix_and_active_constraints(self, x1):
@@ -70,57 +70,91 @@ class KKTConditions:
         # Flatten gradients only for active dimensions
         ineq_grads_active = []
         for e, active in zip(ineq_constraints_and_grads, active_ineq_constraints):
-            grad = e[0]  # shape [batch_size, dim, x_dim]
-            batch_indices, dim_indices = torch.nonzero(active, as_tuple=True)
-            if len(dim_indices) > 0:
-                # select only active gradients
-                selected = grad[batch_indices, dim_indices, :]
-                # make sure we keep shape [batch, active_dim, x_dim]
-                selected = selected.view(batch_size, -1, grad.shape[-1])
-                ineq_grads_active.append(selected)
+            grad = e[0]  # [batch, dim, x_dim]
+            batch_active_grads = []
+            for b in range(batch_size):
+                batch_mask = active[b]  # [dim]
+                selected = grad[b][batch_mask]  # [num_active, x_dim]
+                if selected.numel() == 0:
+                    selected = torch.zeros((0, grad.shape[-1]), device=grad.device)
+                batch_active_grads.append(selected)
+            # Stack along a new batch dimension
+            max_active = max([g.shape[0] for g in batch_active_grads])
+            # pad tensors to the same size (needed for batching)
+            padded = torch.stack([
+                torch.nn.functional.pad(g, (0, 0, 0, max_active - g.shape[0]))
+                for g in batch_active_grads
+            ])
+            ineq_grads_active.append(padded)  # shape [batch, max_active, x_dim]
+
 
         # Dimensions of constraints (per function)
         ineq_constraints_dims = [e[1].shape[-1] for e in ineq_constraints_and_grads]
 
-        if len(ineq_grads_active) == 0:
-            return None, active_ineq_constraints, ineq_constraints_dims
+        # if len(ineq_grads_active) == 0:
+        if all(active.sum() == 0 for active in active_ineq_constraints):
+            return None, active_ineq_constraints, ineq_constraints_dims, ineq_grads_active
 
         # Build LHS block matrix for least squares
+        # ineq_grads_active = [torch.concat(e, dim=0) for e in ineq_grads_active]
         row_blocks = []
         for rgrad in ineq_grads_active:
+            rgrad = rgrad[..., 0, :]
             col_blocks = []
             for cgrad in ineq_grads_active:
-                block = torch.einsum("bnm,bpm->bnp", rgrad, cgrad)
+                # block = torch.einsum("bnm,bpm->bp", rgrad, cgrad)
+                cgrad = cgrad[..., 0, :] 
+                block = torch.einsum("bn,bp->bnp", rgrad, cgrad)
                 col_blocks.append(block)
             col_blocks = torch.concatenate(col_blocks, dim=-1)
             row_blocks.append(col_blocks)
         lhs = torch.concatenate(row_blocks, dim=-2)
 
-        return lhs, active_ineq_constraints, ineq_constraints_dims
+        return lhs, active_ineq_constraints, ineq_constraints_dims, ineq_grads_active
+
     def compute_multipliers(self, x1):
-        lhs, active_ineq_constraints, ineq_constraints_dims = self._get_lhs_block_diagonal_matrix_and_active_constraints(x1)
+        lhs, active_ineq_constraints, ineq_constraints_dims, ineq_grads_active = self._get_lhs_block_diagonal_matrix_and_active_constraints(x1)
 
         batch_size = x1.shape[0] if x1.ndim > 1 else 1
         total_dim = sum(ineq_constraints_dims)
 
         # return zeros if no active constraints
         if lhs is None:
-            return torch.zeros((batch_size, total_dim), device=x1.device)
+            # create a tensor of zeros with shape [batch, dim] for each constraint
+            full_lambdas_list = []
+            start = 0
+            for dim in ineq_constraints_dims:
+                zeros = torch.zeros((batch_size, dim), device=x1.device)
+                full_lambdas_list.append(zeros)
+                start += dim  # not strictly needed here, just for consistency
+            return full_lambdas_list
 
         # Compute gradient of loss
         loss = self.loss_fn(x1)
         grad_outputs = torch.ones_like(loss)
         rhs_full = -torch.autograd.grad(loss, x1, create_graph=True, grad_outputs=grad_outputs)[0]
-
-        # --- FIX START: slice RHS to only active constraints ---
+    
+        # rhs_active: flatten per-sample, per-active constraint
         rhs_active_list = []
         for b in range(batch_size):
             rhs_active_b = []
-            for dim, active in zip(ineq_constraints_dims, active_ineq_constraints):
-                rhs_active_b.extend(rhs_full[b, :dim][active[b]])
-            rhs_active_list.append(torch.tensor(rhs_active_b, device=x1.device))
-        rhs_active = torch.stack(rhs_active_list)
-        # --- FIX END ---
+            for grad, active in zip(ineq_grads_active, active_ineq_constraints):
+                # grad[b]: [max_active, x_dim] after padding
+                # active[b]: [dim]
+                n_active = active[b].sum().item()
+                if n_active > 0:
+                    # take the first n_active rows (because of padding)
+                    rhs_active_rows = rhs_full[b] @ grad[b, :n_active, :].T  # shape [n_active]
+                    rhs_active_b.extend(-rhs_active_rows)
+            rhs_active_b = torch.tensor(rhs_active_b, device=x1.device)
+            rhs_active_list.append(rhs_active_b)
+
+        # pad to max_active constraints across batch
+        max_active = max([len(r) for r in rhs_active_list])
+        rhs_active_list = [
+            torch.nn.functional.pad(r, (0, max_active - len(r))) for r in rhs_active_list
+        ]
+        rhs_active = torch.stack(rhs_active_list)  # [batch, max_active]
 
         # Solve for active multipliers
         active_lambdas = self._solve_least_squares(lhs, rhs_active, vector=True)
@@ -129,14 +163,24 @@ class KKTConditions:
 
         # Fill full multipliers, respecting per-sample, per-dimension activity
         full_lambdas = torch.zeros((batch_size, total_dim), device=x1.device)
+
         start_full = 0
-        start_active = 0
         for dim, active in zip(ineq_constraints_dims, active_ineq_constraints):
             for b in range(batch_size):
+                start_active = 0  # ✅ reset per batch
                 for d in range(dim):
                     if active[b, d]:
                         full_lambdas[b, start_full + d] = active_lambdas[b, start_active]
                         start_active += 1
+            start_full += dim
 
-        # return torch.nn.functional.relu(full_lambdas)
-        return full_lambdas
+        full_lambdas_list = []
+        start = 0
+        for dim in ineq_constraints_dims:
+            full_lambdas_list.append(full_lambdas[:, start:start+dim])
+            start += dim
+
+        # Now full_lambdas_list[i] has shape [batch, dim_of_constraint_i]
+        # Return as a list instead of trying to reshape
+        return full_lambdas_list
+        
