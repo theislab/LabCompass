@@ -121,7 +121,7 @@ class LossGuidedFlow:
         vt = vf_fn(t[:, 0], xt)
 
         # computing guidance term
-        _, gt = self.compute_loss_gradients(
+        loss_val, gt = self.compute_loss_gradients(
             t,
             xt,
             loss_fn,
@@ -133,7 +133,12 @@ class LossGuidedFlow:
         )
 
         # optional decay
-        guidance_strength = lambda_scheduler(t) if lambda_scheduler is not None else 1.0
+        guidance_strength = lambda_scheduler(t) if lambda_scheduler is not None else torch.ones_like(t)
+
+        # update stores
+        self._loss_history.append(loss_val)
+        self._lambda_history.append(guidance_strength)
+
         return vt - guidance_strength*gt
 
     def sample_posterior(
@@ -149,7 +154,11 @@ class LossGuidedFlow:
         num_time_steps=100,
         solver_kwargs=None,
     ):
-        
+
+        # create store for loss function and lambda schedueler values
+        self._loss_history = []
+        self._lambda_history = [] 
+
         # default values for the solver arguments
         if solver_kwargs is None:
             solver_kwargs = {}
@@ -172,12 +181,15 @@ class LossGuidedFlow:
             cfg_guidance_strength=cfg_guidance_strength,
         )
         time = torch.linspace(0.0, 1.0, num_time_steps)
-        return odeint(
+        traj =  odeint(
             vf_fn,
             x0,
             time,
             **solver_kwargs
         ).detach().cpu().numpy()
+        loss_history = torch.stack(self._loss_history, dim=0)
+        lambda_history = torch.stack(self._lambda_history, dim=0)
+        return traj, loss_history, lambda_history
 
     @property
     def prior_vf(self) -> NeuralVelocityField:

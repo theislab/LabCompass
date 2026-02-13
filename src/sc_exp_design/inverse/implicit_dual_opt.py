@@ -26,6 +26,7 @@ class ImpliciDualGuidedFlow(LossGuidedFlow):
         eps=1e-6,
         use_lstsq=True,
         g_tol=1e-6,
+        use_multipliers=True,
     ):
         
         kkt = KKTConditions(
@@ -36,7 +37,10 @@ class ImpliciDualGuidedFlow(LossGuidedFlow):
             g_tol=g_tol,
         )
         def lagrangian(x1):
-            mul = kkt.compute_multipliers(x1)
+            if use_multipliers:
+                mul = kkt.compute_multipliers(x1)
+            else:
+                mul = None
             return kkt.compute_lagrangian(x1, mul)
 
         return super().sample_posterior(

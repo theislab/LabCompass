@@ -42,10 +42,11 @@ class KKTConditions:
             )
         )(x1)
 
-    def compute_lagrangian(self, x1, ineq_mul):
+    def compute_lagrangian(self, x1, ineq_mul=None):
         loss = self.loss_fn(x1)
         for idx, fn in enumerate(self.ineq_constraints):
-            loss = loss + torch.einsum("bn,bn->b", ineq_mul[idx], fn(x1))
+            if ineq_mul is not None:
+                loss = loss + torch.einsum("bn,bn->b", ineq_mul[idx], fn(x1))
         return loss
 
     def _get_lhs_block_diagonal_matrix_and_active_constraints(self, x1):
