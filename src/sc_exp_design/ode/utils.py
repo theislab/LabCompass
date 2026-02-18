@@ -13,22 +13,17 @@ logger = logging.getLogger(__name__)
 __all__ = ["push_forward"]
 
 
-def push_forward(
-    velocity_field: NeuralVelocityField,
-    source: TensorLike | None,
-    condition: dict[str, TensorLike] | None,
-    generate_from_noise: bool,
-    noise_distribution: Callable[[Sequence[int]], TensorLike],
-    num_time_steps: int,
-    solver_kwargs: dict[str, Any],
-    device_id: Literal["cuda", "cpu"],
-    return_trajectory: bool = False,
-    no_grad: bool = True,
-    num_samples: int | None = None,
-    batch_size: int | None = None,
-    cfg_guidance_strength: float = 1.0,
-) -> TensorLike:
-    """"""
+def get_initial_state_and_condition(
+    source,
+    batch_size,
+    num_samples,
+    flow_dim,
+    condition,
+    noise_distribution,
+    device_id,
+    generate_from_noise,
+):
+
     # initializing device
     device = torch.device(device_id)
 
@@ -62,10 +57,37 @@ def push_forward(
     # handling latent state
     initial_state = source
     if initial_state is None:
-        initial_state = noise_distribution((num_samples, *batch_size, velocity_field.config.flow_dim)).squeeze(dim=0).to(device)
+        initial_state = noise_distribution((num_samples, *batch_size, flow_dim)).squeeze(dim=0).to(device)
     msg = f""
     assert initial_state is not None, msg
+    return initial_state, condition
 
+def push_forward(
+    velocity_field: NeuralVelocityField,
+    source: TensorLike | None,
+    condition: dict[str, TensorLike] | None,
+    generate_from_noise: bool,
+    noise_distribution: Callable[[Sequence[int]], TensorLike],
+    num_time_steps: int,
+    solver_kwargs: dict[str, Any],
+    device_id: Literal["cuda", "cpu"],
+    return_trajectory: bool = False,
+    no_grad: bool = True,
+    num_samples: int | None = None,
+    batch_size: int | None = None,
+    cfg_guidance_strength: float = 1.0,
+) -> TensorLike:
+    """"""
+    initial_state, condition = get_initial_state_and_condition(
+        source,
+        batch_size,
+        num_samples,
+        velocity_field.config.flow_dim,
+        condition,
+        noise_distribution,
+        device_id,
+        generate_from_noise,
+    )
     # defining velocity function
     vf = velocity_field.get_vf_fn(condition, source=source, cfg_guidance_strength=cfg_guidance_strength)
     # initializing the sampler clss

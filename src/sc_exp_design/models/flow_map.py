@@ -4,19 +4,19 @@ from collections.abc import Callable, Sequence, Mapping
 from typing import Any, Literal
 
 
+import torch
+
 from sc_exp_design.constants import DataFields
 from sc_exp_design.data import TrainDataLoader, ValidationDataLoader
-
-from sc_exp_design.ode import push_forward
-from sc_exp_design.training import BaseCallBack, CFMTrainer
+from sc_exp_design.ode import get_initial_state_and_condition
+from sc_exp_design.training import BaseCallBack
+from sc_exp_design.training.flow_map import FlowMapTrainer
 from sc_exp_design.transforms import Transform
-
-
 from sc_exp_design.config.flow_map import NeuralFlowMapConfig
 from sc_exp_design.models import FlowMatching
+from sc_exp_design.networks import NeuralVelocityField
 from sc_exp_design.networks.flow_map_net import NeuralFlowMap
 
-import torch
 
 class FlowMap(FlowMatching):
 
@@ -141,6 +141,7 @@ class FlowMap(FlowMatching):
         validation_cfg_guidance_strength: float = 1.0,
         num_grad_accumulation_steps: int = 1,
         close_wandb_connection: bool = True,
+        velocity_field: NeuralVelocityField | None = None,
     ) -> None:
         """Trains the model.
 
@@ -203,8 +204,8 @@ class FlowMap(FlowMatching):
         self.cfg_prob_unconditional = cfg_prob_unconditional
         self.validation_cfg_guidance_strength = validation_cfg_guidance_strength
 
-        self.trainer = CFMTrainer(
-            self.velocity_field,
+        self.trainer = FlowMapTrainer(
+            self.flow_map,
             self.flow,
             self.optimizer,
             lr_scheduler=self.lr_scheduler,
@@ -222,6 +223,7 @@ class FlowMap(FlowMatching):
             cfg_prob_unconditional=self.cfg_prob_unconditional,
             validation_cfg_guidance_strength=self.validation_cfg_guidance_strength,
             num_grad_accumulation_steps=num_grad_accumulation_steps,
+            velocity_field=velocity_field
         )
 
         self.train_dataloader = TrainDataLoader(
@@ -254,16 +256,16 @@ class FlowMap(FlowMatching):
 
     def predict(
         self,
-        batch: dict[str, Tensor | dict[str, torch.Tensor]],
+        batch: dict[str, torch.Tensor | dict[str, torch.Tensor]],
+        time_steps: torch.Tensor | None,
+        num_steps: int = 1,
         return_trajectory: bool = False,
         no_grad: bool = True,
         num_samples: int | None = None,
         batch_size: int | None = None,
         num_time_steps: int | None = None,
         fix_noise: bool = False, 
-        solver_kwargs: dict[str, Any] | None = None,
-        cfg_guidance_strength: float = 1.0,
-    ) -> dict[str, Tensor]:
+    ) -> dict[str, torch.Tensor]:
         """Generates the predictions by integrating the dynamics with the learnt velocity field for a given initial condition
 
         :param batch: A batch of data containing both source point and conditions (guidance term).
@@ -347,4 +349,38 @@ class FlowMap(FlowMatching):
         # handling discretization time steps
         if num_time_steps is None:
             num_time_steps = self.num_time_steps
-        ...
+
+        # pushing forward particles
+        initial_state, condition = get_initial_state_and_condition(
+            source,
+            batch_size,
+            num_samples,
+            self.flow_map.config.flow_dim,
+            condition,
+            self.noise_distribution,
+            self.device_id,
+            self.generate_from_noise,
+        )
+
+        # get map fn
+        map_fn = self.flow_map.get_map_fn(
+            condition,
+            source=source
+        )
+
+        # prepare time steps
+        if time_steps is None:
+            time_steps = torch.linspace(0.0, 1.0, num_steps)
+        
+        X_s = initial_state
+        traj = [X_s]
+        for idx, s in enumerate(time_steps[:-1]):
+            t = time_steps[idx + 1]
+            s_tensor = torch.ones([*initial_state.shape[:-1]], device=self.device).float()*s
+            t_tensor = torch.ones([*initial_state.shape[:-1]], device=self.device).float()*t
+            X_s = map_fn(s_tensor, t_tensor, X_s)
+            traj.append(X_s)
+        if return_trajectory:
+            traj = torch.stack(traj, axis=0)    
+            return traj
+        return X_s

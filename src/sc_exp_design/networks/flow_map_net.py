@@ -233,7 +233,8 @@ class NeuralFlowMap(BaseModule):
             latent_concat = self.vf_modules["film_block"](latent_concat, condition_concat)
 
         # forward pass on neural velocity field
-        return self.vf_modules["decoder"](latent_concat)
+        res = self.vf_modules["decoder"](latent_concat)
+        return xt  + (t - s)*res
 
     def get_condition_embedding(
         self,
@@ -257,17 +258,33 @@ class NeuralFlowMap(BaseModule):
         condition_latent = self.vf_modules["condition_encoder"](cond)
         return condition_latent
 
-    def get_null_condition_token(
+    def get_map_fn(
         self,
-        cond: dict[str, Tensor] | None,
-    ) -> Tensor:
-        """"""
-        # when condition is None we simply return None
-        if cond is None:
-            return None
-        # otherwise we need to replace each value 
-        # of the dictionary with a null condition token
-        cond_copy = {}
-        for key, val in cond.items():
-            cond_copy[key] = torch.ones_like(val)*self.config.null_condition_token
-        return cond_copy
+        cond: dict[str, Tensor] | None = None,
+        source: Tensor | None = None,
+    ) -> Callable[[Tensor, Tensor], Tensor]:
+        """
+        Returns a velocity field function.
+
+        Args:
+            cond (dict[str, Tensor] | None, optional): Conditioning variables. Defaults to None.
+            gamma_fn (Callable[[Tensor, Tensor], Tensor] | None, optional): Function for computing diffusion coefficient. Defaults to None.
+        
+        Returns:
+            Callable[[Tensor, Tensor], Tensor]: Velocity field function.
+        """
+        # sanity checks
+        if self.config.use_source_as_condition:
+            msg = f""
+            assert source is not None, msg
+
+        def vf_fn(
+            s: Tensor,
+            t: Tensor,
+            xt: Tensor,
+        ) -> Tensor:
+            """"""
+            # when not using cfg
+            return self.forward(s, t, xt, cond=cond, source=source)
+
+        return vf_fn

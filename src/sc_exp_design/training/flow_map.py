@@ -19,11 +19,11 @@ from sc_exp_design.types import TensorLike
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    "CFMTrainer",
+    "FlowMapTrainer",
 ]
 
 
-class CFMTrainer(BaseTrainer):
+class FlowMapTrainer(BaseTrainer):
     """"""
 
     def __init__(
@@ -106,14 +106,14 @@ class CFMTrainer(BaseTrainer):
 
         # retrieving batch size and ode time
         batch_size = target.shape[0]
-        t = self.time_sampler((batch_size,), device=target.device)
+        s, t = self.time_sampler((batch_size,), device=target.device)
 
         # computing flow and target velocity field
         xt = self.flow.compute_x_t(t, latent, target)
         ut = self.flow.compute_u_t(t, latent, target, xt)
 
         # forward pass on the neural vf
-        vt = self.flow_map(t, xt, condition, source=source)
+        vt = self.flow_map(s, t, xt, condition, source=source)
 
         # computing losses
         loss = torch.nn.functional.mse_loss(vt, ut)
