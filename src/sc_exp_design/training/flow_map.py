@@ -10,6 +10,7 @@ from sc_exp_design.constants import DataFields, LossFields, PredictionFields
 
 from sc_exp_design.config.flow_map import NeuralFlowMapConfig
 from sc_exp_design.flows import BaseFlow
+from sc_exp_design.networks import NeuralVelocityField
 from sc_exp_design.networks.flow_map_net import NeuralFlowMap
 from sc_exp_design.ode import push_forward
 from sc_exp_design.training.callbacks import BaseCallBack
@@ -47,6 +48,8 @@ class FlowMapTrainer(BaseTrainer):
         cfg_prob_unconditional: float = 0.1,
         validation_cfg_guidance_strength: float = 1.0,
         num_grad_accumulation_steps: int = 1,
+        velocity_field: NeuralVelocityField | None = None,
+        weight_fn: None | Callable = lambda s, t: 1.0
     ) -> None:
         """"""
         self.flow_map = flow_map
@@ -68,6 +71,8 @@ class FlowMapTrainer(BaseTrainer):
         self.cfg_prob_unconditional = cfg_prob_unconditional
         self.validation_cfg_guidance_strength = validation_cfg_guidance_strength
         self.num_grad_accumulation_steps = num_grad_accumulation_steps 
+        self.velocity_field = velocity_field
+        self.weight_fn = weight_fn
 
     @property
     def model(
@@ -75,6 +80,45 @@ class FlowMapTrainer(BaseTrainer):
     ) -> NeuralFlowMap:
         """"""
         return self.flow_map
+
+    def _compute_loss_distillation(
+        self,
+        s,
+        t,
+        latent,
+        target,
+        condition,
+        source,
+    ):
+        xs = self.flow.compute_x_t(s, latent, target)
+        xts_hat = self.flow_map(s, t, xs, condition, source=source)
+        dXdt = torch.vmap(
+            torch.func.jacrev(
+                self.flow_map, argnums=1
+            )
+        )(s, t, xs)
+        vt = self.velocity_field(t, xts_hat, condition, source=source)
+        # print(f"{dXdt.shape=}, {vt.shape=}")
+        return torch.mean(self.weight_fn(s, t) * ((dXdt - vt)**2).sum(-1))
+
+    def _compute_loss_end_to_end(
+        self,
+        s,
+        t,
+        latent,
+        target,
+        condition,
+        source,
+    ):
+        xt = self.flow.compute_x_t(t, latent, target)
+        ut = self.flow.compute_u_t(t, latent, target, xt)
+        xst_hat = self.flow_map(t, s, xt, condition, source=source)
+        dXdt = torch.vmap(
+            torch.func.jacrev(
+                self.flow_map, argnums=1
+            )
+        )(s, t, xst_hat)
+        return torch.mean(self.weight_fn(s, t) * ((dXdt - ut)**2).sum(-1))
 
     def _train_step(
         self,
@@ -108,15 +152,25 @@ class FlowMapTrainer(BaseTrainer):
         batch_size = target.shape[0]
         s, t = self.time_sampler((batch_size,), device=target.device)
 
-        # computing flow and target velocity field
-        xt = self.flow.compute_x_t(t, latent, target)
-        ut = self.flow.compute_u_t(t, latent, target, xt)
-
-        # forward pass on the neural vf
-        vt = self.flow_map(s, t, xt, condition, source=source)
-
-        # computing losses
-        loss = torch.nn.functional.mse_loss(vt, ut)
+        # distillation
+        if self.velocity_field is not None:
+            loss = self._compute_loss_distillation(
+                s,
+                t,
+                latent,
+                target,
+                condition,
+                source,
+            )
+        else:
+            loss = self._compute_loss_end_to_end(
+                s,
+                t,
+                latent,
+                target,
+                condition,
+                source,
+            )
         return loss, {LossFields.LOSS: loss.detach().cpu().item()}
 
     def __validation_step(

@@ -8,7 +8,7 @@ import torch
 
 from sc_exp_design.constants import DataFields
 from sc_exp_design.data import TrainDataLoader, ValidationDataLoader
-from sc_exp_design.ode import get_initial_state_and_condition
+from sc_exp_design.ode.utils import get_initial_state_and_condition
 from sc_exp_design.training import BaseCallBack
 from sc_exp_design.training.flow_map import FlowMapTrainer
 from sc_exp_design.transforms import Transform
@@ -192,7 +192,7 @@ class FlowMap(FlowMatching):
         msg = "Data not initialized, run `prepare_data` before training the model"
         assert self.train_data is not None, msg
         msg = "Model not initialized, run `prepare_model` before training the model"
-        assert self.velocity_field is not None, msg
+        assert self.flow_map is not None, msg
         if self.cvf_config.use_classifier_free_guidance:
             msg = "The probability of sampling the null condition token must be less than 1 for classifier-free guidance"
             assert cfg_prob_unconditional < 1, msg
@@ -257,8 +257,8 @@ class FlowMap(FlowMatching):
     def predict(
         self,
         batch: dict[str, torch.Tensor | dict[str, torch.Tensor]],
-        time_steps: torch.Tensor | None,
-        num_steps: int = 1,
+        time_steps: torch.Tensor | None = None,
+        num_steps: int = 2,
         return_trajectory: bool = False,
         no_grad: bool = True,
         num_samples: int | None = None,
@@ -371,6 +371,7 @@ class FlowMap(FlowMatching):
         # prepare time steps
         if time_steps is None:
             time_steps = torch.linspace(0.0, 1.0, num_steps)
+            # print(f"{time_steps=}")
         
         X_s = initial_state
         traj = [X_s]

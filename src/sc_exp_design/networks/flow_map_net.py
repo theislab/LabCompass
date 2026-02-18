@@ -120,7 +120,7 @@ class NeuralFlowMap(BaseModule):
         self,
         s: Tensor,
         t: Tensor,
-        xt: Tensor,
+        xs: Tensor,
         cond: dict[str, Tensor] | None = None,
         source: Tensor | None = None,
     ) -> Tensor:
@@ -130,7 +130,7 @@ class NeuralFlowMap(BaseModule):
         Args:
             s (Tensor): Start Time input.
             t (Tensor): End Time input.
-            xt (Tensor): State input.
+            xs (Tensor): State input.
             cond (dict[str, Tensor] | None, optional): Conditioning variables. Defaults to None.
             source (Tensor | None, optional): Source state for perturbation inference. Defaults to None.
             target (Tensor | None, optional): Target state for perturbation inference. Defaults to None.
@@ -181,9 +181,9 @@ class NeuralFlowMap(BaseModule):
             condition_latent = torch.concatenate(cond_values, dim=-1)
         
         # encoding states
-        xt_latent = xt
+        xt_latent = xs
         if self.config.encode_state:
-            xt_latent = self.vf_modules["x_encoder"](xt)
+            xt_latent = self.vf_modules["x_encoder"](xs)
 
         # concatenating original and latent representations
         if self.config.conditioning_type == "concatenation":
@@ -234,7 +234,7 @@ class NeuralFlowMap(BaseModule):
 
         # forward pass on neural velocity field
         res = self.vf_modules["decoder"](latent_concat)
-        return xt  + (t - s)*res
+        return xs  + (t - s)*res
 
     def get_condition_embedding(
         self,
@@ -281,10 +281,10 @@ class NeuralFlowMap(BaseModule):
         def vf_fn(
             s: Tensor,
             t: Tensor,
-            xt: Tensor,
+            xs: Tensor,
         ) -> Tensor:
             """"""
             # when not using cfg
-            return self.forward(s, t, xt, cond=cond, source=source)
+            return self.forward(s, t, xs, cond=cond, source=source)
 
         return vf_fn
