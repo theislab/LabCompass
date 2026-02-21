@@ -82,24 +82,30 @@ class FlowMapTrainer(BaseTrainer):
         return self.flow_map
 
     def _compute_loss_distillation(
-        self,
-        s,
-        t,
-        latent,
-        target,
-        condition,
-        source,
-    ):
-        xs = self.flow.compute_x_t(s, latent, target)
-        xts_hat = self.flow_map(s, t, xs, condition, source=source)
-        dXdt = torch.vmap(
-            torch.func.jacrev(
-                self.flow_map, argnums=1
-            )
-        )(s, t, xs)
-        vt = self.velocity_field(t, xts_hat, condition, source=source)
-        # print(f"{dXdt.shape=}, {vt.shape=}")
-        return torch.mean(self.weight_fn(s, t) * ((dXdt - vt)**2).sum(-1))
+            self,
+            s,
+            t,
+            latent,
+            target,
+            condition,
+            source,
+        ):
+            xs = self.flow.compute_x_t(s, latent, target)
+            
+            def fmap_single(s_val, t_val, x_val):
+                return self.flow_map(s_val, t_val, x_val, condition, source=source)
+
+            xts_hat, dXdt = torch.vmap(
+                lambda s_i, t_i, x_i: torch.func.jvp(
+                    fmap_single, 
+                    (s_i, t_i, x_i), 
+                    (torch.zeros_like(s_i), torch.ones_like(t_i), torch.zeros_like(x_i))
+                )
+            )(s, t, xs)
+            
+            vt = self.velocity_field(t, xts_hat, condition, source=source)
+            
+            return torch.mean(self.weight_fn(s, t) * ((dXdt - vt)**2).sum(-1))
 
     def _compute_loss_end_to_end(
         self,
