@@ -271,17 +271,6 @@ class NeuralFlowMap(BaseModule):
         return condition_latent
 
     def get_map_fn(self, cond=None, source=None):
-        # Extract the module's state
-        params = dict(self.named_parameters())
-        buffers = dict(self.named_buffers())
-
-        def vf_fn_functional(s, t, xs, params_arg=None):
-            # Pass params_arg into the model explicitly
-            return functional_call(
-                self,
-                (params_arg, buffers), 
-                args=(s, t, xs), 
-                kwargs={'cond': cond, 'source': source},
-            )
-
-        return partial(vf_fn_functional, params_arg=params)
+        def flow_map_fn(s, t, xs):
+            return self.forward(s, t, xs, cond=cond, source=source)
+        return flow_map_fn
