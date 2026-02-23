@@ -1,9 +1,11 @@
 import itertools
+from functools import partial
 import logging
 from collections.abc import Callable, Iterator
 
 import torch
 from torch import Tensor, nn
+from torch.func import functional_call
 
 from sc_exp_design.constants import VFStepFields
 from sc_exp_design.networks.blocks import BaseModule, ConditionEncoder, MLPBlock, ResnetBlock, FiLMBlock
@@ -268,33 +270,18 @@ class NeuralFlowMap(BaseModule):
         condition_latent = self.vf_modules["condition_encoder"](cond)
         return condition_latent
 
-    def get_map_fn(
-        self,
-        cond: dict[str, Tensor] | None = None,
-        source: Tensor | None = None,
-    ) -> Callable[[Tensor, Tensor], Tensor]:
-        """
-        Returns a velocity field function.
+    def get_map_fn(self, cond=None, source=None):
+        # Extract the module's state
+        params = dict(self.named_parameters())
+        buffers = dict(self.named_buffers())
 
-        Args:
-            cond (dict[str, Tensor] | None, optional): Conditioning variables. Defaults to None.
-            gamma_fn (Callable[[Tensor, Tensor], Tensor] | None, optional): Function for computing diffusion coefficient. Defaults to None.
-        
-        Returns:
-            Callable[[Tensor, Tensor], Tensor]: Velocity field function.
-        """
-        # sanity checks
-        if self.config.use_source_as_condition:
-            msg = f""
-            assert source is not None, msg
+        def vf_fn_functional(s, t, xs, params_arg=None):
+            # Pass params_arg into the model explicitly
+            return functional_call(
+                self,
+                (params_arg, buffers), 
+                args=(s, t, xs), 
+                kwargs={'cond': cond, 'source': source},
+            )
 
-        def vf_fn(
-            s: Tensor,
-            t: Tensor,
-            xs: Tensor,
-        ) -> Tensor:
-            """"""
-            # when not using cfg
-            return self.forward(s, t, xs, cond=cond, source=source)
-
-        return vf_fn
+        return partial(vf_fn_functional, params_arg=params)
