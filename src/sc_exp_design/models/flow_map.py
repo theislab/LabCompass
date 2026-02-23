@@ -142,6 +142,7 @@ class FlowMap(FlowMatching):
         num_grad_accumulation_steps: int = 1,
         close_wandb_connection: bool = True,
         velocity_field: NeuralVelocityField | None = None,
+        weight_fn: None | Callable = lambda s, t: 1.0,
     ) -> None:
         """Trains the model.
 
@@ -223,7 +224,8 @@ class FlowMap(FlowMatching):
             cfg_prob_unconditional=self.cfg_prob_unconditional,
             validation_cfg_guidance_strength=self.validation_cfg_guidance_strength,
             num_grad_accumulation_steps=num_grad_accumulation_steps,
-            velocity_field=velocity_field
+            velocity_field=velocity_field,
+            weight_fn=weight_fn,
         )
 
         self.train_dataloader = TrainDataLoader(

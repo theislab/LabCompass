@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Literal
 
 from sc_exp_design.config.velocity_field import NeuralVelocityFieldConfig
 
@@ -6,6 +7,9 @@ from sc_exp_design.config.velocity_field import NeuralVelocityFieldConfig
 
 @dataclass(slots=True)
 class NeuralFlowMapConfig(NeuralVelocityFieldConfig):
+
+    reparametrization_type: Literal["none", "residual", "redisual-rescaled"] = "residual"
+
     @property
     def decoder_input_dim(
         self,

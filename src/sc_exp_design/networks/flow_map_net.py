@@ -234,7 +234,17 @@ class NeuralFlowMap(BaseModule):
 
         # forward pass on neural velocity field
         res = self.vf_modules["decoder"](latent_concat)
-        return xs  + (t - s)*res
+
+        # handle reparametrization
+        if self.config.reparametrization_type == "none":
+            return res
+        elif self.config.reparametrization_type == "residual":
+            return xs  + (t - s)*res
+        elif self.config.reparametrization_type == "redisual-rescaled":
+            return (1 - (t - s))*xs  + (t - s)*res
+        else:
+            msg = f"{self.config.reparametrization_type} not supported"
+            raise ValueError(msg)
 
     def get_condition_embedding(
         self,

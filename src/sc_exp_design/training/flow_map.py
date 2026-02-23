@@ -49,7 +49,7 @@ class FlowMapTrainer(BaseTrainer):
         validation_cfg_guidance_strength: float = 1.0,
         num_grad_accumulation_steps: int = 1,
         velocity_field: NeuralVelocityField | None = None,
-        weight_fn: None | Callable = lambda s, t: 1.0
+        weight_fn: None | Callable = lambda s, t: 1.0,
     ) -> None:
         """"""
         self.flow_map = flow_map
@@ -90,21 +90,19 @@ class FlowMapTrainer(BaseTrainer):
             condition,
             source,
         ):
+            # sample ground truth interpolant
             xs = self.flow.compute_x_t(s, latent, target)
-            
-            def fmap_single(s_val, t_val, x_val):
-                return self.flow_map(s_val, t_val, x_val, condition, source=source)
-
+    
+            # forward pass on neural networks
             xts_hat, dXdt = torch.vmap(
-                lambda s_i, t_i, x_i: torch.func.jvp(
-                    fmap_single, 
-                    (s_i, t_i, x_i), 
-                    (torch.zeros_like(s_i), torch.ones_like(t_i), torch.zeros_like(x_i))
+                lambda s_i, t_i, xs_i: torch.func.jvp(
+                    self.flow_map.get_map_fn(condition=condition, source=source), 
+                    (s_i, t_i, xs_i),
+                    (torch.zeros_like(s_i), torch.ones_like(t_i), torch.zeros_like(xs_i)),
                 )
             )(s, t, xs)
-            
             vt = self.velocity_field(t, xts_hat, condition, source=source)
-            
+    
             return torch.mean(self.weight_fn(s, t) * ((dXdt - vt)**2).sum(-1))
 
     def _compute_loss_end_to_end(
@@ -116,14 +114,20 @@ class FlowMapTrainer(BaseTrainer):
         condition,
         source,
     ):
+        # sample ground truth interpolant and compute corresponding velocity field
         xt = self.flow.compute_x_t(t, latent, target)
         ut = self.flow.compute_u_t(t, latent, target, xt)
+    
+        # forward pass on neural networks
         xst_hat = self.flow_map(t, s, xt, condition, source=source)
-        dXdt = torch.vmap(
-            torch.func.jacrev(
-                self.flow_map, argnums=1
+        _, dXdt = torch.vmap(
+            lambda s_i, t_i, xs_i: torch.func.jvp(
+                self.flow_map.get_map_fn(condition=condition, source=source), 
+                (s_i, t_i, xs_i),
+                (torch.zeros_like(s_i), torch.ones_like(t_i), torch.zeros_like(xs_i)),
             )
         )(s, t, xst_hat)
+
         return torch.mean(self.weight_fn(s, t) * ((dXdt - ut)**2).sum(-1))
 
     def _train_step(
