@@ -372,8 +372,7 @@ class FlowMap(FlowMatching):
 
         # prepare time steps
         if time_steps is None:
-            time_steps = torch.linspace(0.0, 1.0, num_steps)
-            # print(f"{time_steps=}")
+            time_steps = torch.linspace(0.0, 1.0, num_steps+1)
         
         X_s = initial_state
         traj = [X_s]

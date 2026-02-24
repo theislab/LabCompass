@@ -129,7 +129,6 @@ class FlowMapTrainer(BaseTrainer):
         )(s, t, xst_hat)
 
         loss = torch.mean(self.weight_fn(s, t) * ((dXdt - ut)**2).sum(-1))
-        print(f"{loss=}")
         return loss
 
     def _train_step(
