@@ -33,8 +33,8 @@ class FlowMap(FlowMatching):
     ) -> None:
         if time_sampler is None:
             def time_sampler(shape, **kwargs):
-                s = torch.randn(shape, **kwargs)
-                t = torch.randn(shape, **kwargs)
+                s = torch.rand(shape, **kwargs)
+                t = torch.rand(shape, **kwargs)
                 return s, t
         super().__init__(
             flow_type=flow_type,
