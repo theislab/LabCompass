@@ -270,7 +270,15 @@ class NeuralFlowMap(BaseModule):
         condition_latent = self.vf_modules["condition_encoder"](cond)
         return condition_latent
 
-    def get_map_fn(self, cond=None, source=None):
-        def flow_map_fn(s, t, xs):
+    def get_map_fn(
+        self,
+        cond: dict[str, Tensor] | None = None,
+        source: Tensor | None = None
+    ) -> Callable[[Tensor, Tensor, Tensor], Tensor]:
+        def flow_map_fn(
+            s: Tensor,
+            t: Tensor,
+            xs:Tensor
+        ) -> Tensor:
             return self.forward(s, t, xs, cond=cond, source=source)
         return flow_map_fn

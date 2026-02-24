@@ -82,38 +82,38 @@ class FlowMapTrainer(BaseTrainer):
         return self.flow_map
 
     def _compute_loss_distillation(
-            self,
-            s,
-            t,
-            latent,
-            target,
-            condition,
-            source,
-        ):
-            # sample ground truth interpolant
-            xs = self.flow.compute_x_t(s, latent, target)
+        self,
+        s: torch.Tensor,
+        t: torch.Tensor,
+        latent: torch.Tensor,
+        target: torch.Tensor,
+        condition: dict[str, torch.Tensor] | None,
+        source: torch.Tensor | None,
+    ) -> torch.Tensor:
+        # sample ground truth interpolant
+        xs = self.flow.compute_x_t(s, latent, target)
 
-            # forward pass on neural networks with jvp
-            xts_hat, dXdt = torch.vmap(
-                lambda s_i, t_i, xs_i: torch.func.jvp(
-                    self.flow_map.get_map_fn(condition, source=source), 
-                    (s_i, t_i, xs_i),
-                    (torch.zeros_like(s_i), torch.ones_like(t_i), torch.zeros_like(xs_i)),
-                )
-            )(s, t, xs)
-            vt = self.velocity_field(t, xts_hat, condition, source=source)
+        # forward pass on neural networks with jvp
+        xts_hat, dXdt = torch.vmap(
+            lambda s_i, t_i, xs_i: torch.func.jvp(
+                self.flow_map.get_map_fn(condition, source=source), 
+                (s_i, t_i, xs_i),
+                (torch.zeros_like(s_i), torch.ones_like(t_i), torch.zeros_like(xs_i)),
+            )
+        )(s, t, xs)
+        vt = self.velocity_field(t, xts_hat, condition, source=source)
 
-            return torch.mean(self.weight_fn(s, t) * ((dXdt - vt)**2).sum(-1))
+        return torch.mean(self.weight_fn(s, t) * ((dXdt - vt)**2).sum(-1))
 
     def _compute_loss_end_to_end(
         self,
-        s,
-        t,
-        latent,
-        target,
-        condition,
-        source,
-    ):
+        s: torch.Tensor,
+        t: torch.Tensor,
+        latent: torch.Tensor,
+        target: torch.Tensor,
+        condition: dict[str, torch.Tensor] | None,
+        source: torch.Tensor | None,
+    ) -> torch.Tensor:
         # sample ground truth interpolant and compute corresponding velocity field
         xt = self.flow.compute_x_t(t, latent, target)
         ut = self.flow.compute_u_t(t, latent, target, xt)
