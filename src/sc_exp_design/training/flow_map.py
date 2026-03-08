@@ -94,15 +94,14 @@ class FlowMapTrainer(BaseTrainer):
         xs = self.flow.compute_x_t(s, latent, target)
 
         # forward pass on neural networks with jvp
-        xts_hat, dXdt = torch.vmap(
-            lambda s_i, t_i, xs_i: torch.func.jvp(
-                self.flow_map.get_map_fn(condition, source=source), 
-                (s_i, t_i, xs_i),
-                (torch.zeros_like(s_i), torch.ones_like(t_i), torch.zeros_like(xs_i)),
-            )
-        )(s, t, xs)
-        vt = self.velocity_field(t, xts_hat, condition, source=source)
-
+        xts_hat, dXdt = torch.func.jvp(
+            self.flow_map.get_map_fn(condition, source=source), 
+            (s, t, xs),
+            (torch.zeros_like(s), torch.ones_like(t), torch.zeros_like(xs)),
+        )
+        # evaluate vf
+        vf_fn = self.velocity_field.get_vf_fn(condition, source=source)
+        vt = vf_fn(t, xts_hat)
         return torch.mean(self.weight_fn(s, t) * ((dXdt - vt)**2).sum(-1))
 
     def _compute_loss_end_to_end(
@@ -120,13 +119,11 @@ class FlowMapTrainer(BaseTrainer):
     
         # forward pass on neural networks
         xst_hat = self.flow_map(t, s, xt, condition, source=source)
-        _, dXdt = torch.vmap(
-            lambda s_i, t_i, xs_i: torch.func.jvp(
-                self.flow_map.get_map_fn(condition, source=source), 
-                (s_i, t_i, xs_i),
-                (torch.zeros_like(s_i), torch.ones_like(t_i), torch.zeros_like(xs_i)),
-            )
-        )(s, t, xst_hat)
+        _, dXdt = torch.func.jvp(
+            self.flow_map.get_map_fn(condition, source=source), 
+            (s, t, xst_hat),
+            (torch.zeros_like(s), torch.ones_like(t), torch.zeros_like(xst_hat)),
+        )
 
         loss = torch.mean(self.weight_fn(s, t) * ((dXdt - ut)**2).sum(-1))
         return loss

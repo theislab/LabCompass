@@ -5,7 +5,7 @@ from torchdiffeq import odeint
 
 from sc_exp_design.utils import match_shapes
 from sc_exp_design.networks import NeuralVelocityField
-from sc_exp_design.models import FlowMatching
+from sc_exp_design.models import FlowMatching, FlowMap
 
 
 __all__ = ["LossGuidedFlow"]
@@ -15,8 +15,10 @@ class LossGuidedFlow:
     def __init__(
         self,
         prior_flow: FlowMatching,
+        prior_flow_map: FlowMap | None = None
     ) -> None:
         self.prior_flow = prior_flow
+        self.prior_flow_map = prior_flow_map
 
     def compute_one_step_prediction(
         self,
@@ -27,6 +29,13 @@ class LossGuidedFlow:
         cfg_guidance_strength=1.0
     ):
         # computing velocity field
+        if self.prior_flow_map is not None:
+            t_input = t[..., 0]
+            return self.prior_flow_map.flow_map(
+                t_input,
+                torch.ones_like(t_input),
+                xt
+            )
         t = match_shapes(t, xt)
         vf_fn = self.prior_vf.get_vf_fn(
             cond=cond,
