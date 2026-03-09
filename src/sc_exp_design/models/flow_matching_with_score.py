@@ -116,6 +116,7 @@ class FlowMatchingWithScore(FlowMatching):
         validation_cfg_guidance_strength: float = 1.0,
         num_grad_accumulation_steps: int = 1,
         close_wandb_connection: bool = True,
+        sample_groups: bool = False,
     ) -> None:
         """Trains the model.
 
@@ -206,6 +207,7 @@ class FlowMatchingWithScore(FlowMatching):
             state_transforms=self.state_transforms,
             device_id=self.device_id,
             has_controls=self.data_manager.has_controls,
+            sample_groups=sample_groups,
         )
 
         self.validation_dataloader = None

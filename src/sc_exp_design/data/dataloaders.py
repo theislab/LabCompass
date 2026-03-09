@@ -273,7 +273,8 @@ class TrainDataLoader(BaseCoupledDataLoader):
         batch_size: int,
         state_transforms: Transform | None = None,
         device_id: Literal["cuda", "cpu"] = "cuda",
-        has_controls: bool = True
+        has_controls: bool = True,
+        sample_groups: bool = False,
     ) -> None:
         """
         Initializes the training data loader.
@@ -304,6 +305,7 @@ class TrainDataLoader(BaseCoupledDataLoader):
         self.state_transforms = state_transforms
         self.device = torch.device(self.device_id)
         self.has_controls = has_controls
+        self.sample_groups = sample_groups
 
     def __sample_perturbation_id(
         self,
@@ -332,7 +334,7 @@ class TrainDataLoader(BaseCoupledDataLoader):
         """
         # sampling treatments for current batch needed for OT couplings when we sample only one condition per batch
         treatments = None
-        if isinstance(self.coupling, OTCoupling):
+        if isinstance(self.coupling, OTCoupling) or self.sample_groups:
             treatments = self.__sample_perturbation_id()
 
         # control states

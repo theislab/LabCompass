@@ -143,6 +143,7 @@ class FlowMap(FlowMatching):
         close_wandb_connection: bool = True,
         velocity_field: NeuralVelocityField | None = None,
         weight_fn: None | Callable = lambda s, t: 1.0,
+        sample_groups: bool = False,
     ) -> None:
         """Trains the model.
 
@@ -235,6 +236,7 @@ class FlowMap(FlowMatching):
             state_transforms=self.state_transforms,
             device_id=self.device_id,
             has_controls=self.data_manager.has_controls,
+            sample_groups=sample_groups,
         )
 
         self.validation_dataloader = None
