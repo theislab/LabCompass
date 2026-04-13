@@ -23,3 +23,10 @@ class NeuralFlowMapConfig(NeuralVelocityFieldConfig):
         # film block
         elif self.conditioning_type == "film":
             return self.state_latent_dim + self.time_latent_dim*2
+
+    @property
+    def resnet_embedding_dim(
+        self,
+    ) -> int:
+        """Returns the dimensionality of the residual network condition embedding."""
+        return self.time_latent_dim*2 + self.perturbation_latent_dim + self.source_latent_dim

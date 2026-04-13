@@ -12,7 +12,7 @@ from sc_exp_design.config.flow_map import NeuralFlowMapConfig
 from sc_exp_design.flows import BaseFlow
 from sc_exp_design.networks import NeuralVelocityField
 from sc_exp_design.networks.flow_map_net import NeuralFlowMap
-from sc_exp_design.ode import push_forward
+from sc_exp_design.ode import get_initial_state_and_condition
 from sc_exp_design.training.callbacks import BaseCallBack
 from sc_exp_design.training.base import BaseTrainer
 from sc_exp_design.types import TensorLike
@@ -196,22 +196,37 @@ class FlowMapTrainer(BaseTrainer):
         condition = None
         if DataFields.PERTURBATION_DATA in perturbation_batch.keys():
             condition = perturbation_batch[DataFields.PERTURBATION_DATA]
-        # pushing forward the particles
-        predictions = push_forward(
-            self.flow_map,
+        # pushing forward particles
+        initial_state, condition = get_initial_state_and_condition(
             source,
+            target.shape[0],
+            self.num_samples_per_validation_step,
+            self.flow_map.config.flow_dim,
             condition,
-            self.generate_from_noise,
             self.noise_distribution,
-            self.num_time_steps,
-            self.solver_kwargs,
             self.device_id,
-            return_trajectory=False,
-            no_grad=True,
-            num_samples=self.num_samples_per_validation_step,
-            batch_size=target.shape[0],
-            cfg_guidance_strength=self.validation_cfg_guidance_strength,
+            self.generate_from_noise,
         )
+
+        # get map fn
+        map_fn = self.flow_map.get_map_fn(
+            condition,
+            source=source
+        )
+
+        # prepare time steps
+        time_steps = torch.linspace(0.0, 1.0, self.num_time_steps+1)
+        
+        X_s = initial_state
+        traj = [X_s]
+        for idx, s in enumerate(time_steps[:-1]):
+            t = time_steps[idx + 1]
+            s_tensor = torch.ones([*initial_state.shape[:-1]], device=self.device_id).float()*s
+            t_tensor = torch.ones([*initial_state.shape[:-1]], device=self.device_id).float()*t
+            X_s = map_fn(s_tensor, t_tensor, X_s)
+            traj.append(X_s)
+        predictions = X_s
+
         if self.num_samples_per_validation_step is None:
             return predictions, target
         # handling number of samples

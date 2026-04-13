@@ -10,7 +10,7 @@ from sc_exp_design.types import TensorLike
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["push_forward"]
+__all__ = ["get_initial_state_and_condition", "push_forward"]
 
 
 def get_initial_state_and_condition(
