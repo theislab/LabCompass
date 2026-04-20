@@ -454,7 +454,7 @@ class FlowMatching(BaseModel):
             if (source is not None) and (condition is not None):
                 # sanity check
                 for condition_covariate, condition_data in condition.items():
-                    msg = f""
+                    msg = f"{condition_covariate=} -> {condition_data.shape=} | {source.shape}"
                     assert condition_data.shape[:-1] == source.shape[:-1], msg
                 batch_size = source.shape[:-1]
             # when we only have the source states (unconditional generation)

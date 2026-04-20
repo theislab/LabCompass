@@ -161,7 +161,10 @@ class MLPBlock(BaseModule):
         :return: Tensor of shape `(batch_size, self.output_dim)`
         :rtype: class:`torch.Tensor`
         """
-        return self.net(input_tensor)
+        original_shape = input_tensor.shape[:-1]
+        input_tensor = input_tensor.reshape(-1, input_tensor.shape[-1])
+        y = self.net(input_tensor)
+        return y.reshape(*original_shape, -1)
 
 
 class CategoricalEmbedder(BaseModule):
