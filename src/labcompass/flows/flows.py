@@ -39,7 +39,7 @@ class BaseFlow(abc.ABC, nn.Module):
         source: Tensor,
         target: Tensor,
     ) -> Tensor:
-        """
+        r"""
         Computes the mean function \( \mu_t \) for the flow transformation at time `t`.
 
         :param t: Time variable tensor.
@@ -61,7 +61,7 @@ class BaseFlow(abc.ABC, nn.Module):
         self,
         t: Tensor,
     ) -> Tensor:
-        """
+        r"""
         Computes the standard deviation function \( \sigma_t \) at time `t`.
 
         :param t: Time variable tensor.
@@ -78,7 +78,7 @@ class BaseFlow(abc.ABC, nn.Module):
         source: Tensor,
         target: Tensor,
     ) -> Tensor:
-        """
+        r"""
         Computes the latent representation \( x_t \) at time `t`.
 
         :param t: Time variable tensor.
@@ -110,7 +110,7 @@ class BaseFlow(abc.ABC, nn.Module):
         target: Tensor,
         xt: Tensor,
     ) -> Tensor:
-        """
+        r"""
         Computes the score function \( \nabla log p(x_t) \) at time `t`.
 
         :param t: Time variable tensor.
@@ -146,7 +146,7 @@ class BaseFlow(abc.ABC, nn.Module):
         target: Tensor,
         xt: Tensor | None = None,
     ) -> Tensor:
-        """
+        r"""
         Computes the drift function \( u_t \) at time `t`.
 
         :param t: Time variable tensor.
