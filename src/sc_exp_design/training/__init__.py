@@ -4,7 +4,8 @@ from sc_exp_design.training.callbacks import (
     WandBLogger,
     TrainingCallBacks
 )
-from sc_exp_design.training.inverse import TargetPredictionTrainer, InverseModelTrainer
+from sc_exp_design.training.inverse import InverseModelTrainer
+from sc_exp_design.training.target_prediction import TargetPredictionTrainer
 from sc_exp_design.training.flow_matching import CFMTrainer
 from sc_exp_design.training.utils import (
     binary_classification_loss,

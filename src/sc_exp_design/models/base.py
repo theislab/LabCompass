@@ -28,7 +28,7 @@ class BaseModel:
         # defining path
         dump_path = os.path.join(dump_dir, file_name)
 
-        # checking that the file exists
+        # checking that the fixle exists
         if os.path.exists(dump_path):
             if not overwrite:
                 msg = f""
@@ -49,7 +49,7 @@ class BaseModel:
         # loading model file
         with open(file_name, "rb") as fp:
             model = cloudpickle.load(fp)
-
+        
         # veriying types
         if type(model) is not cls:
             msg = f""

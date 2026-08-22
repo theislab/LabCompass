@@ -68,9 +68,9 @@ def maximum_mean_discrepancy(
     """
     # moving to numpy in case inputs are tensors
     if isinstance(pred, torch.Tensor):
-        pred = pred.numpy()
+        pred = pred.detach().cpu().numpy()
     if isinstance(target, torch.Tensor):
-        target = target.numpy()
+        target = target.detach().cpu().numpy()
     # computing mmd
     xx = rbf_kernel(pred, pred, gamma)
     xy = rbf_kernel(pred, target, gamma)

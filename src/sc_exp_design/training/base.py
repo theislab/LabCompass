@@ -89,6 +89,7 @@ class BaseTrainer(abc.ABC):
         train_dataloader: BaseDataLoader,
         validation_dataloader: BaseDataLoader | None = None,
         valid_freq: int | None = None,
+        close_wandb_connection: bool = True,
     ) -> None:
         """"""
 
@@ -137,7 +138,7 @@ class BaseTrainer(abc.ABC):
                     self.__update_logs(metrics)
 
                 # running callbacks
-        if self.callbacks is not None:
+        if self.callbacks is not None and close_wandb_connection:
             self.callbacks.run_on_train_end()
 
 

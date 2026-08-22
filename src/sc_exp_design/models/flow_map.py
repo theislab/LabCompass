@@ -1,68 +1,24 @@
 import logging
 import os
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Sequence, Mapping
 from typing import Any, Literal
 
+
 import torch
-from anndata import AnnData
-from torch import Tensor
 
 from sc_exp_design.constants import DataFields
-from sc_exp_design.config.velocity_field import NeuralVelocityFieldConfig
-from sc_exp_design.couplings import (
-    IndependentCoupling,
-    OTCoupling,
-)
-from sc_exp_design.data import DataManager, TrainDataLoader, ValidationDataLoader
-from sc_exp_design.flows import (
-    ConstantNoiseFlow,
-    EncodingDecodingFlow,
-    RectifiedFlow,
-    VariancePreservingFlow,
-)
-from sc_exp_design.models.base import BaseModel
-from sc_exp_design.networks import NeuralVelocityField
-from sc_exp_design.ode import push_forward
-from sc_exp_design.training import BaseCallBack, CFMTrainer
+from sc_exp_design.data import TrainDataLoader, ValidationDataLoader
+from sc_exp_design.ode.utils import get_initial_state_and_condition
+from sc_exp_design.training import BaseCallBack
+from sc_exp_design.training.flow_map import FlowMapTrainer
 from sc_exp_design.transforms import Transform
+from sc_exp_design.config.flow_map import NeuralFlowMapConfig
+from sc_exp_design.models import FlowMatching
+from sc_exp_design.networks import NeuralVelocityField
+from sc_exp_design.networks.flow_map_net import NeuralFlowMap
 
-logger = logging.getLogger(__name__)
 
-__all__ = ["FlowMatching"]
-
-
-class FlowMatching(BaseModel):
-    """Initializes the :class:`FlowMatching` model.
-
-    :param flow_type: String identifier for the flow used to define the target dynamics, defaults to `"rectified"`.
-    :type flow_type: class:`Literal["constant_noise", "encoding_decoding", "rectified", "variance_preserving"]`
-
-    :param flow_kwargs: Dictionary containing the keyword arguments passed to the flow for its initialization.
-        Refer to the :module:`sc_exp_design.flows` page for the available flows and their respective keyword arguments.
-        Defaults to `None`.
-    :type flow_kwargs: class:`dict[str, Any] | None`
-
-    :param coupling_type: The coupling used to sample source and terminal states from the dataset, defaults to `"ot"`
-    :type coupling_type: class:`Literal["independent", "ot"]`
-
-    :param coupling_kwargs: Dictionary containing the keyword arguments passed to the coupling for its initialization.
-        Refer to the :module:`sc_exp_design.couplings` page for the available couplings and their respective keyword arguments.
-        Defaults to `None`.
-    :type coupling_kwargs: class:`dict[str, Any] | None`
-
-    :param time_sampler: Function used to sample time steps during training, defaults to `torch.rand` (i.e.: Uniform sampling).
-    :type time_sampler: class:`Callable[[Sequence[int], Any], Tensor]`
-
-    :param device_id: The identifier for the device where to do the computations, defaults to `"cuda"`.
-    :type device_id: class:`Literal["cuda", "cpu"]`
-    
-    :param generate_from_noise: Controls if the source samples are Gaussian (True) or control cells (False).
-    :type num_training_steps: class:`bool`
-
-    :param noise_distribution: Function used to sample initial states when generating from noise.
-        Only used when :param: `generate_from_noise` is set to `True`. Defaults to `torch.randn` (i.e.: Standard Gaussian).
-    :type noise_distribution: class:`Callable[[Sequence[int], Any], Tensor]`
-    """
+class FlowMap(FlowMatching):
 
     def __init__(
         self,
@@ -70,119 +26,30 @@ class FlowMatching(BaseModel):
         flow_kwargs: dict[str, Any] | None = None,
         coupling_type: Literal["independent", "ot"] = "ot",
         coupling_kwargs: dict[str, Any] | None = None,
-        time_sampler: Callable[[Sequence[int], Any], Tensor] = torch.rand,
+        time_sampler: Callable[[Sequence[int], Any], torch.Tensor] | None = None,
         device_id: Literal["cuda", "cpu"] = "cuda",
         generate_from_noise: bool = False,
-        noise_distribution: Callable[[Sequence[int]], Tensor] = torch.randn,
+        noise_distribution: Callable[[Sequence[int]], torch.Tensor] = torch.randn,
     ) -> None:
-        # initialize the Flow model 
-        if flow_type == "constant_noise":
-            flow_class = ConstantNoiseFlow
-        elif flow_type == "encoding_decoding":
-            flow_class = EncodingDecodingFlow
-        elif flow_type == "rectified":
-            flow_class = RectifiedFlow
-        elif flow_type == "variance_preserving":
-            flow_class = VariancePreservingFlow
-        else:
-            msg = f""
-            raise ValueError(msg)
-        # setting optional flow kwargs
-        if flow_kwargs is None:
-            flow_kwargs = {}
-        self.flow = flow_class(**flow_kwargs)
-
-        # initialize the coupling logic 
-        if coupling_type == "independent":
-            coupling_class = IndependentCoupling
-        elif coupling_type == "ot":
-            coupling_class = OTCoupling
-        else:
-            msg = f""
-            raise ValueError(msg)
-        # setting optional coupling kwargs
-        if coupling_kwargs is None:
-            coupling_kwargs = {}
-        self.coupling = coupling_class(**coupling_kwargs)
-
-        self.time_sampler = time_sampler
-
-        if generate_from_noise:
-            if flow_type != "rectified":
-                msg = f"When generating from noise, using the {flow_type} probability paths breaks the marginal preserving property of the generative model."
-                logger.warning(msg)
-        self.generate_from_noise = generate_from_noise
-        self.noise_distribution = noise_distribution
-
-        self.device_id = device_id
-        self.device = torch.device(self.device_id)
-
-        self.data_manager = None
-        self.train_data = None
-        self.validation_data = {}
-
-    def prepare_train_data(
-        self,
-        train_adata: AnnData,
-        sample_rep: str | None = None,
-        control_key: str | None = None,
-        perturbations: str | Sequence[str] | None = None,
-        perturbations_in_obsm: dict[str, bool] | None = None,
-        perturbation_covariates: dict[str, str | Sequence[str]] | None = None,
-        perturbation_reps: dict[str, str | Sequence[str]] | None = None,
-        load_target_covariates: bool = False,
-        target_covariates: dict[str, Literal["one_hot", "label", "identity"] | None] | None = None,
-        target_covariates_in_obsm: dict[str, bool] | None = None,
-        target_covariates_kwargs: dict[str, Any] | None = None,
-    ) -> None:
-        """
-        Prepares the training data using the :class: `DataManager` object.
-
-        Refer to the :class: `DataManager` documentations for an explaination of each argument.
-        It inferes automatically the presence of control cells from :param: `control_key`.
-        Once initialized the :class: `DataManager` class, it calls the :method: `DataManager.get_data` method to
-        retrieve a structured representation of the analyzed dataset.
-        """
-        # sanity check when considering perturbation in .obsm 
-        if isinstance(self.coupling, OTCoupling) and perturbations_in_obsm is not None:
-            msg = "With perturbations in obsm the coupling must be independent"
-            raise ValueError(msg)
-        
-        data_manager = DataManager(
-            train_adata,
-            sample_rep=sample_rep,
-            control_key=control_key,
-            perturbations=perturbations,
-            perturbations_in_obsm=perturbations_in_obsm,
-            perturbation_covariates=perturbation_covariates,
-            perturbation_reps=perturbation_reps,
-            load_target_covariates=load_target_covariates,
-            target_covariates=target_covariates,
-            target_covariates_in_obsm=target_covariates_in_obsm,
-            target_covariates_kwargs=target_covariates_kwargs,
+        if time_sampler is None:
+            def time_sampler(shape, **kwargs):
+                s = torch.rand(shape, **kwargs)
+                t = torch.rand(shape, **kwargs)
+                return s, t
+        super().__init__(
+            flow_type=flow_type,
+            flow_kwargs=flow_kwargs,
+            coupling_type=coupling_type,
+            coupling_kwargs=coupling_kwargs,
+            time_sampler=time_sampler,
+            device_id=device_id,
+            generate_from_noise=generate_from_noise,
+            noise_distribution=noise_distribution,
         )
-        train_data = data_manager.get_data(train_adata)
-
-        self.data_manager = data_manager
-        self.train_data = train_data
-
-    def prepare_validation_data(
-        self,
-        name: str,
-        validation_adata: AnnData,
-    ) -> None:
-        """Prepares the data for validation and initializs the :attr:`FlowMatching.validation_data` attribute of the model.
-
-        :param validation_adata: An instance of :class:`AnnData` containing the validation data.
-            It should satisfy the same requirements as the one used to construct the training data.
-        :type validation_adata: class:`AnnData`
-        """
-        validation_data = self.data_manager.get_data(validation_adata)
-        self.validation_data[name] = validation_data
 
     def prepare_model(
         self,
-        cvf_config: NeuralVelocityFieldConfig,
+        cvf_config: NeuralFlowMapConfig,
         optimizer_class: torch.optim.Optimizer = torch.optim.AdamW,
         optimizer_kwargs: Mapping[str, Any] = {"lr": 0.0001},
         lr_scheduler_class: torch.optim.lr_scheduler.LRScheduler | None = None,
@@ -235,15 +102,15 @@ class FlowMatching(BaseModel):
         self.cvf_config = cvf_config
         
         # given a dimensionality and a configuration of hparams, initialize a flow model 
-        self.velocity_field = NeuralVelocityField(
+        self.flow_map = NeuralFlowMap(
             config=self.cvf_config,
         )
-        self.velocity_field = self.velocity_field.float()
-        self.velocity_field = self.velocity_field.to(self.device)
+        self.flow_map = self.flow_map.float()
+        self.flow_map = self.flow_map.to(self.device)
 
         # optimizer and scheduler 
         self.optimizer = optimizer_class(
-            self.velocity_field.parameters(),
+            self.flow_map.parameters(),
             **optimizer_kwargs,
         )
 
@@ -274,6 +141,8 @@ class FlowMatching(BaseModel):
         validation_cfg_guidance_strength: float = 1.0,
         num_grad_accumulation_steps: int = 1,
         close_wandb_connection: bool = True,
+        velocity_field: NeuralVelocityField | None = None,
+        weight_fn: None | Callable = lambda s, t: 1.0,
         sample_groups: bool = False,
     ) -> None:
         """Trains the model.
@@ -325,7 +194,7 @@ class FlowMatching(BaseModel):
         msg = "Data not initialized, run `prepare_data` before training the model"
         assert self.train_data is not None, msg
         msg = "Model not initialized, run `prepare_model` before training the model"
-        assert self.velocity_field is not None, msg
+        assert self.flow_map is not None, msg
         if self.cvf_config.use_classifier_free_guidance:
             msg = "The probability of sampling the null condition token must be less than 1 for classifier-free guidance"
             assert cfg_prob_unconditional < 1, msg
@@ -337,8 +206,8 @@ class FlowMatching(BaseModel):
         self.cfg_prob_unconditional = cfg_prob_unconditional
         self.validation_cfg_guidance_strength = validation_cfg_guidance_strength
 
-        self.trainer = CFMTrainer(
-            self.velocity_field,
+        self.trainer = FlowMapTrainer(
+            self.flow_map,
             self.flow,
             self.optimizer,
             lr_scheduler=self.lr_scheduler,
@@ -356,6 +225,8 @@ class FlowMatching(BaseModel):
             cfg_prob_unconditional=self.cfg_prob_unconditional,
             validation_cfg_guidance_strength=self.validation_cfg_guidance_strength,
             num_grad_accumulation_steps=num_grad_accumulation_steps,
+            velocity_field=velocity_field,
+            weight_fn=weight_fn,
         )
 
         self.train_dataloader = TrainDataLoader(
@@ -389,16 +260,16 @@ class FlowMatching(BaseModel):
 
     def predict(
         self,
-        batch: dict[str, Tensor | dict[str, Tensor]],
+        batch: dict[str, torch.Tensor | dict[str, torch.Tensor]],
+        time_steps: torch.Tensor | None = None,
+        num_steps: int = 2,
         return_trajectory: bool = False,
         no_grad: bool = True,
         num_samples: int | None = None,
         batch_size: int | None = None,
         num_time_steps: int | None = None,
         fix_noise: bool = False, 
-        solver_kwargs: dict[str, Any] | None = None,
-        cfg_guidance_strength: float = 1.0,
-    ) -> dict[str, Tensor]:
+    ) -> dict[str, torch.Tensor]:
         """Generates the predictions by integrating the dynamics with the learnt velocity field for a given initial condition
 
         :param batch: A batch of data containing both source point and conditions (guidance term).
@@ -454,7 +325,7 @@ class FlowMatching(BaseModel):
             if (source is not None) and (condition is not None):
                 # sanity check
                 for condition_covariate, condition_data in condition.items():
-                    msg = f"{condition_covariate=} -> {condition_data.shape=} | {source.shape}"
+                    msg = f""
                     assert condition_data.shape[:-1] == source.shape[:-1], msg
                 batch_size = source.shape[:-1]
             # when we only have the source states (unconditional generation)
@@ -483,24 +354,37 @@ class FlowMatching(BaseModel):
         if num_time_steps is None:
             num_time_steps = self.num_time_steps
 
-        # handling solver kwargs
-        if solver_kwargs is None:
-            solver_kwargs = self.solver_kwargs
-
         # pushing forward particles
-        predictions = push_forward(
-            self.velocity_field,
+        initial_state, condition = get_initial_state_and_condition(
             source,
+            batch_size,
+            num_samples,
+            self.flow_map.config.flow_dim,
             condition,
-            self.generate_from_noise,
             self.noise_distribution,
-            num_time_steps,
-            solver_kwargs,
             self.device_id,
-            return_trajectory=return_trajectory,
-            no_grad=no_grad,
-            num_samples=num_samples,
-            batch_size=batch_size,
-            cfg_guidance_strength=cfg_guidance_strength,
+            self.generate_from_noise,
         )
-        return predictions
+
+        # get map fn
+        map_fn = self.flow_map.get_map_fn(
+            condition,
+            source=source
+        )
+
+        # prepare time steps
+        if time_steps is None:
+            time_steps = torch.linspace(0.0, 1.0, num_steps+1)
+        
+        X_s = initial_state
+        traj = [X_s]
+        for idx, s in enumerate(time_steps[:-1]):
+            t = time_steps[idx + 1]
+            s_tensor = torch.ones([*initial_state.shape[:-1]], device=self.device).float()*s
+            t_tensor = torch.ones([*initial_state.shape[:-1]], device=self.device).float()*t
+            X_s = map_fn(s_tensor, t_tensor, X_s)
+            traj.append(X_s)
+        if return_trajectory:
+            traj = torch.stack(traj, axis=0)    
+            return traj
+        return X_s

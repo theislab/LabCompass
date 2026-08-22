@@ -6,15 +6,13 @@ import torch
 import numpy as np
 from torch import Tensor
 
-from sc_exp_design.constants import DataFields, LossFields, PredictionFields, VFStepFields
-from sc_exp_design.data import (
-    BaseDataLoader,
-    TrainDataLoader,
-    ValidationDataLoader,
-)
+from sc_exp_design.constants import DataFields, LossFields, PredictionFields
+
+from sc_exp_design.config.flow_map import NeuralFlowMapConfig
 from sc_exp_design.flows import BaseFlow
 from sc_exp_design.networks import NeuralVelocityField
-from sc_exp_design.ode import push_forward
+from sc_exp_design.networks.flow_map_net import NeuralFlowMap
+from sc_exp_design.ode import get_initial_state_and_condition
 from sc_exp_design.training.callbacks import BaseCallBack
 from sc_exp_design.training.base import BaseTrainer
 from sc_exp_design.types import TensorLike
@@ -22,16 +20,16 @@ from sc_exp_design.types import TensorLike
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    "CFMTrainer",
+    "FlowMapTrainer",
 ]
 
 
-class CFMTrainer(BaseTrainer):
+class FlowMapTrainer(BaseTrainer):
     """"""
 
     def __init__(
         self,
-        velocity_field: NeuralVelocityField,
+        flow_map: NeuralFlowMapConfig,
         flow: BaseFlow,
         optimizer: torch.optim.Optimizer,
         lr_scheduler: torch.optim.lr_scheduler.LRScheduler | None = None,
@@ -50,9 +48,11 @@ class CFMTrainer(BaseTrainer):
         cfg_prob_unconditional: float = 0.1,
         validation_cfg_guidance_strength: float = 1.0,
         num_grad_accumulation_steps: int = 1,
+        velocity_field: NeuralVelocityField | None = None,
+        weight_fn: None | Callable = lambda s, t: 1.0,
     ) -> None:
         """"""
-        self.velocity_field = velocity_field
+        self.flow_map = flow_map
         self.flow = flow
         self.optimizer = optimizer
         self.lr_scheduler = lr_scheduler
@@ -71,13 +71,62 @@ class CFMTrainer(BaseTrainer):
         self.cfg_prob_unconditional = cfg_prob_unconditional
         self.validation_cfg_guidance_strength = validation_cfg_guidance_strength
         self.num_grad_accumulation_steps = num_grad_accumulation_steps 
+        self.velocity_field = velocity_field
+        self.weight_fn = weight_fn
 
     @property
     def model(
         self,
-    ) -> NeuralVelocityField:
+    ) -> NeuralFlowMap:
         """"""
-        return self.velocity_field
+        return self.flow_map
+
+    def _compute_loss_distillation(
+        self,
+        s: torch.Tensor,
+        t: torch.Tensor,
+        latent: torch.Tensor,
+        target: torch.Tensor,
+        condition: dict[str, torch.Tensor] | None,
+        source: torch.Tensor | None,
+    ) -> torch.Tensor:
+        # sample ground truth interpolant
+        xs = self.flow.compute_x_t(s, latent, target)
+
+        # forward pass on neural networks with jvp
+        xts_hat, dXdt = torch.func.jvp(
+            self.flow_map.get_map_fn(condition, source=source), 
+            (s, t, xs),
+            (torch.zeros_like(s), torch.ones_like(t), torch.zeros_like(xs)),
+        )
+        # evaluate vf
+        vf_fn = self.velocity_field.get_vf_fn(condition, source=source)
+        vt = vf_fn(t, xts_hat)
+        return torch.mean(self.weight_fn(s, t) * ((dXdt - vt)**2).sum(-1))
+
+    def _compute_loss_end_to_end(
+        self,
+        s: torch.Tensor,
+        t: torch.Tensor,
+        latent: torch.Tensor,
+        target: torch.Tensor,
+        condition: dict[str, torch.Tensor] | None,
+        source: torch.Tensor | None,
+    ) -> torch.Tensor:
+        # sample ground truth interpolant and compute corresponding velocity field
+        xt = self.flow.compute_x_t(t, latent, target)
+        ut = self.flow.compute_u_t(t, latent, target, xt)
+    
+        # forward pass on neural networks
+        xst_hat = self.flow_map(t, s, xt, condition, source=source)
+        _, dXdt = torch.func.jvp(
+            self.flow_map.get_map_fn(condition, source=source), 
+            (s, t, xst_hat),
+            (torch.zeros_like(s), torch.ones_like(t), torch.zeros_like(xst_hat)),
+        )
+
+        loss = torch.mean(self.weight_fn(s, t) * ((dXdt - ut)**2).sum(-1))
+        return loss
 
     def _train_step(
         self,
@@ -103,23 +152,33 @@ class CFMTrainer(BaseTrainer):
         if DataFields.PERTURBATION_DATA in batch.keys():
             condition = batch[DataFields.PERTURBATION_DATA]
         # handling the case of unconditional generation
-        if self.velocity_field.config.use_classifier_free_guidance:
+        if self.flow_map.config.use_classifier_free_guidance:
             if torch.rand(1).item() < self.cfg_prob_unconditional:
-                condition = self.velocity_field.get_null_condition_token(condition)
+                condition = self.flow_map.get_null_condition_token(condition)
 
         # retrieving batch size and ode time
         batch_size = target.shape[0]
-        t = self.time_sampler((batch_size,), device=target.device)
+        s, t = self.time_sampler((batch_size,), device=target.device)
 
-        # computing flow and target velocity field
-        xt = self.flow.compute_x_t(t, latent, target)
-        ut = self.flow.compute_u_t(t, latent, target, xt)
-
-        # forward pass on the neural vf
-        vt = self.velocity_field(t, xt, condition, source=source)
-
-        # computing losses
-        loss = torch.nn.functional.mse_loss(vt, ut)
+        # distillation
+        if self.velocity_field is not None:
+            loss = self._compute_loss_distillation(
+                s,
+                t,
+                latent,
+                target,
+                condition,
+                source,
+            )
+        else:
+            loss = self._compute_loss_end_to_end(
+                s,
+                t,
+                latent,
+                target,
+                condition,
+                source,
+            )
         return loss, {LossFields.LOSS: loss.detach().cpu().item()}
 
     def __validation_step(
@@ -137,22 +196,37 @@ class CFMTrainer(BaseTrainer):
         condition = None
         if DataFields.PERTURBATION_DATA in perturbation_batch.keys():
             condition = perturbation_batch[DataFields.PERTURBATION_DATA]
-        # pushing forward the particles
-        predictions = push_forward(
-            self.velocity_field,
+        # pushing forward particles
+        initial_state, condition = get_initial_state_and_condition(
             source,
+            target.shape[0],
+            self.num_samples_per_validation_step,
+            self.flow_map.config.flow_dim,
             condition,
-            self.generate_from_noise,
             self.noise_distribution,
-            self.num_time_steps,
-            self.solver_kwargs,
             self.device_id,
-            return_trajectory=False,
-            no_grad=True,
-            num_samples=self.num_samples_per_validation_step,
-            batch_size=target.shape[0],
-            cfg_guidance_strength=self.validation_cfg_guidance_strength,
+            self.generate_from_noise,
         )
+
+        # get map fn
+        map_fn = self.flow_map.get_map_fn(
+            condition,
+            source=source
+        )
+
+        # prepare time steps
+        time_steps = torch.linspace(0.0, 1.0, self.num_time_steps+1)
+        
+        X_s = initial_state
+        traj = [X_s]
+        for idx, s in enumerate(time_steps[:-1]):
+            t = time_steps[idx + 1]
+            s_tensor = torch.ones([*initial_state.shape[:-1]], device=self.device_id).float()*s
+            t_tensor = torch.ones([*initial_state.shape[:-1]], device=self.device_id).float()*t
+            X_s = map_fn(s_tensor, t_tensor, X_s)
+            traj.append(X_s)
+        predictions = X_s
+
         if self.num_samples_per_validation_step is None:
             return predictions, target
         # handling number of samples

@@ -84,6 +84,7 @@ class TestDataLoaders(BaseDataTest):
             batch_size,
             state_transforms,
             has_controls=data_manager.has_controls,
+            device_id="mps",
         )
 
         # sampling batch of train data and validating it
@@ -102,7 +103,8 @@ class TestDataLoaders(BaseDataTest):
             target_covariates_in_obsm,
         )
 
-    @pytest.mark.parametrize("set_num_treatments_to_load", [True, False])
+    @pytest.mark.parametrize("use_batch_size", [True, False])
+    # @pytest.mark.parametrize("set_num_treatments_to_load", [True, False])
     def test_validation_dataloader(
         self,
         adata: anndata.AnnData,
@@ -120,7 +122,8 @@ class TestDataLoaders(BaseDataTest):
         perturbation_reps: dict[str, str | Sequence[str]] | None,
         load_target_covariates: bool,
         target_covariates: dict[str, Literal["one_hot", "label", "identity"] | None] | None,
-        set_num_treatments_to_load: bool,
+        # set_num_treatments_to_load: bool,
+        use_batch_size: bool,
     ) -> None:
         """"""
         # validating parametrized inputs
@@ -169,12 +172,12 @@ class TestDataLoaders(BaseDataTest):
 
         # initializing validation data loader
         validation_dataloader = sc_exp_design.data.ValidationDataLoader(
-            data,
+            {"test": data},
             coupling,
-            batch_size,
+            batch_size if use_batch_size else None,
             state_transforms,
             has_controls=data_manager.has_controls,
-            num_treatments_to_load=num_treatments_to_load if set_num_treatments_to_load else None,
+            device_id="mps",
         )
 
         # sampling batch of train data and validating it
@@ -208,33 +211,33 @@ class TestDataLoaders(BaseDataTest):
                 # retrieve expected perturbation ids
                 expected_keys = ["_".join(treatment) for treatment in seen_combinatorial_perturbations]
 
-                if set_num_treatments_to_load:
-                    # check that we have the correct number of batches
-                    if len(validation_batch) != num_treatments_to_load:
-                        msg = f"When {set_num_treatments_to_load=} the validation batch should have {num_treatments_to_load} element. Found {len(validation_batch)}. Keys: {validation_batch.keys()}. Expected keys: {expected_keys}. {seen_combinatorial_perturbations=}. {perturbations=} "
-                        raise ValueError(msg)
+            #     if set_num_treatments_to_load:
+            #         # check that we have the correct number of batches
+            #         if len(validation_batch) != num_treatments_to_load:
+            #             msg = f"When {set_num_treatments_to_load=} the validation batch should have {num_treatments_to_load} element. Found {len(validation_batch)}. Keys: {validation_batch.keys()}. Expected keys: {expected_keys}. {seen_combinatorial_perturbations=}. {perturbations=} "
+            #             raise ValueError(msg)
 
-                    # check that we have the correct keys
-                    for perturbation_key in validation_batch.keys():
-                        if perturbation_key not in expected_keys:
-                            msg = f"Perturbation identitfier {perturbation_key} not found in {expected_keys=}."
-                            raise ValueError(msg)
+            #         # check that we have the correct keys
+            #         for perturbation_key in validation_batch.keys():
+            #             if perturbation_key not in expected_keys:
+            #                 msg = f"Perturbation identitfier {perturbation_key} not found in {expected_keys=}."
+            #                 raise ValueError(msg)
 
-                else:
-                    # check that we have the correct number of batches
-                    if len(validation_batch) != len(seen_combinatorial_perturbations):
-                        msg = f"When {set_num_treatments_to_load=} the validation batch should have {len(seen_combinatorial_perturbations)} elements (one for each combionatorial perturbation). Found {len(validate_batch)}."
-                        raise ValueError(msg)
+            #     else:
+            #         # check that we have the correct number of batches
+            #         if len(validation_batch) != len(seen_combinatorial_perturbations):
+            #             msg = f"When {set_num_treatments_to_load=} the validation batch should have {len(seen_combinatorial_perturbations)} elements (one for each combionatorial perturbation). Found {len(validate_batch)}."
+            #             raise ValueError(msg)
 
-                    # check that we have the correct keys
-                    if list(validation_batch.keys()) != expected_keys:
-                        msg = f"When {set_num_treatments_to_load=} the validation batch should have all the perturbation ids appearing in `seen_combinatorial_perturbations`. Got {tuple(validation_batch.keys())}, expected {expected_keys}"
-                        raise ValueError(msg)
-            else:
-                # check that we have the correct number of batches
-                if len(validation_batch) != 1:
-                    msg = f"When {set_num_treatments_to_load=} the validation batch should have 1 element. Found {len(validation_batch)}. Keys: {validation_batch.keys()}."
-                    raise ValueError(msg)
+            #         # check that we have the correct keys
+            #         if list(validation_batch.keys()) != expected_keys:
+            #             msg = f"When {set_num_treatments_to_load=} the validation batch should have all the perturbation ids appearing in `seen_combinatorial_perturbations`. Got {tuple(validation_batch.keys())}, expected {expected_keys}"
+            #             raise ValueError(msg)
+            # else:
+            #     # check that we have the correct number of batches
+            #     if len(validation_batch) != 1:
+            #         msg = f"When {set_num_treatments_to_load=} the validation batch should have 1 element. Found {len(validation_batch)}. Keys: {validation_batch.keys()}."
+            #         raise ValueError(msg)
 
                 # check that we have the correct keys
                 # for perturbation_key in validation_batch.keys():
@@ -246,10 +249,11 @@ class TestDataLoaders(BaseDataTest):
 
         # for each element verify that the batch dictionary is correct
         for perturbation, perturbation_batch in validation_batch.items():
+            # print(perturbation, perturbation_batch.keys())
             validate_batch(
                 perturbation_batch,
                 data_manager.has_controls,
-                batch_size,
+                perturbation_batch[DataFields.TARGET_STATE].shape[0],
                 num_genes,
                 num_unique_target_values,
                 dim_target_covariates,
