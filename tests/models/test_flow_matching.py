@@ -5,8 +5,8 @@ import anndata
 import pytest
 import torch
 
-from sc_exp_design.config import NeuralVelocityFieldConfig
-from sc_exp_design.models import FlowMatching
+from labcompass.config import NeuralVelocityFieldConfig
+from labcompass.models import FlowMatching
 
 
 class TestFlowMatching:

@@ -1,10 +1,10 @@
-# scExpDesign
+# LabCompass
 
 [![Tests][badge-tests]][tests]
 [![Documentation][badge-docs]][documentation]
 
-[badge-tests]: https://img.shields.io/github/actions/workflow/status/lorenzo-consoli/scExpDesign/test.yaml?branch=main
-[badge-docs]: https://img.shields.io/readthedocs/scExpDesign
+[badge-tests]: https://img.shields.io/github/actions/workflow/status/theislab/LabCompass/test.yaml?branch=main
+[badge-docs]: https://img.shields.io/readthedocs/LabCompass
 
 Generative Modeling for Experimental Design in Single Cell Data
 
@@ -17,14 +17,14 @@ in particular, the [API documentation][].
 
 ```{python}
 >>> # importing the required packages
->>> import sc_exp_design
+>>> import labcompass
 >>> import anndata as ad
 >>> # initializing the AnnData object with the train data
 >>> train_adata = ad.AnnData(...)
 >>> # retrieving the default configurations
->>> config = sc_exp_design.networks.NeuralVelocityFieldConfig()
+>>> config = labcompass.networks.NeuralVelocityFieldConfig()
 >>> # initializing the model with default settings
->>> cfm = sc_exp_design.models.FlowMatching()
+>>> cfm = labcompass.models.FlowMatching()
 >>> # preparing the train data
 >>> cfm.prepare_train_data(
 ...     train_adata,
@@ -53,20 +53,20 @@ in particular, the [API documentation][].
 You need to have Python 3.10 or newer installed on your system.
 If you don't have Python installed, we recommend installing [Mambaforge][].
 
-There are several alternative options to install scExpDesign:
+There are several alternative options to install LabCompass:
 
 <!--
-1) Install the latest release of `scExpDesign` from [PyPI][]:
+1) Install the latest release of `LabCompass` from [PyPI][]:
 
 ```bash
-pip install scExpDesign
+pip install LabCompass
 ```
 -->
 
 1. Install the latest development version:
 
 ```bash
-pip install git+https://github.com/theislab/scExpDesign.git@main
+pip install git+https://github.com/theislab/LabCompass.git@main
 ```
 
 2. Run Tests
@@ -90,9 +90,9 @@ If you found a bug, please use the [issue tracker][].
 
 [mambaforge]: https://github.com/conda-forge/miniforge#mambaforge
 [scverse discourse]: https://discourse.scverse.org/
-[issue tracker]: https://github.com/lorenzo-consoli/scExpDesign/issues
-[tests]: https://github.com/lorenzo-consoli/scExpDesign/actions/workflows/test.yml
-[documentation]: https://scExpDesign.readthedocs.io
-[changelog]: https://scExpDesign.readthedocs.io/en/latest/changelog.html
-[api documentation]: https://scExpDesign.readthedocs.io/en/latest/api.html
-[pypi]: https://pypi.org/project/scExpDesign
+[issue tracker]: https://github.com/theislab/LabCompass/issues
+[tests]: https://github.com/theislab/LabCompass/actions/workflows/test.yml
+[documentation]: https://LabCompass.readthedocs.io
+[changelog]: https://LabCompass.readthedocs.io/en/latest/changelog.html
+[api documentation]: https://LabCompass.readthedocs.io/en/latest/api.html
+[pypi]: https://pypi.org/project/LabCompass

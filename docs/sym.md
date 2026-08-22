@@ -2,7 +2,7 @@
 
 ```{eval-rst}
 .. module:: sym
-.. currentmodule:: sc_exp_design
+.. currentmodule:: labcompass
 
 .. autosummary::
     :toctree: generated/sym

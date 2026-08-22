@@ -4,8 +4,8 @@ from typing import Literal
 import anndata
 import pytest
 
-import sc_exp_design
-from sc_exp_design.constants import DataFields
+import labcompass
+from labcompass.constants import DataFields
 
 from .base_data_test import BaseDataTest
 from .utils import validate_batch, validate_parametrized_inputs
@@ -55,7 +55,7 @@ class TestDataLoaders(BaseDataTest):
         )
 
         # initializing data manager
-        data_manager = sc_exp_design.data.DataManager(
+        data_manager = labcompass.data.DataManager(
             adata,
             sample_rep=sample_rep,
             control_key=control_key,
@@ -72,13 +72,13 @@ class TestDataLoaders(BaseDataTest):
         data = data_manager.get_data()
 
         # initialize coupling
-        coupling = sc_exp_design.couplings.IndependentCoupling()
+        coupling = labcompass.couplings.IndependentCoupling()
 
         # initialize transforms
         state_transforms = None
 
         # initializing trainig data loader
-        train_dataloader = sc_exp_design.data.TrainDataLoader(
+        train_dataloader = labcompass.data.TrainDataLoader(
             data,
             coupling,
             batch_size,
@@ -148,7 +148,7 @@ class TestDataLoaders(BaseDataTest):
         )
 
         # initializing data manager
-        data_manager = sc_exp_design.data.DataManager(
+        data_manager = labcompass.data.DataManager(
             adata,
             sample_rep=sample_rep,
             control_key=control_key,
@@ -165,13 +165,13 @@ class TestDataLoaders(BaseDataTest):
         data = data_manager.get_data()
 
         # initialize coupling
-        coupling = sc_exp_design.couplings.IndependentCoupling()
+        coupling = labcompass.couplings.IndependentCoupling()
 
         # initialize transforms
         state_transforms = None
 
         # initializing validation data loader
-        validation_dataloader = sc_exp_design.data.ValidationDataLoader(
+        validation_dataloader = labcompass.data.ValidationDataLoader(
             {"test": data},
             coupling,
             batch_size if use_batch_size else None,

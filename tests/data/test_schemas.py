@@ -5,7 +5,7 @@ import anndata
 import numpy as np
 import pytest
 
-import sc_exp_design
+import labcompass
 
 INVALID_KEY = "unwanted_key"
 
@@ -26,13 +26,13 @@ class TestDataSchema:
         # when we expect an exception
         if sample_rep == INVALID_KEY:
             with pytest.raises(KeyError):
-                state_data_schema = sc_exp_design.data.schemas.StateDataSchema(
+                state_data_schema = labcompass.data.schemas.StateDataSchema(
                     adata,
                     sample_rep,
                 )
         # this should initialize without problems
         else:
-            state_data_schema = sc_exp_design.data.schemas.StateDataSchema(
+            state_data_schema = labcompass.data.schemas.StateDataSchema(
                 adata,
                 sample_rep,
             )
@@ -91,7 +91,7 @@ class TestDataSchema:
             # perturbation is not present in adata.obs
             if (perturbation not in perturbation_reps.keys()) or (perturbation == INVALID_KEY):
                 with pytest.raises(KeyError):
-                    perturbation_schema = sc_exp_design.data.schemas.PerturbationDataSchema(
+                    perturbation_schema = labcompass.data.schemas.PerturbationDataSchema(
                         adata,
                         perturbations,
                         perturbation_reps,
@@ -100,7 +100,7 @@ class TestDataSchema:
                     )
     
         # initializing schema
-        perturbation_schema = sc_exp_design.data.schemas.PerturbationDataSchema(
+        perturbation_schema = labcompass.data.schemas.PerturbationDataSchema(
             adata,
             perturbations,
             perturbation_reps,
@@ -119,7 +119,7 @@ class TestDataSchema:
                 # retrieving representation and constructing
                 # expected key to be found in data dictionary
                 reps = reps[0]
-                expected_key = f"{sc_exp_design.constants.DataFields.CONDITION_FEATS}_{perturbation}_{reps}"
+                expected_key = f"{labcompass.constants.DataFields.CONDITION_FEATS}_{perturbation}_{reps}"
                 # checking that the key is present in the data dictionary
                 assert expected_key in perturbation_data.keys()
                 # check shape
@@ -131,7 +131,7 @@ class TestDataSchema:
                 # check representations
                 for perturbation_rep in reps:
                     # constructing expected key
-                    expected_key = f"{sc_exp_design.constants.DataFields.CONDITION_REP}_{perturbation}_{perturbation_rep}"
+                    expected_key = f"{labcompass.constants.DataFields.CONDITION_REP}_{perturbation}_{perturbation_rep}"
                     # checking that the key is present in the data dictionary
                     assert expected_key in perturbation_data.keys()
                     # check shape
@@ -144,7 +144,7 @@ class TestDataSchema:
                     covs = perturbation_covariates[perturbation]
                     for perturbation_cov in covs:
                         # constructing expected key
-                        expected_key = f"{sc_exp_design.constants.DataFields.CONDITION_COV}_{perturbation}_{perturbation_cov}"
+                        expected_key = f"{labcompass.constants.DataFields.CONDITION_COV}_{perturbation}_{perturbation_cov}"
                         # checking that the key is present in the data dictionary
                         assert expected_key in perturbation_data.keys()
                         # check shape
@@ -184,7 +184,7 @@ class TestDataSchema:
         # throwing error at schema initialization
         if INVALID_KEY in target_covariates.keys():
             with pytest.raises(KeyError):    
-                target_schema = sc_exp_design.data.schemas.TargetDataSchema(
+                target_schema = labcompass.data.schemas.TargetDataSchema(
                     adata,
                     target_covariates,
                     target_covariates_in_obsm,
@@ -192,7 +192,7 @@ class TestDataSchema:
                 )
 
         # initializing target data schema 
-        target_schema = sc_exp_design.data.schemas.TargetDataSchema(
+        target_schema = labcompass.data.schemas.TargetDataSchema(
             adata,
             target_covariates,
             target_covariates_in_obsm,

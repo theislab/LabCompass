@@ -2,7 +2,7 @@ from typing import Any, Literal
 
 import pytest
 
-from sc_exp_design.config import NeuralVelocityFieldConfig
+from labcompass.config import NeuralVelocityFieldConfig
 
 
 INVALID_STRING = "invalid_string"

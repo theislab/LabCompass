@@ -3,16 +3,18 @@ build-backend = "hatchling.build"
 requires = [ "hatchling" ]
 
 [project]
-name = "scexpdesign"
+name = "labcompass"
 version = "0.0.1"
 description = "Generative Modeling for Experimental Design in Single Cell Data"
 readme = "README.md"
 license = { file = "LICENSE" }
 maintainers = [
   { name = "Lorenzo Consoli", email = "lorenzo.consoli@helmholtz-munich.de" },
+  { name = "Alessandro Palma", email = "alessandro.palma@helmholtz-munich.de" },
 ]
 authors = [
   { name = "Lorenzo Consoli" },
+  { name = "Alessandro Palma" },
 ]
 requires-python = ">=3.10"
 classifiers = [
@@ -56,12 +58,12 @@ optional-dependencies.test = [
   "pytest",
 ]
 # https://docs.pypi.org/project_metadata/#project-urls
-urls.Documentation = "https://scExpDesign.readthedocs.io/"
-urls.Homepage = "https://github.com/lorenzo-consoli/scExpDesign"
-urls.Source = "https://github.com/lorenzo-consoli/scExpDesign"
+urls.Documentation = "https://LabCompass.readthedocs.io/"
+urls.Homepage = "https://github.com/theislab/LabCompass"
+urls.Source = "https://github.com/theislab/LabCompass"
 
 [tool.hatch.build.targets.wheel]
-packages = [ "src/sc_exp_design" ]
+packages = [ "src/labcompass" ]
 
 [tool.hatch.envs.default]
 installer = "uv"
@@ -124,7 +126,7 @@ addopts = [
 ]
 
 [tool.coverage.run]
-source = [ "sc_exp_design" ]
+source = [ "labcompass" ]
 omit = [
   "**/test_*.py",
 ]

@@ -2,7 +2,7 @@
 
 ```{eval-rst}
 .. module:: training
-.. currentmodule:: sc_exp_design
+.. currentmodule:: labcompass
 
 .. autosummary::
     :toctree: generated/training

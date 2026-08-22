@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 import torch
 
-from sc_exp_design.metrics import (
+from labcompass.metrics import (
     compute_cell_props,
     compute_e_distance,
     compute_min_max_mse,
