@@ -133,7 +133,6 @@ def compute_pert_inference_loss(
     pert_target_rep: dict[str, Tensor],
     pert_noise_models: dict[str, str],
     pert_cov_estimation_modes: dict[str, str] | None = None,
-    add_loss: bool = True,
     allow_noise_model_to_be_none: bool = True,
     loss_fn_kwargs=None
 ) -> tuple[Tensor, dict[str, Tensor]]:
@@ -152,9 +151,6 @@ def compute_pert_inference_loss(
 
     :param pert_cov_estimation_modes: Dictionary mapping each target covariate name to its covariance-estimation mode, forwarded to :func:`reconstruction_loss_noise_model`, defaults to `None`.
     :type pert_cov_estimation_modes: class:`dict[str, str] | None`
-
-    :param add_loss: Currently unused by this function.
-    :type add_loss: class:`bool`
 
     :param allow_noise_model_to_be_none: Forwarded to :func:`reconstruction_loss_noise_model` for every covariate, defaults to `True`.
     :type allow_noise_model_to_be_none: class:`bool`

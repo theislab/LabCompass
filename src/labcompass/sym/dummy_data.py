@@ -7,13 +7,11 @@ def get_dummy_adata(
     num_unique_groups: int = 3,
     num_control_cells: int = 100,
     num_perturbed_cells: int = 150,
-    num_genes: int = 200,
     num_unique_target_values: int = 7,
     num_perturbation_feats: int  = 100,
     tot_perturbed_cells: int = 750,
     num_cells: int = 850,
     states: np.ndarray = np.ones((850, 200)),
-    dim_target_covariates: int = 8,
     target_covariates_in_obsm: str = "target3",
     target_covariate_in_obsm_data: np.ndarray = np.zeros((850, 8)),
     perturbations_in_obsm: str = "treatment2",
@@ -41,10 +39,6 @@ def get_dummy_adata(
         covariates, defaults to `150`.
     :type num_perturbed_cells: class:`int`
 
-    :param num_genes: Not used directly in the function body; the number of features is instead determined by the shape of
-        :param:`states`, defaults to `200`.
-    :type num_genes: class:`int`
-
     :param num_unique_target_values: Number of unique categorical values sampled for the `"target0"` and `"target1"`
         categorical target covariates, defaults to `7`.
     :type num_unique_target_values: class:`int`
@@ -64,10 +58,6 @@ def get_dummy_adata(
 
     :param states: The cell states used both as `.X` and stored in `.obsm["states"]`, defaults to `np.ones((850, 200))`.
     :type states: class:`np.ndarray`
-
-    :param dim_target_covariates: Not used directly in the function body; the dimensionality of the continuous target
-        covariate is instead determined by the shape of :param:`target_covariate_in_obsm_data`, defaults to `8`.
-    :type dim_target_covariates: class:`int`
 
     :param target_covariates_in_obsm: Key under which :param:`target_covariate_in_obsm_data` is stored in `.obsm`, defaults
         to `"target3"`.

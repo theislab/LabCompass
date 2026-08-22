@@ -52,7 +52,7 @@ class BaseApproximatePosterior(BaseModule):
             return MLPGaussianNoiseModel
         else:
             msg = (
-                f"{noise_model=} not supported, possible values `['gaussian']`" if self.raise_error_if_none else
+                f"{noise_model=} not supported, possible values `['gaussian']`" if self._raise_error_if_none else
                 f"{noise_model=} not supported, possible values `['gaussian', None]`"
             )
             raise NotImplementedError(msg)

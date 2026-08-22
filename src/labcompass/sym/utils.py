@@ -486,8 +486,8 @@ def get_annotated_perturbation_data(
         keys when :param:`multi_attribute` is `False`, defaults to `"treatment"`.
     :type treatment_label: class:`str`
 
-    :param category_label: Unused when :param:`n_cat` is a dictionary; only relevant as the categorical covariate name when
-        :param:`n_cat` is an :class:`int`, in which case `"cell_type"` is used instead, defaults to `"cell_type"`.
+    :param category_label: Ignored when :param:`n_cat` is a dictionary; otherwise, the name of the single categorical
+        covariate generated when :param:`n_cat` is an :class:`int`, defaults to `"cell_type"`.
     :type category_label: class:`str`
 
     :return: A tuple `(adata, sym_dictionary)` where `adata` is an :class:`AnnData` with `.X` set to the generated cell states,
@@ -499,7 +499,7 @@ def get_annotated_perturbation_data(
     """
 
     if isinstance(n_cat, int):
-        n_cat = {"cell_type": n_cat}
+        n_cat = {category_label: n_cat}
     msg = f""
     assert isinstance(n_cat, dict), msg
 
