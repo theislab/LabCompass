@@ -1,9 +1,5 @@
 # LabCompass
 
-[![Documentation][badge-docs]][documentation]
-
-[badge-docs]: https://img.shields.io/readthedocs/LabCompass
-
 Generative modeling for experimental design in single-cell data.
 
 LabCompass is built around **conditional flow matching (CFM)**: given control cells and a set of
@@ -23,12 +19,31 @@ provides a family of models for the design and analysis of perturbation experime
 - **`TargetPredictionModel`** — a supervised model that predicts downstream target covariates from
   cell states, e.g. for use as a forward/proxy model in guided generation.
 
-## Getting started
+## Package structure
 
-Please refer to the [documentation][],
-in particular, the [API documentation][].
+- `labcompass.models` — the user-facing model classes listed above.
+- `labcompass.networks` — the underlying neural network architectures: velocity fields, flow-map
+  networks, noise/likelihood models, attention and condition-encoding building blocks.
+- `labcompass.data` — data loading and management for `AnnData`-based perturbation datasets
+  (control/treatment sampling, batching, schema validation).
+- `labcompass.couplings` — optimal-transport and independent couplings pairing control and
+  perturbed cells during training.
+- `labcompass.flows` — the interpolation paths / noise schedules used by conditional flow matching
+  (rectified, variance-preserving, ...).
+- `labcompass.ode` — ODE integration utilities for pushing cell states forward through a trained
+  velocity field.
+- `labcompass.inverse` — the constrained-optimization machinery (KKT conditions, guided flows)
+  backing `InverseModel`.
+- `labcompass.training` — training loops and loss/metric callbacks for each model type.
+- `labcompass.transforms` — invertible pre/post-processing transforms (standardization,
+  composition of transforms).
+- `labcompass.metrics` — evaluation metrics, both distributional (e.g. MMD, Wasserstein distance,
+  energy distance) and classification-based.
+- `labcompass.sym` — synthetic/toy data generators used for testing and examples.
 
 ## Example usage
+
+Additional worked examples are available as notebooks in [docs/notebooks](docs/notebooks).
 
 ```{python}
 >>> # importing the required packages
@@ -95,7 +110,7 @@ PYTHONUNBUFFERED=1 pytest --tb=long --capture=tee-sys 2>&1 | tee .pytest-logs.lo
 
 ## Release notes
 
-See the [changelog][].
+See [CHANGELOG.md](CHANGELOG.md).
 
 ## Contact
 
@@ -109,7 +124,4 @@ If you found a bug, please use the [issue tracker][].
 [mambaforge]: https://github.com/conda-forge/miniforge#mambaforge
 [scverse discourse]: https://discourse.scverse.org/
 [issue tracker]: https://github.com/theislab/LabCompass/issues
-[documentation]: https://LabCompass.readthedocs.io
-[changelog]: https://LabCompass.readthedocs.io/en/latest/changelog.html
-[api documentation]: https://LabCompass.readthedocs.io/en/latest/api.html
 [pypi]: https://pypi.org/project/LabCompass
