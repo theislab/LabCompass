@@ -1,12 +1,27 @@
 # LabCompass
 
-[![Tests][badge-tests]][tests]
 [![Documentation][badge-docs]][documentation]
 
-[badge-tests]: https://img.shields.io/github/actions/workflow/status/theislab/LabCompass/test.yaml?branch=main
 [badge-docs]: https://img.shields.io/readthedocs/LabCompass
 
-Generative Modeling for Experimental Design in Single Cell Data
+Generative modeling for experimental design in single-cell data.
+
+LabCompass is built around **conditional flow matching (CFM)**: given control cells and a set of
+perturbations (drugs, genetic edits, dosage/time covariates, ...), it learns a velocity field that
+transports control cell states to their perturbed counterparts. On top of this core, LabCompass
+provides a family of models for the design and analysis of perturbation experiments:
+
+- **`FlowMatching`** — the core conditional flow matching model: learns a neural velocity field
+  from control to perturbed cell states, conditioned on arbitrary perturbation covariates.
+- **`FlowMatchingWithScore`** — extends `FlowMatching` with a learned score function alongside the
+  velocity field.
+- **`FlowMap`** — a flow-map variant of `FlowMatching` for direct (few-step) transport between
+  states, using either independent or optimal-transport (OT) couplings.
+- **`InverseModel`** — solves the inverse problem: given a desired target cell state, infers the
+  perturbation covariates that would produce it (via MAP optimization, Langevin sampling, or an
+  amortized neural inverse model), using a trained `FlowMatching` model as the forward model.
+- **`TargetPredictionModel`** — a supervised model that predicts downstream target covariates from
+  cell states, e.g. for use as a forward/proxy model in guided generation.
 
 ## Getting started
 
@@ -42,7 +57,7 @@ in particular, the [API documentation][].
 >>> # preparing the model
 >>> cfm.prepare_model(
 ...    2, # dimensionality of the flow
-...    config, # configurations for the conditioinal velocity field
+...    config, # configurations for the conditional velocity field
 ... )
 >>> # training the model
 >>> cfm.train()
@@ -69,10 +84,13 @@ pip install LabCompass
 pip install git+https://github.com/theislab/LabCompass.git@main
 ```
 
-2. Run Tests
+## Development
+
+To run the test suite locally:
 
 ```bash
-PYTHONUNBUFFERED=1 pytest --tb=long --capture=tee-sys tests/networks/test_velocity_field.py 2>&1 | tee .pytest-logs.log
+pip install -e ".[test]"
+PYTHONUNBUFFERED=1 pytest --tb=long --capture=tee-sys 2>&1 | tee .pytest-logs.log
 ```
 
 ## Release notes
@@ -91,7 +109,6 @@ If you found a bug, please use the [issue tracker][].
 [mambaforge]: https://github.com/conda-forge/miniforge#mambaforge
 [scverse discourse]: https://discourse.scverse.org/
 [issue tracker]: https://github.com/theislab/LabCompass/issues
-[tests]: https://github.com/theislab/LabCompass/actions/workflows/test.yml
 [documentation]: https://LabCompass.readthedocs.io
 [changelog]: https://LabCompass.readthedocs.io/en/latest/changelog.html
 [api documentation]: https://LabCompass.readthedocs.io/en/latest/api.html
