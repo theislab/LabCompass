@@ -102,7 +102,7 @@ class InverseModel(BaseModel):
         self,
         target_covariates: str | Sequence[str],
         target_covariates_dims: int | dict[str, int],
-        target_covariates_noise_models: Literal["gaussian", "neg_bin"] | dict[str, None | Literal["gaussian", "neg_bin"]] | None = None,
+        target_covariates_noise_models: Literal["gaussian"] | dict[str, None | Literal["gaussian"]] | None = None,
         target_covariates_predictor_kwargs: dict[str, dict[str, Any]] | None = None,
         target_covariates_use_shared_representation: bool = False,
         target_covariates_latent_dim: int = 1024,
@@ -126,10 +126,10 @@ class InverseModel(BaseModel):
         :type target_covariates_dims: class:`int | dict[str, int]`
 
         :param target_covariates_noise_models: The noise model used for the predictive distribution of each
-            target covariate, either `"gaussian"`, `"neg_bin"`, or `None` for a deterministic output. If a single
+            target covariate, either `"gaussian"` or `None` for a deterministic output. If a single
             :class:`str` is given, `target_covariates` must contain a single element. Defaults to `None`, in
             which case every covariate is assigned `None`.
-        :type target_covariates_noise_models: class:`Literal["gaussian", "neg_bin"] | dict[str, None | Literal["gaussian", "neg_bin"]] | None`
+        :type target_covariates_noise_models: class:`Literal["gaussian"] | dict[str, None | Literal["gaussian"]] | None`
 
         :param target_covariates_predictor_kwargs: Dictionary mapping each target covariate to the keyword
             arguments used to initialize its predictor network. Defaults to `None`, in which case an empty
@@ -394,7 +394,7 @@ class InverseModel(BaseModel):
         hard: bool = False,
         perturbation_initializer: Callable[[Any], torch.Tensor] | dict[str, Callable[[Any], torch.Tensor]] | None = None,
         perturbation_non_linearities: torch.nn.Module | Callable[[torch.Tensor], torch.Tensor] | dict[str, torch.nn.Module | Callable[[torch.Tensor], torch.Tensor]] | None = None,
-        perturbation_covariates_noise_models: Literal["gaussian", "neg_bin"] | dict[str, None | Literal["gaussian", "neg_bin"]] | None = None,
+        perturbation_covariates_noise_models: Literal["gaussian"] | dict[str, None | Literal["gaussian"]] | None = None,
         perturbation_covariates_predictor_kwargs: dict[str, dict[str, Any]] | None = None,
         perturbation_covariates_use_shared_representation: bool = False,
         perturbation_covariates_latent_dim: int = 1024,
@@ -473,7 +473,7 @@ class InverseModel(BaseModel):
             perturbation covariate, only used when `self.inverse_method` is `"neural"`. If a single :class:`str`
             is given, `perturbation_covariates` must contain a single element. Defaults to `None`, in which case
             every covariate is assigned `None` and a warning is logged.
-        :type perturbation_covariates_noise_models: class:`Literal["gaussian", "neg_bin"] | dict[str, None | Literal["gaussian", "neg_bin"]] | None`
+        :type perturbation_covariates_noise_models: class:`Literal["gaussian"] | dict[str, None | Literal["gaussian"]] | None`
 
         :param perturbation_covariates_predictor_kwargs: Dictionary mapping each perturbation covariate to the
             keyword arguments used to initialize its predictor network, only used when `self.inverse_method` is

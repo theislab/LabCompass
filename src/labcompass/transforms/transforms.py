@@ -112,21 +112,37 @@ class ComposedTransform(Transform):
         self,
         input_tensor: Tensor,
     ) -> Tensor:
-        """Applies the composed sequence of transforms to `input_tensor`.
+        """Applies the composed sequence of transforms to `input_tensor`, one after the other, in order.
 
         :param input_tensor: The tensor to transform.
         :type input_tensor: class:`torch.Tensor`
+
+        :return: The tensor obtained by applying every transform in `self.transforms`, in order.
+        :rtype: class:`torch.Tensor`
         """
+        for t in self.transforms:
+            input_tensor = t.transform(input_tensor)
+        return input_tensor
 
     def inverse_transform(
         self,
         input_tensor: Tensor,
     ) -> Tensor:
-        """Applies the inverse of the composed sequence of transforms to `input_tensor`.
+        """Applies the inverse of the composed sequence of transforms to `input_tensor`, in reverse order.
 
         :param input_tensor: The transformed tensor to invert.
         :type input_tensor: class:`torch.Tensor`
+
+        :return: The tensor obtained by applying the :method:`inverse_transform` of every transform in
+            `self.transforms`, in reverse order.
+        :rtype: class:`torch.Tensor`
+
+        :raises AttributeError: If any transform in `self.transforms` does not itself define
+            :method:`inverse_transform` (i.e. is not an :class:`InvertibleTransform`).
         """
+        for t in reversed(list(self.transforms)):
+            input_tensor = t.inverse_transform(input_tensor)
+        return input_tensor
 
 
 class Standardizer(InvertibleTransform):

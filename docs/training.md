@@ -18,5 +18,4 @@
     training.compute_pert_inference_loss
     training.gaussian_rec_loss
     training.kl_div_standard_normal
-    training.neg_bin_rec_loss
 ```

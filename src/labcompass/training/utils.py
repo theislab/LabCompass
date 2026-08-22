@@ -9,7 +9,6 @@ from labcompass.constants import LossFields, ParamsFields
 
 __all__ = [
     "gaussian_rec_loss",
-    "neg_bin_rec_loss",
     "binary_classification_loss",
     "reconstruction_loss_noise_model",
 ]
@@ -51,14 +50,6 @@ def gaussian_rec_loss(
     return loss
 
 
-def neg_bin_rec_loss(
-    params: dict[str, Tensor],
-    target: Tensor,
-) -> Tensor:
-    """"""
-    return torch.tensor([0.0])
-
-
 def binary_classification_loss(
     params: Tensor,
     target: Tensor,
@@ -87,7 +78,7 @@ def binary_classification_loss(
 def reconstruction_loss_noise_model(
     params: dict[str, Tensor],
     samples: Tensor,
-    noise_model: Literal["gaussian", "neg_bin"] | None,
+    noise_model: Literal["gaussian"] | None,
     cov_estimation_mode: Literal["isotropic", "anisotropic"] | None = None,
     allow_noise_model_to_be_none: bool = True,
     loss_fn_kwargs: dict[str, Any] | None = None
@@ -101,7 +92,7 @@ def reconstruction_loss_noise_model(
     :type samples: class:`torch.Tensor`
 
     :param noise_model: Identifier of the noise model used to reconstruct `samples`. When `None` and `allow_noise_model_to_be_none` is `True`, :func:`binary_classification_loss` is used instead.
-    :type noise_model: class:`Literal["gaussian", "neg_bin"] | None`
+    :type noise_model: class:`Literal["gaussian"] | None`
 
     :param cov_estimation_mode: Covariance estimation mode forwarded to :func:`gaussian_rec_loss` when `noise_model` is `"gaussian"`. Required in that case, defaults to `None`.
     :type cov_estimation_mode: class:`Literal["isotropic", "anisotropic"] | None`
@@ -115,21 +106,19 @@ def reconstruction_loss_noise_model(
     :return: The reconstruction loss.
     :rtype: class:`torch.Tensor`
 
-    :raises ValueError: If `noise_model` is not one of `"gaussian"`, `"neg_bin"`, or (when `allow_noise_model_to_be_none` is `True`) `None`.
+    :raises ValueError: If `noise_model` is not one of `"gaussian"`, or (when `allow_noise_model_to_be_none` is `True`) `None`.
     """
     # loss on the source posterior
     if noise_model == "gaussian":
         msg = f"With {noise_model=} `cov_estimation_mode` needs to be in `['isotropic', 'anisotropic']`, found `None`."
         assert cov_estimation_mode is not None, msg
         loss_fn = partial(gaussian_rec_loss, cov_estimation_mode=cov_estimation_mode)
-    elif noise_model == "neg_bin":
-        loss_fn = neg_bin_rec_loss
     elif allow_noise_model_to_be_none and noise_model is None:
         loss_fn = binary_classification_loss
     else:
         msg = (
-            f"{noise_model=} not supported (possible values `['gaussian', 'neg_bin', None]`)." if allow_noise_model_to_be_none else
-            f"{noise_model=} not supported (possible values `['gaussian', 'neg_bin']`)."
+            f"{noise_model=} not supported (possible values `['gaussian', None]`)." if allow_noise_model_to_be_none else
+            f"{noise_model=} not supported (possible values `['gaussian']`)."
         )
         raise ValueError(msg)
     loss = loss_fn(

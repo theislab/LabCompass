@@ -30,7 +30,7 @@ def compute_accuracy(pred, target):
     return accuracy_score(target, label)
 
 
-def compute_precision(pred, target, average="weighthed"):
+def compute_precision(pred, target, average="weighted"):
     """Compute the precision score between softmax-derived predicted labels and `target`.
 
     `pred` is converted to class probabilities with a softmax over the last axis, and the predicted
@@ -43,7 +43,7 @@ def compute_precision(pred, target, average="weighthed"):
     :type target: class:`TensorLike`
 
     :param average: Averaging strategy forwarded to :func:`sklearn.metrics.precision_score`
-        (e.g. `"micro"`, `"macro"`, `"weighted"`), defaults to `"weighthed"`.
+        (e.g. `"micro"`, `"macro"`, `"weighted"`), defaults to `"weighted"`.
     :type average: class:`str`
 
     :return: The precision score, as computed by :func:`sklearn.metrics.precision_score`.
@@ -54,7 +54,7 @@ def compute_precision(pred, target, average="weighthed"):
     return precision_score(target, label, average=average)
 
 
-def compute_recall(pred, target, average="weighthed"):
+def compute_recall(pred, target, average="weighted"):
     """Compute the recall score between softmax-derived predicted labels and `target`.
 
     `pred` is converted to class probabilities with a softmax over the last axis, and the predicted
@@ -67,7 +67,7 @@ def compute_recall(pred, target, average="weighthed"):
     :type target: class:`TensorLike`
 
     :param average: Averaging strategy forwarded to :func:`sklearn.metrics.recall_score`
-        (e.g. `"micro"`, `"macro"`, `"weighted"`), defaults to `"weighthed"`.
+        (e.g. `"micro"`, `"macro"`, `"weighted"`), defaults to `"weighted"`.
     :type average: class:`str`
 
     :return: The recall score, as computed by :func:`sklearn.metrics.recall_score`.
@@ -78,7 +78,7 @@ def compute_recall(pred, target, average="weighthed"):
     return recall_score(target, label, average=average)
 
 
-def compute_f1(pred, target, average="weighthed"):
+def compute_f1(pred, target, average="weighted"):
     """Compute the F1 score between softmax-derived predicted labels and `target`.
 
     `pred` is converted to class probabilities with a softmax over the last axis, and the predicted
@@ -91,7 +91,7 @@ def compute_f1(pred, target, average="weighthed"):
     :type target: class:`TensorLike`
 
     :param average: Averaging strategy forwarded to :func:`sklearn.metrics.f1_score`
-        (e.g. `"micro"`, `"macro"`, `"weighted"`), defaults to `"weighthed"`.
+        (e.g. `"micro"`, `"macro"`, `"weighted"`), defaults to `"weighted"`.
     :type average: class:`str`
 
     :return: The F1 score, as computed by :func:`sklearn.metrics.f1_score`.

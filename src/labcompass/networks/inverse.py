@@ -368,7 +368,7 @@ class NeuralInverseModel(BaseConditionOptimizer):
         tau: float = 1.0,
         eps: float = 1e-10,
         state_dim: int | None = None,
-        perturbation_covariates_noise_models: Literal["gaussian", "neg_bin"] | dict[str, None | Literal["gaussian", "neg_bin"]] | None = None,
+        perturbation_covariates_noise_models: Literal["gaussian"] | dict[str, None | Literal["gaussian"]] | None = None,
         perturbation_covariates_predictor_kwargs: dict[str, dict[str, Any]] | None = None,
         perturbation_covariates_use_shared_representation: bool = False,
         perturbation_covariates_latent_dim: int = 1024,
@@ -475,10 +475,6 @@ class NeuralInverseModel(BaseConditionOptimizer):
                     covariate_data = ...
                     raise NotImplementedError
 
-            # negative binomial noise model
-            elif covariate_noise_model == "neg_bin":
-                raise NotImplementedError
-            
             # identity (keep as ise)
             elif covariate_noise_model is None:
                 pass

@@ -8,7 +8,7 @@ from torch import Tensor, nn
 
 from labcompass.constants import VFStepFields
 from labcompass.networks.blocks import BaseModule, MLPBlock
-from labcompass.networks.neural_noise_models import MLPGaussianNoiseModel, MLPNegBinNoiseModel
+from labcompass.networks.neural_noise_models import MLPGaussianNoiseModel
 
 __all__ = ["PerturbationApproximatePosterior"]
 
@@ -26,17 +26,17 @@ class BaseApproximatePosterior(BaseModule):
     
     def _get_noise_model(
         self,
-        noise_model: Literal["gaussian", "neg_bin"] | None,
+        noise_model: Literal["gaussian"] | None,
     ) -> BaseModule:
         """
         Returns the appropriate noise model based on the provided string identifier.
 
         Args:
-            noise_model (str | None): The type of noise model to be used. Can be 
-                                    'gaussian', 'neg_bin', or None.
+            noise_model (str | None): The type of noise model to be used. Can be
+                                    'gaussian', or None.
 
         Returns:
-            BaseModule: A module corresponding to the specified noise model. 
+            BaseModule: A module corresponding to the specified noise model.
                         If no model is provided, defaults to MLPBlock.
 
         Raises:
@@ -45,18 +45,15 @@ class BaseApproximatePosterior(BaseModule):
         Notes:
             - If `noise_model` is None, and `self._raise_error_if_none` is False, the method will return `MLPBlock`.
             - If `noise_model` is "gaussian", it returns the `MLPGaussianNoiseModel`.
-            - If `noise_model` is "neg_bin", it returns the `MLPNegBinNoiseModel`.
         """
         if noise_model is None and (not self._raise_error_if_none):
             return MLPBlock
         elif noise_model == "gaussian":
             return MLPGaussianNoiseModel
-        elif noise_model == "neg_bin":
-            return MLPNegBinNoiseModel
         else:
             msg = (
-                f"{noise_model=} not supported, possible values `['gaussian', 'neg_bin']`" if self.raise_error_if_none else
-                f"{noise_model=} not supported, possible values `['gaussian', 'neg_bin', None]`" 
+                f"{noise_model=} not supported, possible values `['gaussian']`" if self.raise_error_if_none else
+                f"{noise_model=} not supported, possible values `['gaussian', None]`"
             )
             raise NotImplementedError(msg)
 
@@ -72,7 +69,7 @@ class PerturbationApproximatePosterior(BaseApproximatePosterior):
         input_dim (int): The input dimension of the model.
         freeze_grads (bool): Flag to freeze gradients during training.
         target_output_dims (dict): A dictionary mapping covariate IDs to their respective output dimensions.
-        noise_models (dict): A dictionary mapping covariate IDs to noise model types, such as "gaussian" or "neg_bin".
+        noise_models (dict): A dictionary mapping covariate IDs to noise model types, such as "gaussian".
         covariate_kwargs (dict): A dictionary containing additional keyword arguments for covariate-specific configurations.
         pert_approximate_posterior (dict): A dictionary storing the initialized perturbation approximate posterior modules for each covariate.
 
@@ -92,7 +89,7 @@ class PerturbationApproximatePosterior(BaseApproximatePosterior):
         input_dim: int,
         freeze_grads: bool = True,
         target_output_dims: dict[str, int] | None = None,
-        noise_models: dict[str, Literal["gaussian", "neg_bin"]] | None = None,
+        noise_models: dict[str, Literal["gaussian"]] | None = None,
         covariate_kwargs: dict[str, dict[str, Any]] | None = None,
         use_shared_representation: bool = False,
         latent_dim: int = 1024,

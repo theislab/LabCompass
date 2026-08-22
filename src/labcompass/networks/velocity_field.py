@@ -325,15 +325,15 @@ class NeuralVelocityField(BaseModule):
         :type cond: class:`dict[str, Tensor] | None`
 
         :return: `None` if `cond` is `None`, otherwise a dictionary with the same keys as `cond`, where every
-            value is replaced with a tensor of the same shape filled with `self.config.null_condition_token`.
+            value is replaced with a tensor of the same shape filled with `self.config.cfg_null_condition_token`.
         :rtype: class:`dict[str, Tensor] | None`
         """
         # when condition is None we simply return None
         if cond is None:
             return None
-        # otherwise we need to replace each value 
+        # otherwise we need to replace each value
         # of the dictionary with a null condition token
         cond_copy = {}
         for key, val in cond.items():
-            cond_copy[key] = torch.ones_like(val)*self.config.null_condition_token
+            cond_copy[key] = torch.ones_like(val)*self.config.cfg_null_condition_token
         return cond_copy
