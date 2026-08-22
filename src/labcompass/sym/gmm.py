@@ -74,14 +74,23 @@ class GaussianMixtureModel:
     def is_multi_attribute(
         self,
     ) -> bool:
-        """"""
+        """Indicates whether the mixture parameters are organized per perturbation attribute.
+
+        :return: `True` if `self.params` is a dictionary keyed by attribute/covariate label (multi-attribute mixture),
+            `False` if `self.params` is a flat sequence of component parameter dictionaries.
+        :rtype: class:`bool`
+        """
         return isinstance(self.params, dict)
 
     @property
     def parameters(
         self,
     ) -> Sequence[dict[str, TensorLike]]:
-        """"""
+        """Returns the parameters of the Gaussian mixture model.
+
+        :return: The sequence of dictionaries containing the `"mean"` and `"cov"` for each Gaussian component.
+        :rtype: class:`Sequence[dict[str, TensorLike]]`
+        """
         return self.params
 
     def __init_distributions(

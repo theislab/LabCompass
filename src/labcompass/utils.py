@@ -77,7 +77,14 @@ def match_shapes(
 
 
 def set_reproducibility(random_seed: int) -> None:
-    """"""
+    """Seeds `torch`, `random`, and `numpy` with `random_seed` and configures cuDNN backend flags for reproducibility.
+
+    Sets `torch.backends.cudnn.deterministic` and `torch.backends.cudnn.benchmark` to `True`, and seeds
+    :func:`torch.manual_seed`, :func:`random.seed`, and :func:`numpy.random.seed` with `random_seed`.
+
+    :param random_seed: The seed value used to seed all random number generators.
+    :type random_seed: class:`int`
+    """
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = True
     torch.manual_seed(random_seed)
@@ -89,7 +96,21 @@ def get_conditions_to_pool(
     layers_before_pooling: dict[str, Any],
     covariates_not_pooled: Sequence[str] | None,
 ) -> Sequence[str]:
-    """"""
+    """Determine which covariate keys of `layers_before_pooling` should be pooled together.
+
+    Every key of `layers_before_pooling` is returned except those listed in `covariates_not_pooled`.
+
+    :param layers_before_pooling: Mapping from covariate name to its pre-pooling representation/layer;
+        only its keys are used to determine the covariates to pool.
+    :type layers_before_pooling: class:`dict[str, Any]`
+
+    :param covariates_not_pooled: Sequence of covariate names to exclude from pooling. When `None`,
+        all keys of `layers_before_pooling` are returned.
+    :type covariates_not_pooled: class:`Sequence[str] | None`
+
+    :return: The covariate names to be pooled.
+    :rtype: class:`Sequence[str]`
+    """
     if covariates_not_pooled is not None:
         covariates_to_pool = [
             covariate

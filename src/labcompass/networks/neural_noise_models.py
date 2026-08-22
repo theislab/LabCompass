@@ -13,12 +13,14 @@ __all__ = [
 
 
 class MLPNegBinNoiseModel(BaseModule):
-    """"""
+    """Negative-Binomial noise model for reconstructing count data, mirroring the role of :class:`MLPGaussianNoiseModel` for a different likelihood family.
+
+    Note that :method:`_init_modules` and :method:`forward` currently have empty bodies (aside from their docstrings), so this module does not yet build any sub-modules or perform any computation.
+    """
 
     def __init__(
         self,
     ) -> None:
-        """"""
         super().__init__()
 
     def _init_modules(
@@ -31,7 +33,17 @@ class MLPNegBinNoiseModel(BaseModule):
         input_tensor: Tensor,
         size_factor: Tensor,
     ) -> Tensor:
-        """"""
+        """Performs a forward pass through the model.
+
+        :param input_tensor: Input tensor to the model.
+        :type input_tensor: class:`torch.Tensor`
+
+        :param size_factor: Size factor tensor associated with the input observations.
+        :type size_factor: class:`torch.Tensor`
+
+        :return: `None`. The method body is currently empty (aside from this docstring), so no computation is performed and no value is returned despite the `Tensor` return-type annotation.
+        :rtype: class:`None`
+        """
 
 
 class MLPGaussianNoiseModel(BaseModule):

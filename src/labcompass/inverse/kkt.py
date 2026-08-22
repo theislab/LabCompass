@@ -5,6 +5,33 @@ __all__ = ["KKTConditions"]
 
 
 class KKTConditions:
+    """Initializes :class:`KKTConditions`, implementing (a least-squares approximation of) the KKT stationarity conditions for a set of inequality constraints.
+
+    Given a batch of terminal states, this class estimates the Lagrange multipliers of the active
+    inequality constraints and builds the corresponding Lagrangian, so that it can be used as a
+    (locally) constrained objective during guided sampling/optimization.
+
+    :param loss_fn: The primal objective function, evaluated on a batch of terminal states and
+        returning a per-sample scalar.
+    :type loss_fn: class:`Callable[[Tensor], Tensor]`
+
+    :param ineq_constraints: List of inequality constraint functions `g_i`, each evaluated on a batch
+        of terminal states and returning a per-sample constraint vector `g_i(x1) <= 0`.
+    :type ineq_constraints: class:`list[Callable[[Tensor], Tensor]]`
+
+    :param eps: Small value added to the diagonal of the linear system solved for the Lagrange
+        multipliers, for numerical stability, defaults to `1e-6`.
+    :type eps: class:`float`
+
+    :param use_lstsq: Whether to solve the multiplier system with :func:`torch.linalg.lstsq` instead
+        of explicit matrix inversion, defaults to `True`.
+    :type use_lstsq: class:`bool`
+
+    :param g_tol: Tolerance below which a constraint is considered active, i.e. `|g_i(x1)| <= g_tol`,
+        defaults to `1e-6`.
+    :type g_tol: class:`float`
+    """
+
     def __init__(
         self,
         loss_fn,
@@ -43,6 +70,22 @@ class KKTConditions:
         )(x1)
 
     def compute_lagrangian(self, x1, ineq_mul=None):
+        """Compute the Lagrangian of `loss_fn` at `x1`, given (optional) multipliers for the inequality constraints.
+
+        The Lagrangian is `loss_fn(x1) + sum_i <ineq_mul[i], ineq_constraints[i](x1)>`, where the inner
+        product is taken per-sample over the constraint output dimension. When `ineq_mul` is `None`,
+        no constraint term is added and the raw `loss_fn(x1)` is returned.
+
+        :param x1: Batch of terminal states, of shape `(batch_size, flow_dim)`.
+        :type x1: class:`Tensor`
+
+        :param ineq_mul: Optional list of Lagrange multiplier tensors, one per entry in
+            :attr:`ineq_constraints`, each of shape `(batch_size, constraint_dim)`, defaults to `None`.
+        :type ineq_mul: class:`list[Tensor] | None`
+
+        :return: The (per-sample) Lagrangian value.
+        :rtype: class:`Tensor`
+        """
         loss = self.loss_fn(x1)
         for idx, fn in enumerate(self.ineq_constraints):
             if ineq_mul is not None:
@@ -113,6 +156,21 @@ class KKTConditions:
         return lhs, active_ineq_constraints, ineq_constraints_dims, ineq_grads_active
 
     def compute_multipliers(self, x1):
+        """Estimate the Lagrange multipliers of the active inequality constraints at `x1`.
+
+        A constraint (or constraint dimension) is considered active when its absolute value is within
+        :attr:`g_tol` of zero. The multipliers for the active constraints are obtained by solving, in a
+        least-squares sense, the stationarity condition of the KKT system built from the constraint
+        gradients and the gradient of `loss_fn` at `x1`; inactive constraint dimensions are assigned a
+        multiplier of zero. If no constraint is active, all multipliers are zero.
+
+        :param x1: Batch of terminal states, of shape `(batch_size, flow_dim)`.
+        :type x1: class:`Tensor`
+
+        :return: A list of multiplier tensors, one per entry in :attr:`ineq_constraints`, each of shape
+            `(batch_size, constraint_dim)`.
+        :rtype: class:`list[Tensor]`
+        """
         lhs, active_ineq_constraints, ineq_constraints_dims, ineq_grads_active = self._get_lhs_block_diagonal_matrix_and_active_constraints(x1)
 
         batch_size = x1.shape[0] if x1.ndim > 1 else 1

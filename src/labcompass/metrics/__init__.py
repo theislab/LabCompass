@@ -28,6 +28,15 @@ __all__ = [
 
 @dataclass(frozen=True)
 class Metrics:
+    """Registry of evaluation metric callables, bundling default distributional/regression and classification metrics.
+
+    Each field is a callable of the form `Callable[[TensorLike, TensorLike], float]` taking `(pred, target)`
+    and returning a scalar score, bound by default to one of the `compute_*` functions in
+    :mod:`labcompass.metrics.metrics` and :mod:`labcompass.metrics.classification_metrics`. Several
+    classification fields are bound via `functools.partial` to a specific averaging mode (`"micro"`,
+    `"macro"`, or `"weighted"`) of the underlying metric.
+    """
+
     r_squared: Callable[[TensorLike, TensorLike], float] = compute_r_squared
     energy_distance: Callable[[TensorLike, TensorLike], float] = compute_e_distance
     maximum_mean_discrepancy: Callable[[TensorLike, TensorLike], float] = compute_mmd

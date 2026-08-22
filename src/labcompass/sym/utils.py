@@ -388,7 +388,115 @@ def get_annotated_perturbation_data(
     treatment_label: str = "treatment",
     category_label: str = "cell_type",
 ) -> tuple[anndata.AnnData, dict[str, Any]]:
-    """"""
+    """Generates a synthetic single-cell perturbation dataset from a Gaussian mixture model and wraps it in an :class:`AnnData` object.
+
+    Control cells are sampled as isotropic Gaussian noise (scaled by :param:`sigma`) around the origin, while perturbed cells
+    are sampled from Gaussian components (one per unique perturbation) whose means are drawn from a grid of `linespace_width`
+    values in `[-mean_range, mean_range]`. Each cell is additionally assigned categorical labels (e.g. cell types) sampled from
+    a linear-logit model of its state. When :param:`multi_attribute` is `True`, several perturbation covariates are generated
+    simultaneously (one Gaussian mixture per covariate, combined additively); when :param:`dose_resolved` is `True`, a continuous
+    dosage per cell interpolates its state between the control mean and the perturbed component mean.
+
+    :param sigma: Standard deviation used to sample control cells (`torch.randn(...) * sigma`) and, when :param:`homoskedastic`
+        is `True`, the fixed variance of every perturbed component's covariance (`sigma * eye(d)`).
+    :type sigma: class:`float`
+
+    :param d: Dimensionality of the generated cell states.
+    :type d: class:`int`
+
+    :param U: Number of unique perturbations (excluding control) to generate. When :param:`multi_attribute` is `True`, a
+        dictionary mapping each covariate label to its own number of unique perturbations.
+    :type U: class:`int | dict[str, int]`
+
+    :param n_cat: Number of categorical labels to sample per cell. When an :class:`int` is passed, it is used as the number
+        of categories for a single covariate named `"cell_type"`; otherwise a dictionary mapping each categorical covariate
+        name to its number of categories.
+    :type n_cat: class:`int | dict[str, int]`
+
+    :param N0: Number of control cells to generate.
+    :type N0: class:`int`
+
+    :param Nu: Number of cells to generate for each unique perturbation.
+    :type Nu: class:`int`
+
+    :param mean_range: Half-width of the range `[-mean_range, mean_range]` from which the perturbation component means are
+        drawn, defaults to `5.0`.
+    :type mean_range: class:`float`
+
+    :param linespace_width: Number of candidate values per dimension in the grid used to sample perturbation component means,
+        defaults to `10`.
+    :type linespace_width: class:`int`
+
+    :param uniform_range: Scale applied to the randomly sampled logit matrix used to assign categorical labels from cell
+        states, defaults to `5.0`.
+    :type uniform_range: class:`float`
+
+    :param seed: Random seed used to make the generation reproducible via `labcompass.utils.set_reproducibility`, defaults to
+        `None` in which case no seed is set.
+    :type seed: class:`int | None`
+
+    :param return_perturbation_representation: Whether to include the perturbation mean vectors (`"treatment_means"`) in the
+        returned dictionary, defaults to `False`.
+    :type return_perturbation_representation: class:`bool`
+
+    :param non_linearity: Non-linearity applied to the cell states before computing the categorical logits, defaults to `None`
+        in which case the identity function is used.
+    :type non_linearity: class:`Callable[[TensorLike], TensorLike] | None`
+
+    :param homoskedastic: Whether every perturbed component shares the same covariance as the control distribution
+        (`sigma * eye(d)`). When `False`, covariances are instead sampled according to :param:`covariance_type`, defaults to
+        `True`.
+    :type homoskedastic: class:`bool`
+
+    :param covariance_type: The type of covariance matrix sampled for each perturbed component when :param:`homoskedastic` is
+        `False`. `"full_covariance"` is not yet implemented, defaults to `"isotropic"`.
+    :type covariance_type: class:`Literal["isotropic", "anisotropic", "full_covariance"]`
+
+    :param cov_prior: Function used to sample the (unscaled) variances of the perturbed components' covariances, defaults to
+        `np.random.rand`.
+    :type cov_prior: class:`Callable[[Any], TensorLike]`
+
+    :param min_var: Lower bound used to rescale the variances sampled by :param:`cov_prior`, defaults to `1e-4`.
+    :type min_var: class:`float`
+
+    :param max_var: Upper bound used to rescale the variances sampled by :param:`cov_prior`, defaults to `5.0`.
+    :type max_var: class:`float`
+
+    :param dose_resolved: Whether to additionally sample a continuous dosage per perturbed cell and interpolate its state
+        between the control mean and the perturbed component mean, defaults to `False`.
+    :type dose_resolved: class:`bool`
+
+    :param dosage_prior: Function used to sample the per-cell dosages when :param:`dose_resolved` is `True`, defaults to
+        `torch.rand`.
+    :type dosage_prior: class:`Callable[[Any], TensorLike]`
+
+    :param interpolation_fn: Function used to interpolate a cell's state between the control mean and the perturbed component
+        mean given its dosage. Only used when :param:`dose_resolved` is `True`, defaults to `None` in which case linear
+        interpolation `(1 - dose) * source + dose * target` is used.
+    :type interpolation_fn: class:`Callable[[float, TensorLike, TensorLike], TensorLike] | None`
+
+    :param multi_attribute: Whether to generate several perturbation covariates simultaneously, each with its own Gaussian
+        mixture, defaults to `False`. When `True`, :param:`U` must be a dictionary.
+    :type multi_attribute: class:`bool`
+
+    :param control_label: Label assigned to control cells in the returned :class:`AnnData`, defaults to `"control"`.
+    :type control_label: class:`str`
+
+    :param treatment_label: Prefix used to build perturbation labels (e.g. `"treatment_1"`) and the corresponding `.obs`/`.uns`
+        keys when :param:`multi_attribute` is `False`, defaults to `"treatment"`.
+    :type treatment_label: class:`str`
+
+    :param category_label: Unused when :param:`n_cat` is a dictionary; only relevant as the categorical covariate name when
+        :param:`n_cat` is an :class:`int`, in which case `"cell_type"` is used instead, defaults to `"cell_type"`.
+    :type category_label: class:`str`
+
+    :return: A tuple `(adata, sym_dictionary)` where `adata` is an :class:`AnnData` with `.X` set to the generated cell states,
+        `.obs` containing the perturbation/control labels and categorical labels (and dosages if :param:`dose_resolved` is
+        `True`), and `.uns` containing the label-to-id mappings, one-hot encodings and perturbation mean shifts; `sym_dictionary`
+        is the raw dictionary produced during generation (keys `"gmm"`, `"states"`, `"perturbation_ids"`, `"categories"`, and
+        optionally `"treatment_means"` / `"dosages"`).
+    :rtype: class:`tuple[anndata.AnnData, dict[str, Any]]`
+    """
 
     if isinstance(n_cat, int):
         n_cat = {"cell_type": n_cat}

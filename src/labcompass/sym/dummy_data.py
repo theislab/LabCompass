@@ -18,7 +18,75 @@ def get_dummy_adata(
     target_covariate_in_obsm_data: np.ndarray = np.zeros((850, 8)),
     perturbations_in_obsm: str = "treatment2",
 ) -> anndata.AnnData:
-    """"""
+    """Builds a dummy :class:`AnnData` object with synthetic control/perturbed cells for use in tests and examples.
+
+    The returned object contains two categorical perturbation covariates (`"treatment0"`, `"treatment1"`) with associated
+    dosage/time covariates and group labels, one perturbation covariate carried as a feature representation in `.obsm`
+    (`"treatment2"`), three target covariates (two categorical, one continuous), and a continuous target covariate carried
+    in `.obsm`. All numerical data is randomly generated and does not reflect real biological signal.
+
+    :param num_unique_treatments: Number of unique (non-control) treatments (`"drug1"`, `"drug2"`, ...) simulated for the
+        `"treatment0"` and `"treatment1"` covariates, defaults to `5`.
+    :type num_unique_treatments: class:`int`
+
+    :param num_unique_groups: Number of higher-level groups that treatments are assigned to when building the
+        treatment-to-group mapping used for the `"treatment0_group"`/`"treatment1_group"` entries in `.uns`, defaults to `3`.
+    :type num_unique_groups: class:`int`
+
+    :param num_control_cells: Number of control cells included in the `"treatment0"`/`"treatment1"` perturbation data and
+        in the overall `is_control` flag, defaults to `100`.
+    :type num_control_cells: class:`int`
+
+    :param num_perturbed_cells: Number of cells generated per unique treatment for the `"treatment0"`/`"treatment1"`
+        covariates, defaults to `150`.
+    :type num_perturbed_cells: class:`int`
+
+    :param num_genes: Not used directly in the function body; the number of features is instead determined by the shape of
+        :param:`states`, defaults to `200`.
+    :type num_genes: class:`int`
+
+    :param num_unique_target_values: Number of unique categorical values sampled for the `"target0"` and `"target1"`
+        categorical target covariates, defaults to `7`.
+    :type num_unique_target_values: class:`int`
+
+    :param num_perturbation_feats: Dimensionality of the perturbation feature representation stored in `.obsm` under
+        `f"{perturbations_in_obsm}_features"`, defaults to `100`.
+    :type num_perturbation_feats: class:`int`
+
+    :param tot_perturbed_cells: Total number of perturbed cells sampled for the `"treatment0"`/`"treatment1"` and
+        `"treatment2"` perturbation data, before concatenation with control cells. Should be consistent with
+        `num_unique_treatments * num_perturbed_cells`, defaults to `750`.
+    :type tot_perturbed_cells: class:`int`
+
+    :param num_cells: Total number of cells used to sample the `"target0"`, `"target1"` and `"target2"` target covariates.
+        Should be consistent with `num_control_cells + tot_perturbed_cells`, defaults to `850`.
+    :type num_cells: class:`int`
+
+    :param states: The cell states used both as `.X` and stored in `.obsm["states"]`, defaults to `np.ones((850, 200))`.
+    :type states: class:`np.ndarray`
+
+    :param dim_target_covariates: Not used directly in the function body; the dimensionality of the continuous target
+        covariate is instead determined by the shape of :param:`target_covariate_in_obsm_data`, defaults to `8`.
+    :type dim_target_covariates: class:`int`
+
+    :param target_covariates_in_obsm: Key under which :param:`target_covariate_in_obsm_data` is stored in `.obsm`, defaults
+        to `"target3"`.
+    :type target_covariates_in_obsm: class:`str`
+
+    :param target_covariate_in_obsm_data: Continuous target covariate array stored in `.obsm` under the key
+        :param:`target_covariates_in_obsm`, defaults to `np.zeros((850, 8))`.
+    :type target_covariate_in_obsm_data: class:`np.ndarray`
+
+    :param perturbations_in_obsm: Prefix used to build the `.obsm` key (`f"{perturbations_in_obsm}_features"`) under which
+        the randomly sampled perturbation feature representation is stored, defaults to `"treatment2"`.
+    :type perturbations_in_obsm: class:`str`
+
+    :return: A synthetic :class:`AnnData` object with `.X` set to :param:`states`, `.obs` containing the `is_control` flag,
+        the target covariates and the `"treatment0"`/`"treatment1"` perturbation labels, `.uns` containing one-hot encodings
+        of the treatment and group labels, and `.obsm` containing the cell states, treatment dosages/times, the perturbation
+        feature representation and the continuous target covariate.
+    :rtype: class:`anndata.AnnData`
+    """
 
 
     # defining treatment data

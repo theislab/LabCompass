@@ -8,4 +8,8 @@
     :toctree: generated/models
 
     models.FlowMatching
+    models.FlowMatchingWithScore
+    models.FlowMap
+    models.InverseModel
+    models.TargetPredictionModel
 ```

@@ -18,24 +18,23 @@ __all__ = ["NeuralFlowMap"]
 
 
 class NeuralFlowMap(BaseModule):
-    """
-    A neural velocity field module for modeling continuous-time dynamics with neural networks.
-    
-    This class implements a velocity field using a neural network architecture, allowing for encoding
-    time, state, and conditions to predict state transitions.
+    """A neural flow map module predicting a direct (possibly multi-step) transport map between two time points.
+
+    Given a start time `s`, an end time `t` and a state `xs` at time `s`, this module predicts the state at
+    time `t`, optionally guided by perturbation conditions and a source state, allowing few-step or one-step
+    integration of the underlying dynamics without numerically solving an ODE.
+
+    :param config: Configuration object specifying the architecture of the flow map module (which encoders
+        to build for state, start/end time, conditions and source, the conditioning strategy used to combine
+        them, the reparametrization applied to the decoder output, and the configuration of the final
+        decoder), used to build the submodules collected in :attr:`NeuralFlowMap.vf_modules`.
+    :type config: class:`NeuralFlowMapConfig`
     """
 
     def __init__(
         self,
         config: NeuralFlowMapConfig,
     ) -> None:
-        """
-        Initialize the NeuralVelocityField.
-        
-        Args:
-            flow_dim (int): Dimensionality of the flow field.
-            config (NeuralFlowMapConfig): Configuration settings for the model.
-        """
         super().__init__()
         self.config = config
 
@@ -126,19 +125,40 @@ class NeuralFlowMap(BaseModule):
         cond: dict[str, Tensor] | None = None,
         source: Tensor | None = None,
     ) -> Tensor:
-        """
-        Forward pass through the neural velocity field model.
-        
-        Args:
-            s (Tensor): Start Time input.
-            t (Tensor): End Time input.
-            xs (Tensor): State input.
-            cond (dict[str, Tensor] | None, optional): Conditioning variables. Defaults to None.
-            source (Tensor | None, optional): Source state for perturbation inference. Defaults to None.
-            target (Tensor | None, optional): Target state for perturbation inference. Defaults to None.
-        
-        Returns:
-            dict[str, Tensor]: Model output including velocity field and latent representations.
+        """Predicts the state at time `t` given the state `xs` at time `s`.
+
+        Encodes the start time `s`, end time `t`, state `xs`, perturbation conditions and (optionally) the
+        source state according to the :class:`NeuralFlowMapConfig` passed at initialization, combines the
+        resulting latent representations using the configured conditioning strategy (`"concatenation"`,
+        `"resnet"` or `"film"`), and decodes them into the predicted state at time `t`. The raw decoder
+        output is then combined with `xs` according to :attr:`NeuralFlowMapConfig.reparametrization_type`:
+
+        - `"none"`: the decoder output is returned directly as the predicted state.
+        - `"residual"`: the prediction is `xs + (t - s) * decoder_output`.
+        - `"redisual-rescaled"`: the prediction is `(1 - (t - s)) * xs + (t - s) * decoder_output`.
+
+        :param s: Start time(s) from which the state `xs` is transported, of shape `(*batch_shape,)`.
+        :type s: class:`Tensor`
+
+        :param t: End time(s) at which the state is predicted, of shape `(*batch_shape,)`.
+        :type t: class:`Tensor`
+
+        :param xs: State at time `s`, of shape `(*batch_shape, flow_dim)`.
+        :type xs: class:`Tensor`
+
+        :param cond: Dictionary mapping each perturbation covariate name to its corresponding conditioning
+            tensor. Required when :attr:`NeuralFlowMapConfig.use_guidance` is `True`, defaults to `None`.
+        :type cond: class:`dict[str, Tensor] | None`
+
+        :param source: Source (e.g.: control) state used as an additional conditioning signal. Required when
+            :attr:`NeuralFlowMapConfig.use_source_as_condition` is `True`, defaults to `None`.
+        :type source: class:`Tensor | None`
+
+        :return: The predicted state at time `t`, of shape `(*batch_shape, flow_dim)`.
+        :rtype: class:`Tensor`
+
+        :raises ValueError: If :attr:`NeuralFlowMapConfig.reparametrization_type` is not one of `"none"`,
+            `"residual"` or `"redisual-rescaled"`.
         """
         # encoding time
         t = torch.unsqueeze(t, dim=-1)
@@ -275,10 +295,28 @@ class NeuralFlowMap(BaseModule):
         cond: dict[str, Tensor] | None = None,
         source: Tensor | None = None
     ) -> Callable[[Tensor, Tensor, Tensor], Tensor]:
+        """Builds a flow map function of `(s, t, xs)` bound to fixed conditions and source state.
+
+        The returned function evaluates :meth:`NeuralFlowMap.forward` at given `s`, `t` and `xs` values.
+
+        :param cond: Dictionary mapping each perturbation covariate name to its corresponding conditioning
+            tensor, held fixed across calls to the returned function. Required when
+            :attr:`NeuralFlowMapConfig.use_guidance` is `True`, defaults to `None`.
+        :type cond: class:`dict[str, Tensor] | None`
+
+        :param source: Source (e.g.: control) state, held fixed across calls to the returned function.
+            Required when :attr:`NeuralFlowMapConfig.use_source_as_condition` is `True`, defaults to `None`.
+        :type source: class:`Tensor | None`
+
+        :return: A function mapping `(s, t, xs)` to the predicted state at time `t`, of shape
+            `(*batch_shape, flow_dim)`.
+        :rtype: class:`Callable[[Tensor, Tensor, Tensor], Tensor]`
+        """
         def flow_map_fn(
             s: Tensor,
             t: Tensor,
             xs:Tensor
         ) -> Tensor:
+            """Evaluates the flow map from time `s` to time `t` for state `xs`, given the enclosing `cond` and `source`."""
             return self.forward(s, t, xs, cond=cond, source=source)
         return flow_map_fn

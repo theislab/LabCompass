@@ -27,7 +27,17 @@ class Coupling(abc.ABC):
         target: TensorLike,
         **kwargs,
     ) -> Any:
-        """"""
+        """Matches samples from the `source` and `target` distributions according to the coupling strategy implemented by subclasses.
+
+        :param source: A tensor or array of values containing the data coming from the source distribution.
+        :type source: class:`TensorLike`
+
+        :param target: A tensor or array of values containing the data coming from the target distribution.
+        :type target: class:`TensorLike`
+
+        :return: Implementation-specific representation of the matching between `source` and `target` samples.
+        :rtype: class:`Any`
+        """
         raise NotImplementedError
 
 
@@ -179,7 +189,7 @@ class IndependentCoupling(Coupling):
         *args,
         **kwargs,
     ) -> None:
-        """"""
+        """Initializes the :class:`IndependentCoupling` class. Accepts and ignores any positional or keyword arguments, kept only for interface compatibility with other :class:`Coupling` implementations."""
 
     def match_groups(
         self,

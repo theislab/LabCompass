@@ -27,7 +27,33 @@ __all__ = ["InverseModel"]
 
 
 class InverseModel(BaseModel):
-    """"""
+    """Initializes the :class:`InverseModel`, which solves the inverse problem of inferring the perturbation
+    covariates that would drive a control cell state towards a desired target cell state.
+
+    :param forward_model: A trained forward model (typically a fitted :class:`FlowMatching` instance) used to map
+        control states and perturbation covariates to predicted post-perturbation states. It is expected to expose
+        a `.predict()` method compatible with :class:`labcompass.networks.blocks.BaseForwardModel`, together with
+        `cvf_config` and `train_data` attributes. Defaults to `None`.
+    :type forward_model: class:`BaseForwardModel | None`
+
+    :param state_dim: Dimensionality of the cell state space the inverse problem operates in. If `None`, it is
+        inferred from `forward_model.cvf_config.flow_dim`. If both `state_dim` and `forward_model` are provided and
+        disagree, a warning is logged and the value is overridden with `forward_model.cvf_config.flow_dim`.
+        Defaults to `None`.
+    :type state_dim: class:`int | None`
+
+    :param inverse_method: String identifier selecting the algorithm used to solve the inverse problem: `"map"`
+        uses :class:`labcompass.networks.inverse.MAPConditionOptimizer` to obtain a point estimate of the
+        perturbation covariates via gradient-based MAP optimization, `"langevin"` uses
+        :class:`labcompass.networks.inverse.LangevinSampler` to draw posterior samples of the perturbation
+        covariates via Langevin dynamics (see :class:`labcompass.models.inverse_utils.LangevinOptimizer`), and
+        `"neural"` uses :class:`labcompass.networks.inverse.NeuralInverseModel` to amortize inference with a
+        neural network that predicts the perturbation covariates directly. Defaults to `"map"`.
+    :type inverse_method: class:`Literal["map", "langevin", "neural"]`
+
+    :param device_id: The identifier for the device where to do the computations, defaults to `"cuda"`.
+    :type device_id: class:`Literal["cuda", "cpu"]`
+    """
     def __init__(
         self,
         forward_model: BaseForwardModel | None = None,
@@ -35,8 +61,7 @@ class InverseModel(BaseModel):
         inverse_method: Literal["map", "langevin", "neural"] = "map",
         device_id: Literal["cuda", "cpu"] = "cuda",
     ) -> None:
-        """"""
-        # sanity check on the input 
+        # sanity check on the input
         if state_dim is None:
             msg = f""
             assert forward_model is not None, msg
@@ -88,7 +113,66 @@ class InverseModel(BaseModel):
         lr_scheduler_kwargs: Mapping[str, Any] | None = None,
         lr_scheduler_step: Literal["grad_step", "epoch"] = "grad_step",
     ) -> None:
-        """"""
+        """Initializes the target-covariate prediction model, used to predict the target covariates from the
+        states predicted by the forward model, together with its optimizer and optional learning rate scheduler.
+
+        :param target_covariates: The identifier(s) of the target covariate(s) to predict. If a single
+            :class:`str` is given, it is wrapped into a one-element tuple.
+        :type target_covariates: class:`str | Sequence[str]`
+
+        :param target_covariates_dims: The output dimensionality of the predictor for each target covariate. If
+            an :class:`int` is given, `target_covariates` must contain a single element and the dimensionality is
+            applied to it.
+        :type target_covariates_dims: class:`int | dict[str, int]`
+
+        :param target_covariates_noise_models: The noise model used for the predictive distribution of each
+            target covariate, either `"gaussian"`, `"neg_bin"`, or `None` for a deterministic output. If a single
+            :class:`str` is given, `target_covariates` must contain a single element. Defaults to `None`, in
+            which case every covariate is assigned `None`.
+        :type target_covariates_noise_models: class:`Literal["gaussian", "neg_bin"] | dict[str, None | Literal["gaussian", "neg_bin"]] | None`
+
+        :param target_covariates_predictor_kwargs: Dictionary mapping each target covariate to the keyword
+            arguments used to initialize its predictor network. Defaults to `None`, in which case an empty
+            dictionary is used for every covariate.
+        :type target_covariates_predictor_kwargs: class:`dict[str, dict[str, Any]] | None`
+
+        :param target_covariates_use_shared_representation: Whether the target covariate predictors share a
+            common encoder representation of the input state, defaults to `False`.
+        :type target_covariates_use_shared_representation: class:`bool`
+
+        :param target_covariates_latent_dim: Dimensionality of the (optionally shared) latent representation used
+            by the target covariate predictors, defaults to `1024`.
+        :type target_covariates_latent_dim: class:`int`
+
+        :param target_covariates_encoder_mlp_kwargs: Dictionary containing the keyword arguments used to
+            initialize the encoder MLP producing the (optionally shared) latent representation, defaults to
+            `None`.
+        :type target_covariates_encoder_mlp_kwargs: class:`dict[str, Any] | None`
+
+        :param optimizer_class: Optimizer used to update the target prediction model's weights during training.
+            Should reference a class derived from :class:`torch.optim.Optimizer` and not an instance, defaults to
+            :class:`torch.optim.AdamW`.
+        :type optimizer_class: class:`torch.optim.Optimizer`
+
+        :param optimizer_kwargs: Dictionary containing the keyword arguments used to initialize the
+            `optimizer_class`, defaults to `{"lr": 0.001}`.
+        :type optimizer_kwargs: class:`dict[str, Any]`
+
+        :param lr_scheduler_class: Optional scheduler used to update the learning rate during optimization. Should
+            reference a class derived from :class:`torch.optim.lr_scheduler.LRScheduler` and not an instance,
+            defaults to `None`.
+        :type lr_scheduler_class: class:`torch.optim.lr_scheduler.LRScheduler | None`
+
+        :param lr_scheduler_kwargs: Dictionary containing the keyword arguments used to initialize the
+            `lr_scheduler_class`, defaults to `None`.
+        :type lr_scheduler_kwargs: class:`dict[str, Any] | None`
+
+        :param lr_scheduler_step: :class:`str` identifier indicating when to perform the learning rate scheduling
+            step, if a `lr_scheduler_class` is specified (otherwise it is ignored). When `"grad_step"`, the
+            learning rate is updated after each gradient step; when `"epoch"`, it is updated after each
+            validation step. Defaults to `"grad_step"`.
+        :type lr_scheduler_step: class:`Literal["grad_step", "epoch"]`
+        """
         # preparing input with some sanity checks
         if isinstance(target_covariates, str):
             target_covariates = (target_covariates, )
@@ -97,7 +181,7 @@ class InverseModel(BaseModel):
             msg = f"When `target_covariates_dims` is of type `int`, the respective perturbations should contain only one element, found {len(target_covariates)}"
             assert len(target_covariates) == 1, msg
             target_covariates_dims = {target_covariates[0]: target_covariates_dims}
-        
+
         if isinstance(target_covariates_noise_models, str):
             msg = f"When `target_covariates_noise_models` is of type `str`, the respective perturbations should contain only one element, found {len(target_covariates)}"
             assert len(target_covariates) == 1, msg
@@ -172,7 +256,42 @@ class InverseModel(BaseModel):
         callbacks: BaseCallBack | None = None,
         grad_steps_log_interval: int = 100,
     ) -> None:
-        """"""
+        """Trains the target-covariate prediction model prepared by :meth:`prepare_target_prediction_model`.
+
+        :param train_data: The data used to train the target prediction model. Must be an instance of
+            :class:`AnnotatedPerturbationData` with `target_reprs` set. Defaults to `None`, in which case
+            `self.forward_model.train_data` is used.
+        :type train_data: class:`AnnotatedPerturbationData | None`
+
+        :param validation_data: (Optional) data used to validate the target prediction model during training,
+            with the same requirements as `train_data`. Defaults to `None`.
+        :type validation_data: class:`AnnotatedPerturbationData | None`
+
+        :param num_training_steps: The number of steps which to train the model on, defaults to `500`.
+        :type num_training_steps: class:`int`
+
+        :param valid_freq: The number of gradient steps after which to perform a validation step, only used when
+            `validation_data` is provided, defaults to `None`.
+        :type valid_freq: class:`int | None`
+
+        :param train_batch_size: The batch size used for sampling the training data, defaults to `1024`.
+        :type train_batch_size: class:`int`
+
+        :param validation_batch_size: The batch size used for sampling the validation data, defaults to `512`.
+        :type validation_batch_size: class:`int`
+
+        :param state_transforms: (Optional) transformations applied to the states before feeding them into the
+            model. Should be an instance of a class derived from :class:`labcompass.transforms.Transform`,
+            defaults to `None`.
+        :type state_transforms: class:`Transform`
+
+        :param callbacks: (Optional) callbacks that will be called during training, defaults to `None`.
+        :type callbacks: class:`BaseCallBack`
+
+        :param grad_steps_log_interval: The number of gradient steps after which to update the progress bar,
+            defaults to `100`.
+        :type grad_steps_log_interval: class:`int`
+        """
         # sanity checks
         msg = f"You need to have instantitated the target predictor model by calling `prepare_target_prediction_model`"
         assert self.target_prediction_model is not None, msg
@@ -288,7 +407,135 @@ class InverseModel(BaseModel):
         lr_scheduler_step: Literal["grad_step", "epoch"] = "grad_step",
         **kwargs,
     ) -> None:
-        """"""
+        """Initializes the inverse model (an instance of :class:`MAPConditionOptimizer`,
+        :class:`LangevinSampler`, or :class:`NeuralInverseModel`, depending on `self.inverse_method`) that infers
+        the perturbation covariates driving control cell states towards `optimal_condition`, together with its
+        optimizer and optional learning rate scheduler.
+
+        :param optimal_condition: The desired value(s) of the target covariate(s) that the inferred perturbation
+            should produce. If a single :class:`torch.Tensor` is given, `self.target_covariates` must contain a
+            single element and the tensor is associated with it.
+        :type optimal_condition: class:`torch.Tensor | dict[str, torch.Tensor]`
+
+        :param loss_fn: The loss function(s) comparing the target covariate(s) predicted from the perturbed state
+            against `optimal_condition`. If a single :class:`Callable` is given, `self.target_covariates` must
+            contain a single element and the function is associated with it.
+        :type loss_fn: class:`dict[str, Callable[[torch.Tensor, torch.Tensor], torch.Tensor]] | Callable[[torch.Tensor, torch.Tensor], torch.Tensor]`
+
+        :param perturbation_covariates: The identifier(s) of the perturbation covariate(s) to infer.
+        :type perturbation_covariates: class:`str | Sequence[str]`
+
+        :param perturbation_covariates_dims: The dimensionality of the representation of each perturbation
+            covariate. If an :class:`int` is given, `perturbation_covariates` must contain a single element.
+        :type perturbation_covariates_dims: class:`int | dict[str, int]`
+
+        :param is_discrete_dict: Whether each perturbation covariate is discrete (in which case it is optimized
+            through a differentiable Gumbel-softmax relaxation) or continuous. If a single :class:`bool` is
+            given, `perturbation_covariates` must contain a single element. Defaults to `None`, in which case
+            every covariate is treated as continuous (`False`) and a warning is logged.
+        :type is_discrete_dict: class:`bool | dict[str, bool] | None`
+
+        :param forward_model: The forward model used to predict the perturbed cell states, overriding
+            `self.forward_model` when provided. Defaults to `None`, in which case `self.forward_model` is used.
+        :type forward_model: class:`BaseForwardModel | None`
+
+        :param target_prediction_model: The model used to predict the target covariates from the perturbed cell
+            states, overriding `self.target_prediction_model` when provided. Defaults to `None`, in which case
+            `self.target_prediction_model` is used, which requires it to have already been trained via
+            :meth:`train_target_prediction_model`.
+        :type target_prediction_model: class:`BaseModule | None`
+
+        :param prior: (Optional) dictionary of prior distributions over the perturbation covariates, used to add
+            a negative log-prior regularization term to the loss. Defaults to `None`.
+        :type prior: class:`torch.nn.Module | None`
+
+        :param prior_weight: The weight of the negative log-prior term in the loss, only used when `prior` is
+            provided. Defaults to `None`, in which case it is set to `1.0` and a warning is logged.
+        :type prior_weight: class:`float | None`
+
+        :param hard: Whether discrete perturbation covariates use the hard (straight-through) Gumbel-softmax
+            estimator rather than the soft relaxation, defaults to `False`.
+        :type hard: class:`bool`
+
+        :param perturbation_initializer: Function(s) used to initialize the optimized perturbation covariate
+            tensor(s). If a single :class:`Callable` is given, `perturbation_covariates` must contain a single
+            element. Defaults to `None`, in which case `torch.randn` is used for every covariate and a warning is
+            logged.
+        :type perturbation_initializer: class:`Callable[[Any], torch.Tensor] | dict[str, Callable[[Any], torch.Tensor]] | None`
+
+        :param perturbation_non_linearities: Non-linearity(ies) applied to each continuous perturbation covariate
+            before it is fed to the forward model. If a single :class:`torch.nn.Module` or :class:`Callable` is
+            given, `perturbation_covariates` must contain a single element. Defaults to `None`, in which case
+            :class:`torch.nn.Identity` is used for every covariate and a warning is logged.
+        :type perturbation_non_linearities: class:`torch.nn.Module | Callable[[torch.Tensor], torch.Tensor] | dict[str, torch.nn.Module | Callable[[torch.Tensor], torch.Tensor]] | None`
+
+        :param perturbation_covariates_noise_models: The noise model used for the predictive distribution of each
+            perturbation covariate, only used when `self.inverse_method` is `"neural"`. If a single :class:`str`
+            is given, `perturbation_covariates` must contain a single element. Defaults to `None`, in which case
+            every covariate is assigned `None` and a warning is logged.
+        :type perturbation_covariates_noise_models: class:`Literal["gaussian", "neg_bin"] | dict[str, None | Literal["gaussian", "neg_bin"]] | None`
+
+        :param perturbation_covariates_predictor_kwargs: Dictionary mapping each perturbation covariate to the
+            keyword arguments used to initialize its predictor network, only used when `self.inverse_method` is
+            `"neural"`. Defaults to `None`, in which case an empty dictionary is used for every covariate and a
+            warning is logged.
+        :type perturbation_covariates_predictor_kwargs: class:`dict[str, dict[str, Any]] | None`
+
+        :param perturbation_covariates_use_shared_representation: Whether the perturbation covariate predictors
+            share a common encoder representation of the input, only used when `self.inverse_method` is
+            `"neural"`, defaults to `False`.
+        :type perturbation_covariates_use_shared_representation: class:`bool`
+
+        :param perturbation_covariates_latent_dim: Dimensionality of the (optionally shared) latent
+            representation used by the perturbation covariate predictors, only used when `self.inverse_method` is
+            `"neural"`, defaults to `1024`.
+        :type perturbation_covariates_latent_dim: class:`int`
+
+        :param perturbation_encoder_mlp_kwargs: Dictionary containing the keyword arguments used to initialize the
+            encoder MLP producing the (optionally shared) latent representation, only used when
+            `self.inverse_method` is `"neural"`. Defaults to `None`, in which case an empty dictionary is used and
+            a warning is logged.
+        :type perturbation_encoder_mlp_kwargs: class:`dict[str, Any] | None`
+
+        :param n_samples: The number of perturbation covariate samples drawn per control state, only used when
+            `self.inverse_method` is `"langevin"`. Defaults to `None`, in which case it is set to `1` and a
+            warning is logged.
+        :type n_samples: class:`int | None`
+
+        :param optimizer_class: Optimizer used to update the inverse model's parameters during training. Should
+            reference a class derived from :class:`torch.optim.Optimizer` and not an instance, defaults to
+            :class:`torch.optim.AdamW`. When `self.inverse_method` is `"langevin"`, it is forced to
+            :class:`labcompass.models.inverse_utils.LangevinOptimizer` (with a warning if a different class was
+            passed), and its keyword arguments are instead built from the `eta` and `noise_scale` entries of
+            `kwargs`.
+        :type optimizer_class: class:`torch.optim.Optimizer`
+
+        :param optimizer_kwargs: Dictionary containing the keyword arguments used to initialize `optimizer_class`,
+            defaults to `{"lr": 0.001}`. Ignored when `self.inverse_method` is `"langevin"`.
+        :type optimizer_kwargs: class:`dict[str, Any]`
+
+        :param lr_scheduler_class: Optional scheduler used to update the learning rate during optimization. Should
+            reference a class derived from :class:`torch.optim.lr_scheduler.LRScheduler` and not an instance,
+            defaults to `None`. Not supported when `self.inverse_method` is `"langevin"`, in which case it is
+            forced back to `None` and a warning is logged if provided.
+        :type lr_scheduler_class: class:`torch.optim.lr_scheduler.LRScheduler | None`
+
+        :param lr_scheduler_kwargs: Dictionary containing the keyword arguments used to initialize
+            `lr_scheduler_class`, defaults to `None`.
+        :type lr_scheduler_kwargs: class:`dict[str, Any] | None`
+
+        :param lr_scheduler_step: :class:`str` identifier indicating when to perform the learning rate scheduling
+            step, if a `lr_scheduler_class` is specified (otherwise it is ignored). When `"grad_step"`, the
+            learning rate is updated after each gradient step; when `"epoch"`, it is updated after each
+            validation step. Defaults to `"grad_step"`.
+        :type lr_scheduler_step: class:`Literal["grad_step", "epoch"]`
+
+        :param kwargs: Additional keyword arguments forwarded to the underlying inverse-method class
+            (:class:`MAPConditionOptimizer`, :class:`LangevinSampler`, or :class:`NeuralInverseModel`). When
+            `self.inverse_method` is `"langevin"`, the `eta` and `noise_scale` entries (if present) are also used
+            to build `optimizer_kwargs`.
+        :type kwargs: class:`Any`
+        """
         # we need to have at least one trained target predictor
         if target_prediction_model is None:
             msg = f"You need to have trained the target predictor model by calling `train_target_prediction_model`."
@@ -520,7 +767,43 @@ class InverseModel(BaseModel):
         callbacks: BaseCallBack | None = None,
         grad_steps_log_interval: int = 100,
     ) -> None:
-        """"""
+        """Trains the inverse model prepared by :meth:`prepare_inverse_model` on control cell states.
+
+        :param train_data: The data used to train the inverse model. Must be an instance of
+            :class:`AnnotatedPerturbationData` with `target_reprs` set. Only the rows flagged as controls
+            (`train_data.adata.obs[train_data.control_key]`) are used. Defaults to `None`, in which case
+            `self.forward_model.train_data` is used.
+        :type train_data: class:`AnnotatedPerturbationData | None`
+
+        :param validation_data: (Optional) data used to validate the inverse model during training, with the same
+            requirements as `train_data`; only its control rows are used. Defaults to `None`.
+        :type validation_data: class:`AnnotatedPerturbationData | None`
+
+        :param num_training_steps: The number of steps which to train the model on, defaults to `500`.
+        :type num_training_steps: class:`int`
+
+        :param valid_freq: The number of gradient steps after which to perform a validation step, only used when
+            `validation_data` is provided, defaults to `None`.
+        :type valid_freq: class:`int | None`
+
+        :param train_batch_size: The batch size used for sampling the training data, defaults to `1024`.
+        :type train_batch_size: class:`int`
+
+        :param validation_batch_size: The batch size used for sampling the validation data, defaults to `512`.
+        :type validation_batch_size: class:`int`
+
+        :param state_transforms: (Optional) transformations applied to the states before feeding them into the
+            model. Should be an instance of a class derived from :class:`labcompass.transforms.Transform`,
+            defaults to `None`.
+        :type state_transforms: class:`Transform`
+
+        :param callbacks: (Optional) callbacks that will be called during training, defaults to `None`.
+        :type callbacks: class:`BaseCallBack`
+
+        :param grad_steps_log_interval: The number of gradient steps after which to update the progress bar,
+            defaults to `100`.
+        :type grad_steps_log_interval: class:`int`
+        """
         # sanity checks
         msg = f"You need to have instantitated the target predictor model by calling `prepare_inverse_model`"
         assert self.inverse_model is not None, msg
@@ -587,7 +870,20 @@ class InverseModel(BaseModel):
         control_states: torch.Tensor,
         return_loss: bool = False,
     ) -> dict[str, torch.Tensor] | tuple[torch.Tensor, dict[str, torch.Tensor]]:
-        """"""
+        """Infers the perturbation covariates for the given control cell states using the trained inverse model.
+
+        :param control_states: A tensor of control cell states for which to infer the perturbation covariates
+            driving them towards `self.optimal_condition`.
+        :type control_states: class:`torch.Tensor`
+
+        :param return_loss: Whether to also return the loss computed by the inverse model, defaults to `False`.
+        :type return_loss: class:`bool`
+
+        :return: A dictionary with the source states, the inferred perturbation covariates, the forward model's
+            predicted post-perturbation states, and the target covariates predicted from them, if `return_loss`
+            is `False`. Otherwise, a tuple with the loss as first element and this dictionary as second element.
+        :rtype: class:`dict[str, torch.Tensor] | tuple[torch.Tensor, dict[str, torch.Tensor]]`
+        """
         loss, out_dict = self.inverse_model(control_states)
         if return_loss:
             return loss, out_dict

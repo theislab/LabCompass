@@ -17,7 +17,7 @@ __all__ = [
 
 
 class BaseCallBack:
-    """"""
+    """Base class defining the callback interface invoked by :meth:`BaseTrainer.fit` at the different stages of training."""
     callback_type: Literal["computational", "logging"]
 
     def run_on_train_begin(
@@ -25,7 +25,7 @@ class BaseCallBack:
         *args,
         **kwargs,
     ) -> None:
-        """"""
+        """Hook invoked once before training begins. This base implementation does nothing; subclasses may override it to perform setup (e.g. initializing a logging run)."""
         pass
 
     def run_on_train_step(
@@ -33,14 +33,18 @@ class BaseCallBack:
         *args,
         **kwargs,
     ) -> None:
-        """"""
+        """Hook invoked periodically during training. This base implementation does nothing; subclasses may override it to log training metrics."""
         pass
 
     def run_on_valid_step(
         self,
         prediction_dict: dict[str, dict[str, TensorLike]],
     ) -> None:
-        """"""
+        """Hook invoked after a validation step. This base implementation does nothing; subclasses may override it to compute or log validation metrics.
+
+        :param prediction_dict: Dictionary mapping each perturbation identifier to a dictionary containing the model predictions and the target values for that perturbation.
+        :type prediction_dict: class:`dict[str, dict[str, TensorLike]]`
+        """
         pass
 
     def run_on_train_end(
@@ -48,7 +52,7 @@ class BaseCallBack:
         *args,
         **kwargs,
     ) -> None:
-        """"""
+        """Hook invoked once at the end of training, after the last gradient step. This base implementation does nothing; subclasses may override it to perform teardown (e.g. closing a logging run)."""
         pass
 
 
@@ -63,7 +67,14 @@ class LoggingCallBack(BaseCallBack):
 
 
 class MetricsCallBack(ComputationalCallBack):
-    """"""
+    """Computational callback that computes a set of metrics on model predictions during validation.
+
+    :param metric_ids: Sequence of attribute names of :class:`labcompass.metrics.Metrics` identifying which metrics to compute at each validation step.
+    :type metric_ids: class:`Sequence[str]`
+
+    :param state_transforms: Optional transform applied to both predictions and targets before computing the metrics, e.g. to invert a preprocessing transform. Defaults to `None`.
+    :type state_transforms: class:`Transform | None`
+    """
 
     def __init__(
         self,
@@ -93,7 +104,14 @@ class MetricsCallBack(ComputationalCallBack):
         self,
         predictions_dict: dict[str, dict[str, TensorLike]],
     ) -> dict[str, float]:
-        """"""
+        """Computes the configured metrics for every perturbation in `predictions_dict`, using its predictions and target states.
+
+        :param predictions_dict: Dictionary mapping each perturbation identifier to a dictionary containing the predicted states (under :attr:`PredictionFields.PREDICTION_DATA`) and the target states (under :attr:`DataFields.TARGET_STATE`).
+        :type predictions_dict: class:`dict[str, dict[str, TensorLike]]`
+
+        :return: Dictionary mapping `"{perturbation}_{metric_id}"` to the corresponding metric value.
+        :rtype: class:`dict[str, float]`
+        """
         # defining output dictionary
         metrics = {}
         
@@ -117,7 +135,20 @@ class MetricsCallBack(ComputationalCallBack):
 
 
 class WandBLogger(LoggingCallBack):
-    """"""
+    """Logging callback that streams training and validation metrics to Weights & Biases.
+
+    :param project_name: Name of the W&B project under which the run is created.
+    :type project_name: class:`str`
+
+    :param log_dir: Local directory where W&B stores its run files.
+    :type log_dir: class:`str`
+
+    :param config: Configuration dictionary logged alongside the run. Converted to an :class:`omegaconf.DictConfig` if a plain `dict` is passed.
+    :type config: class:`dict[str, Any]`
+
+    :param kwargs: Additional keyword arguments forwarded to :class:`wandb.Settings` when initializing the run.
+    :type kwargs: class:`Any`
+    """
 
     def __init__(
         self,
@@ -137,7 +168,7 @@ class WandBLogger(LoggingCallBack):
         *args,
         **kwargs,
     ) -> None:
-        """"""
+        """Logs into Weights & Biases and initializes a new run using :attr:`project_name`, :attr:`config`, :attr:`log_dir` and the settings built from :attr:`kwargs`. The resulting run name is stored as :attr:`run_name`."""
         # moving configuration to omegaconf
         config = self.config
         if isinstance(config, dict):
@@ -163,7 +194,14 @@ class WandBLogger(LoggingCallBack):
         grad_step: int,
         logs: dict[str, Any],
     ) -> None:
-        """"""
+        """Logs the metrics collected at a training step to the current W&B run.
+
+        :param grad_step: Index of the current gradient step, logged under the `"train_step"` key.
+        :type grad_step: class:`int`
+
+        :param logs: Dictionary of metric names and values collected at the current training step.
+        :type logs: class:`dict[str, Any]`
+        """
         # logging the training step
         wandb.log(
             {
@@ -176,53 +214,76 @@ class WandBLogger(LoggingCallBack):
         self,
         log_dict: dict[str, Any],
     ) -> None:
-        """"""
+        """Logs a dictionary of validation metrics to the current W&B run.
+
+        :param log_dict: Dictionary of metric names and values computed during the validation step.
+        :type log_dict: class:`dict[str, Any]`
+        """
         wandb.log(log_dict)
 
     def run_on_train_end(
         self,
     ) -> None:
-        """"""
+        """Closes the current Weights & Biases run."""
         wandb.finish()
 
 
 class TrainingCallBacks(BaseCallBack):
-    """"""
-    
+    """Aggregates multiple callbacks and dispatches each training hook to the appropriate subset of them, running computational callbacks before logging callbacks.
+
+    :param callbacks: Sequence of callback instances to run during training.
+    :type callbacks: class:`Sequence[BaseCallBack]`
+    """
+
     def __init__(
         self,
         callbacks: Sequence[BaseCallBack],
     ) -> None:
         """"""
         self.callbacks = callbacks
-    
+
     @property
     def computational_callbacks(
         self,
     ) -> Sequence[BaseCallBack]:
-        """"""
+        """The subset of :attr:`callbacks` whose `callback_type` is `"computational"`.
+
+        :return: The computational callbacks.
+        :rtype: class:`Sequence[BaseCallBack]`
+        """
         return [callback for callback in self.callbacks if callback.callback_type == "computational"]
 
     @property
     def logging_callbacks(
         self,
     ) -> Sequence[BaseCallBack]:
-        """"""
+        """The subset of :attr:`callbacks` whose `callback_type` is `"logging"`.
+
+        :return: The logging callbacks.
+        :rtype: class:`Sequence[BaseCallBack]`
+        """
         return [callback for callback in self.callbacks if callback.callback_type == "logging"]
 
     def run_on_train_begin(
         self,
     ) -> None:
-        """"""
+        """Calls `run_on_train_begin` on every callback in :attr:`callbacks`."""
         for callback in self.callbacks:
             callback.run_on_train_begin()
-    
+
     def run_on_train_step(
         self,
         grad_step: int,
         logs: dict[str, Any],
     ) -> None:
-        """"""
+        """Calls `run_on_train_step` on every logging callback in :attr:`logging_callbacks`.
+
+        :param grad_step: Index of the current gradient step, forwarded to each callback.
+        :type grad_step: class:`int`
+
+        :param logs: Dictionary of metric names and values collected at the current training step, forwarded to each callback.
+        :type logs: class:`dict[str, Any]`
+        """
         # then log the results
         for callback in self.logging_callbacks:
             callback.run_on_train_step(grad_step, logs)
@@ -231,7 +292,14 @@ class TrainingCallBacks(BaseCallBack):
         self,
         prediction_dict: dict[str, dict[str, TensorLike]],
     ) -> dict[str, Any]:
-        """"""
+        """Runs all computational callbacks on the validation predictions to compute metrics, then forwards the resulting metrics to every logging callback.
+
+        :param prediction_dict: Dictionary mapping each perturbation identifier to a dictionary containing the model predictions and the target values for that perturbation.
+        :type prediction_dict: class:`dict[str, dict[str, TensorLike]]`
+
+        :return: Dictionary of metric names and values computed by the computational callbacks.
+        :rtype: class:`dict[str, Any]`
+        """
         # run computational callbacks first
         callback_out = {}
         for callback in self.computational_callbacks:
@@ -245,6 +313,6 @@ class TrainingCallBacks(BaseCallBack):
     def run_on_train_end(
         self,
     ) -> None:
-        """"""
+        """Calls `run_on_train_end` on every callback in :attr:`callbacks`."""
         for callback in self.callbacks:
             callback.run_on_train_end()

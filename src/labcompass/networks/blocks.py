@@ -18,7 +18,13 @@ class BaseModule(abc.ABC, nn.Module):
 
     @abc.abstractmethod
     def forward(self, input_tensor: Tensor):
-        """"""
+        """Performs the forward pass of the module. Must be overridden by every subclass.
+
+        :param input_tensor: The input tensor to the module.
+        :type input_tensor: class:`torch.Tensor`
+
+        :raises NotImplementedError: Always, since this is an abstract method that subclasses must override.
+        """
         raise NotImplementedError
 
     @abc.abstractmethod

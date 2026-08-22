@@ -45,7 +45,13 @@ class BaseDataLoader(abc.ABC):
     def sample(
         self,
     ) -> dict[str, TensorLike | dict[str, TensorLike]]:
-        """"""
+        """Samples a batch of data.
+
+        Must be implemented by subclasses to define how a batch is constructed.
+
+        :return: The data of the batch in a dictionary.
+        :rtype: class:`dict[str, TensorLike | dict[str, TensorLike]]`
+        """
         raise NotImplementedError
 
 

@@ -245,7 +245,12 @@ class AnnotatedPerturbationData:
     def allow_grouped_couplings(
         self,
     ) -> bool:
-        """"""
+        """Flag indicating whether treatment data can be split by individual perturbation combinations.
+
+        `True` when :attr:`seen_combinations` is not `None`, in which case a single perturbation combination
+        can be sampled and its data retrieved on its own (needed to solve the Optimal Transport problem
+        for each perturbation individually); `False` otherwise.
+        """
         if self.seen_combinations is None:
             return False
         return True

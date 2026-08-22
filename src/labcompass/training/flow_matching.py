@@ -27,7 +27,65 @@ __all__ = [
 
 
 class CFMTrainer(BaseTrainer):
-    """"""
+    """Trainer implementing the training loop for the conditional flow-matching velocity field.
+
+    :param velocity_field: The velocity field being trained; called on the flow's interpolated states to predict the target velocity.
+    :type velocity_field: class:`NeuralVelocityField`
+
+    :param flow: The flow used to sample interpolated states `xt` and target velocities `ut` between the source/latent state and the target state.
+    :type flow: class:`BaseFlow`
+
+    :param optimizer: Optimizer used to update :attr:`velocity_field`'s parameters.
+    :type optimizer: class:`torch.optim.Optimizer`
+
+    :param lr_scheduler: Optional learning rate scheduler, defaults to `None`.
+    :type lr_scheduler: class:`torch.optim.lr_scheduler.LRScheduler | None`
+
+    :param lr_scheduler_step: When to step :attr:`lr_scheduler`, either after each gradient step (`"grad_step"`) or after each validation step (`"valid_step"`), defaults to `"grad_step"`.
+    :type lr_scheduler_step: class:`Literal["grad_step", "valid_step"]`
+
+    :param time_sampler: Function used to sample the time steps at which the flow is evaluated during training, defaults to `torch.rand`.
+    :type time_sampler: class:`Callable`
+
+    :param callbacks: Optional callbacks run during training, defaults to `None`.
+    :type callbacks: class:`BaseCallBack | None`
+
+    :param grad_step_interval_log: Number of gradient steps between progress bar updates, defaults to `1000`.
+    :type grad_step_interval_log: class:`int`
+
+    :param num_time_steps: Number of discretization steps used when integrating the velocity field during validation, defaults to `100`.
+    :type num_time_steps: class:`int`
+
+    :param solver_kwargs: Dictionary of keyword arguments passed to :func:`push_forward` when integrating the dynamics during validation, defaults to `None`.
+    :type solver_kwargs: class:`dict[str, Any] | None`
+
+    :param has_controls: Whether the training data provides source/control states. When `False`, the latent state is instead drawn from :attr:`noise_distribution`, defaults to `True`.
+    :type has_controls: class:`bool`
+
+    :param generate_from_noise: Whether the flow's source is Gaussian noise rather than the batch's source state, defaults to `False`.
+    :type generate_from_noise: class:`bool`
+
+    :param noise_distribution: Function used to sample the latent state when :attr:`generate_from_noise` is `True` or when :attr:`has_controls` is `False`, defaults to `torch.randn`.
+    :type noise_distribution: class:`Callable[[Sequence[int]], Tensor]`
+
+    :param grad_steps_log_interval: Number of gradient steps after which :meth:`BaseTrainer.fit` updates the progress bar and runs the logging callbacks, defaults to `None`.
+    :type grad_steps_log_interval: class:`bool | None`
+
+    :param device_id: Identifier of the device used when pushing particles forward during validation, defaults to `"cuda"`.
+    :type device_id: class:`Literal["cuda", "cpu"]`
+
+    :param num_samples_per_validation_step: Number of samples generated per observation during validation. Only used when :attr:`generate_from_noise` is `True`, defaults to `None` in which case a single sample is generated.
+    :type num_samples_per_validation_step: class:`int | None`
+
+    :param cfg_prob_unconditional: Probability of replacing the condition with the null condition token during training, when the velocity field uses classifier-free guidance, defaults to `0.1`.
+    :type cfg_prob_unconditional: class:`float`
+
+    :param validation_cfg_guidance_strength: Strength of the classifier-free guidance term applied when pushing particles forward during validation, defaults to `1.0`.
+    :type validation_cfg_guidance_strength: class:`float`
+
+    :param num_grad_accumulation_steps: Number of gradient steps over which to accumulate gradients before stepping the optimizer, defaults to `1`.
+    :type num_grad_accumulation_steps: class:`int`
+    """
 
     def __init__(
         self,
@@ -76,7 +134,11 @@ class CFMTrainer(BaseTrainer):
     def model(
         self,
     ) -> NeuralVelocityField:
-        """"""
+        """The model being optimized.
+
+        :return: The wrapped velocity field, i.e. :attr:`velocity_field`.
+        :rtype: class:`NeuralVelocityField`
+        """
         return self.velocity_field
 
     def _train_step(

@@ -16,7 +16,35 @@ __all__ = ["InverseModelTrainer", ]
 
 
 class InverseModelTrainer(BaseTrainer):
-    """"""
+    """Trainer implementing the training loop for an inverse model.
+
+    :param inverse_model: The model being trained; called as `self.inverse_model(source_states)` at each training step to compute the loss.
+    :type inverse_model: class:`BaseModule`
+
+    :param forward_model: Forward model instance associated with the trainer.
+    :type forward_model: class:`BaseModule`
+
+    :param target_prediction_model: Target-prediction model instance associated with the trainer.
+    :type target_prediction_model: class:`BaseModule`
+
+    :param optimizer: Optimizer used to update :attr:`inverse_model`'s parameters.
+    :type optimizer: class:`torch.optim.Optimizer`
+
+    :param lr_scheduler: Optional learning rate scheduler, defaults to `None`.
+    :type lr_scheduler: class:`torch.optim.lr_scheduler.LRScheduler | None`
+
+    :param lr_scheduler_step: When to step :attr:`lr_scheduler`, either after each gradient step (`"grad_step"`) or after each validation step (`"valid_step"`), defaults to `"grad_step"`.
+    :type lr_scheduler_step: class:`Literal["grad_step", "valid_step"]`
+
+    :param callbacks: Optional callbacks run during training, defaults to `None`.
+    :type callbacks: class:`BaseCallBack | None`
+
+    :param grad_steps_log_interval: Number of gradient steps after which :meth:`BaseTrainer.fit` updates the progress bar and runs the logging callbacks, defaults to `None`.
+    :type grad_steps_log_interval: class:`int | None`
+
+    :param num_grad_accumulation_steps: Number of gradient steps over which to accumulate gradients before stepping the optimizer, defaults to `1`.
+    :type num_grad_accumulation_steps: class:`int`
+    """
 
     def __init__(
         self,
@@ -47,7 +75,11 @@ class InverseModelTrainer(BaseTrainer):
     def model(
         self,
     ) -> BaseModule:
-        """"""
+        """The model being optimized.
+
+        :return: The wrapped inverse model, i.e. :attr:`inverse_model`.
+        :rtype: class:`BaseModule`
+        """
         return self.inverse_model
 
     def _train_step(

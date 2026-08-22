@@ -21,6 +21,10 @@ __all__ = ["FlowMatchingWithScore"]
 
 
 class FlowMatchingWithScore(FlowMatching):
+    """Variant of :class:`FlowMatching` whose velocity field additionally predicts the score of the marginal probability path.
+
+    Uses the same constructor as :class:`FlowMatching`.
+    """
 
     def prepare_model(
         self,

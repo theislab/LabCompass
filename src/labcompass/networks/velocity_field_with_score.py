@@ -17,11 +17,17 @@ __all__ = ["NeuralVelocityField"]
 
 
 class NeuralVelocityFieldWithScore(NeuralVelocityField):
-    """
-    A neural velocity field module for modeling continuous-time dynamics with neural networks.
-    
-    This class implements a velocity field using a neural network architecture, allowing for encoding
-    time, state, and conditions to predict state transitions.
+    """Extension of :class:`NeuralVelocityField` that additionally predicts the score of the noise distribution.
+
+    In addition to the velocity decoder, this module maintains a separate score decoder sharing the same
+    encoders and conditioning pipeline as :class:`NeuralVelocityField`, so that :meth:`forward` returns both
+    the predicted velocity and the predicted score for a given state, time and set of conditions.
+
+    :param config: Configuration object specifying the architecture of the velocity/score field module
+        (which encoders to build for state, time, conditions and source, the conditioning strategy used to
+        combine them, and the configuration of the two decoders), used to build the submodules collected in
+        :attr:`NeuralVelocityFieldWithScore.vf_modules`.
+    :type config: class:`NeuralVelocityFieldConfig`
     """
 
     def _init_modules(
@@ -106,18 +112,30 @@ class NeuralVelocityFieldWithScore(NeuralVelocityField):
         cond: dict[str, Tensor] | None = None,
         source: Tensor | None = None,
     ) -> tuple[Tensor, Tensor]:
-        """
-        Forward pass through the neural velocity field model.
-        
-        Args:
-            t (Tensor): Time input.
-            xt (Tensor): State input.
-            cond (dict[str, Tensor] | None, optional): Conditioning variables. Defaults to None.
-            source (Tensor | None, optional): Source state for perturbation inference. Defaults to None.
-            target (Tensor | None, optional): Target state for perturbation inference. Defaults to None.
-        
-        Returns:
-            dict[str, Tensor]: Model output including velocity field and latent representations.
+        """Computes the predicted velocity and score of the flow at state `xt` and time `t`.
+
+        Encodes the time, state, perturbation conditions and (optionally) the source state according to the
+        :class:`NeuralVelocityFieldConfig` passed at initialization, combines the resulting latent
+        representations using the configured conditioning strategy (`"concatenation"`, `"resnet"` or
+        `"film"`), and decodes the combined representation independently through the velocity and score
+        decoders.
+
+        :param t: Time steps at which the velocity and score are evaluated, of shape `(*batch_shape,)`.
+        :type t: class:`Tensor`
+
+        :param xt: State at time `t`, of shape `(*batch_shape, flow_dim)`.
+        :type xt: class:`Tensor`
+
+        :param cond: Dictionary mapping each perturbation covariate name to its corresponding conditioning
+            tensor. Required when :attr:`NeuralVelocityFieldConfig.use_guidance` is `True`, defaults to `None`.
+        :type cond: class:`dict[str, Tensor] | None`
+
+        :param source: Source (e.g.: control) state used as an additional conditioning signal. Required when
+            :attr:`NeuralVelocityFieldConfig.use_source_as_condition` is `True`, defaults to `None`.
+        :type source: class:`Tensor | None`
+
+        :return: A tuple `(velocity, score)`, each of shape `(*batch_shape, flow_dim)`.
+        :rtype: class:`tuple[Tensor, Tensor]`
         """
         # encoding time
         t = torch.unsqueeze(t, dim=-1)
@@ -212,15 +230,28 @@ class NeuralVelocityFieldWithScore(NeuralVelocityField):
         source: Tensor | None = None,
         cfg_guidance_strength: float = 1.0,
     ) -> Callable[[Tensor, Tensor], Tensor]:
-        """
-        Returns a velocity field function.
+        """Builds a velocity function of `(t, xt)` bound to fixed conditions and source state.
 
-        Args:
-            cond (dict[str, Tensor] | None, optional): Conditioning variables. Defaults to None.
-            gamma_fn (Callable[[Tensor, Tensor], Tensor] | None, optional): Function for computing diffusion coefficient. Defaults to None.
-        
-        Returns:
-            Callable[[Tensor, Tensor], Tensor]: Velocity field function.
+        The returned function evaluates :meth:`NeuralVelocityFieldWithScore.forward` at given `t` and `xt`
+        values and returns only the velocity component of its output.
+
+        :param cond: Dictionary mapping each perturbation covariate name to its corresponding conditioning
+            tensor, held fixed across calls to the returned function. Required when
+            :attr:`NeuralVelocityFieldConfig.use_guidance` is `True`, defaults to `None`.
+        :type cond: class:`dict[str, Tensor] | None`
+
+        :param source: Source (e.g.: control) state, held fixed across calls to the returned function.
+            Required when :attr:`NeuralVelocityFieldConfig.use_source_as_condition` is `True`, defaults to
+            `None`.
+        :type source: class:`Tensor | None`
+
+        :param cfg_guidance_strength: Accepted for interface parity with
+            :meth:`NeuralVelocityField.get_vf_fn`, but unused by the returned function, defaults to `1.0`.
+        :type cfg_guidance_strength: class:`float`
+
+        :return: A function mapping `(t, xt)` to the predicted velocity tensor of shape
+            `(*batch_shape, flow_dim)`.
+        :rtype: class:`Callable[[Tensor, Tensor], Tensor]`
         """
         # sanity checks
         if self.config.use_source_as_condition:
@@ -231,7 +262,7 @@ class NeuralVelocityFieldWithScore(NeuralVelocityField):
             t: Tensor,
             xt: Tensor,
         ) -> Tensor:
-            """"""
+            """Evaluates the velocity component of :meth:`NeuralVelocityFieldWithScore.forward` at time `t` and state `xt`."""
             return self.forward(t, xt, cond=cond, source=source)[0]
 
         return vf_fn
@@ -242,15 +273,28 @@ class NeuralVelocityFieldWithScore(NeuralVelocityField):
         source: Tensor | None = None,
         cfg_guidance_strength: float = 1.0,
     ) -> Callable[[Tensor, Tensor], Tensor]:
-        """
-        Returns a velocity field function.
+        """Builds a score function of `(t, xt)` bound to fixed conditions and source state.
 
-        Args:
-            cond (dict[str, Tensor] | None, optional): Conditioning variables. Defaults to None.
-            gamma_fn (Callable[[Tensor, Tensor], Tensor] | None, optional): Function for computing diffusion coefficient. Defaults to None.
-        
-        Returns:
-            Callable[[Tensor, Tensor], Tensor]: Velocity field function.
+        The returned function evaluates :meth:`NeuralVelocityFieldWithScore.forward` at given `t` and `xt`
+        values and returns only the score component of its output.
+
+        :param cond: Dictionary mapping each perturbation covariate name to its corresponding conditioning
+            tensor, held fixed across calls to the returned function. Required when
+            :attr:`NeuralVelocityFieldConfig.use_guidance` is `True`, defaults to `None`.
+        :type cond: class:`dict[str, Tensor] | None`
+
+        :param source: Source (e.g.: control) state, held fixed across calls to the returned function.
+            Required when :attr:`NeuralVelocityFieldConfig.use_source_as_condition` is `True`, defaults to
+            `None`.
+        :type source: class:`Tensor | None`
+
+        :param cfg_guidance_strength: Accepted for interface parity with
+            :meth:`NeuralVelocityField.get_vf_fn`, but unused by the returned function, defaults to `1.0`.
+        :type cfg_guidance_strength: class:`float`
+
+        :return: A function mapping `(t, xt)` to the predicted score tensor of shape
+            `(*batch_shape, flow_dim)`.
+        :rtype: class:`Callable[[Tensor, Tensor], Tensor]`
         """
         # sanity checks
         if self.config.use_source_as_condition:
@@ -261,7 +305,7 @@ class NeuralVelocityFieldWithScore(NeuralVelocityField):
             t: Tensor,
             xt: Tensor,
         ) -> Tensor:
-            """"""
+            """Evaluates the score component of :meth:`NeuralVelocityFieldWithScore.forward` at time `t` and state `xt`."""
             # when not using cfg
             return self.forward(t, xt, cond=cond, source=source)[1]
         return score_fn
@@ -292,7 +336,16 @@ class NeuralVelocityFieldWithScore(NeuralVelocityField):
         self,
         cond: dict[str, Tensor] | None,
     ) -> Tensor:
-        """"""
+        """Builds the null (unconditional) counterpart of a condition dictionary for classifier-free guidance.
+
+        :param cond: Dictionary mapping each perturbation covariate name to its corresponding conditioning
+            tensor. If `None`, `None` is returned unchanged.
+        :type cond: class:`dict[str, Tensor] | None`
+
+        :return: `None` if `cond` is `None`, otherwise a dictionary with the same keys as `cond`, where every
+            value is replaced with a tensor of the same shape filled with `self.config.null_condition_token`.
+        :rtype: class:`dict[str, Tensor] | None`
+        """
         # when condition is None we simply return None
         if cond is None:
             return None

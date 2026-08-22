@@ -64,7 +64,20 @@ def binary_classification_loss(
     target: Tensor,
     loss_fn_kwargs: dict[str, Any] | None,
 ) -> Tensor:
-    """"""
+    """Computes the cross-entropy loss between predicted class logits and target class labels.
+
+    :param params: Tensor of predicted class logits.
+    :type params: class:`torch.Tensor`
+
+    :param target: Tensor of target class labels, cast to `long` before computing the loss.
+    :type target: class:`torch.Tensor`
+
+    :param loss_fn_kwargs: Optional dictionary of keyword arguments forwarded to :func:`torch.nn.functional.cross_entropy`. `None` is treated as an empty dictionary.
+    :type loss_fn_kwargs: class:`dict[str, Any] | None`
+
+    :return: The cross-entropy loss.
+    :rtype: class:`torch.Tensor`
+    """
     loss_fn_kwargs = {} if loss_fn_kwargs is None else loss_fn_kwargs
     target = target.long()
     loss = nn.functional.cross_entropy(params, target, **loss_fn_kwargs)
@@ -79,7 +92,31 @@ def reconstruction_loss_noise_model(
     allow_noise_model_to_be_none: bool = True,
     loss_fn_kwargs: dict[str, Any] | None = None
 ) -> Tensor:
-    """"""
+    """Computes the reconstruction loss for the given noise model, dispatching to the loss function matching `noise_model`.
+
+    :param params: Dictionary of predicted noise-model parameters (e.g. mean/covariance for a Gaussian model) or, when `noise_model` is `None`, a tensor of predicted class logits.
+    :type params: class:`dict[str, torch.Tensor]`
+
+    :param samples: Tensor of target values (observed samples, or target class labels when `noise_model` is `None`) to compute the loss against.
+    :type samples: class:`torch.Tensor`
+
+    :param noise_model: Identifier of the noise model used to reconstruct `samples`. When `None` and `allow_noise_model_to_be_none` is `True`, :func:`binary_classification_loss` is used instead.
+    :type noise_model: class:`Literal["gaussian", "neg_bin"] | None`
+
+    :param cov_estimation_mode: Covariance estimation mode forwarded to :func:`gaussian_rec_loss` when `noise_model` is `"gaussian"`. Required in that case, defaults to `None`.
+    :type cov_estimation_mode: class:`Literal["isotropic", "anisotropic"] | None`
+
+    :param allow_noise_model_to_be_none: Whether `noise_model` is allowed to be `None`, in which case :func:`binary_classification_loss` is used, defaults to `True`.
+    :type allow_noise_model_to_be_none: class:`bool`
+
+    :param loss_fn_kwargs: Optional dictionary of keyword arguments forwarded to the selected loss function, defaults to `None`.
+    :type loss_fn_kwargs: class:`dict[str, Any] | None`
+
+    :return: The reconstruction loss.
+    :rtype: class:`torch.Tensor`
+
+    :raises ValueError: If `noise_model` is not one of `"gaussian"`, `"neg_bin"`, or (when `allow_noise_model_to_be_none` is `True`) `None`.
+    """
     # loss on the source posterior
     if noise_model == "gaussian":
         msg = f"With {noise_model=} `cov_estimation_mode` needs to be in `['isotropic', 'anisotropic']`, found `None`."
@@ -111,7 +148,34 @@ def compute_pert_inference_loss(
     allow_noise_model_to_be_none: bool = True,
     loss_fn_kwargs=None
 ) -> tuple[Tensor, dict[str, Tensor]]:
-    """"""
+    """Computes and aggregates the reconstruction loss for each perturbation target covariate.
+
+    For every covariate in `pert_posterior_params`, looks up the corresponding target representation, noise model and covariance-estimation mode, computes its reconstruction loss via :func:`reconstruction_loss_noise_model`, and sums the per-covariate losses into a single scalar.
+
+    :param pert_posterior_params: Dictionary mapping each target covariate name to the parameters predicted for its noise model.
+    :type pert_posterior_params: class:`dict[str, torch.Tensor]`
+
+    :param pert_target_rep: Dictionary mapping each target covariate name to its target representation.
+    :type pert_target_rep: class:`dict[str, torch.Tensor]`
+
+    :param pert_noise_models: Dictionary mapping each target covariate name to the identifier of its noise model, forwarded to :func:`reconstruction_loss_noise_model`.
+    :type pert_noise_models: class:`dict[str, str]`
+
+    :param pert_cov_estimation_modes: Dictionary mapping each target covariate name to its covariance-estimation mode, forwarded to :func:`reconstruction_loss_noise_model`, defaults to `None`.
+    :type pert_cov_estimation_modes: class:`dict[str, str] | None`
+
+    :param add_loss: Currently unused by this function.
+    :type add_loss: class:`bool`
+
+    :param allow_noise_model_to_be_none: Forwarded to :func:`reconstruction_loss_noise_model` for every covariate, defaults to `True`.
+    :type allow_noise_model_to_be_none: class:`bool`
+
+    :param loss_fn_kwargs: Optional dictionary of keyword arguments forwarded to :func:`reconstruction_loss_noise_model` for every covariate, defaults to `None` in which case an empty dictionary is used.
+    :type loss_fn_kwargs: class:`dict[str, Any] | None`
+
+    :return: A tuple `(loss, loss_dict)` where `loss` is the sum of the per-covariate reconstruction losses and `loss_dict` maps `"{covariate}_{LossFields.PERTURBATION_LOSS}"` to the corresponding detached loss value.
+    :rtype: class:`tuple[torch.Tensor, dict[str, torch.Tensor]]`
+    """
     loss = torch.zeros((), requires_grad=True)
     loss_dict = {}
     for pert_target_cov_id, pert_target_cov_params in pert_posterior_params.items():

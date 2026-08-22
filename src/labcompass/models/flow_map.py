@@ -19,6 +19,39 @@ from labcompass.networks.flow_map_net import NeuralFlowMap
 
 
 class FlowMap(FlowMatching):
+    """Initializes the :class:`FlowMap` model, a flow-map based variant of :class:`FlowMatching` that learns a two-time map
+    between arbitrary time points instead of an instantaneous velocity field.
+
+    :param flow_type: String identifier for the flow used to define the target dynamics, defaults to `"rectified"`.
+    :type flow_type: class:`Literal["constant_noise", "encoding_decoding", "rectified", "variance_preserving"]`
+
+    :param flow_kwargs: Dictionary containing the keyword arguments passed to the flow for its initialization.
+        Refer to the :module:`labcompass.flows` page for the available flows and their respective keyword arguments.
+        Defaults to `None`.
+    :type flow_kwargs: class:`dict[str, Any] | None`
+
+    :param coupling_type: The coupling used to sample source and terminal states from the dataset, defaults to `"ot"`
+    :type coupling_type: class:`Literal["independent", "ot"]`
+
+    :param coupling_kwargs: Dictionary containing the keyword arguments passed to the coupling for its initialization.
+        Refer to the :module:`labcompass.couplings` page for the available couplings and their respective keyword arguments.
+        Defaults to `None`.
+    :type coupling_kwargs: class:`dict[str, Any] | None`
+
+    :param time_sampler: Function used to sample the pair of time steps `(s, t)` during training, defaults to `None` in which case
+        `s` and `t` are each sampled independently and uniformly at random in `[0, 1]`.
+    :type time_sampler: class:`Callable[[Sequence[int], Any], torch.Tensor] | None`
+
+    :param device_id: The identifier for the device where to do the computations, defaults to `"cuda"`.
+    :type device_id: class:`Literal["cuda", "cpu"]`
+
+    :param generate_from_noise: Controls if the source samples are Gaussian (True) or control cells (False).
+    :type generate_from_noise: class:`bool`
+
+    :param noise_distribution: Function used to sample initial states when generating from noise.
+        Only used when :param:`generate_from_noise` is set to `True`. Defaults to `torch.randn` (i.e.: Standard Gaussian).
+    :type noise_distribution: class:`Callable[[Sequence[int]], torch.Tensor]`
+    """
 
     def __init__(
         self,

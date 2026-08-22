@@ -276,7 +276,7 @@ class DataContainer:
     def num_observations(
         self,
     ) -> int:
-        """"""
+        """Returns the number of observations in the batch, i.e. the first dimension of `state_data`"""
         return self.state_data.shape[0]
 
     @property
