@@ -50,9 +50,6 @@ class CFMTrainer(BaseTrainer):
     :param callbacks: Optional callbacks run during training, defaults to `None`.
     :type callbacks: class:`BaseCallBack | None`
 
-    :param grad_step_interval_log: Number of gradient steps between progress bar updates, defaults to `1000`.
-    :type grad_step_interval_log: class:`int`
-
     :param num_time_steps: Number of discretization steps used when integrating the velocity field during validation, defaults to `100`.
     :type num_time_steps: class:`int`
 
@@ -69,7 +66,7 @@ class CFMTrainer(BaseTrainer):
     :type noise_distribution: class:`Callable[[Sequence[int]], Tensor]`
 
     :param grad_steps_log_interval: Number of gradient steps after which :meth:`BaseTrainer.fit` updates the progress bar and runs the logging callbacks, defaults to `None`.
-    :type grad_steps_log_interval: class:`bool | None`
+    :type grad_steps_log_interval: class:`int | None`
 
     :param device_id: Identifier of the device used when pushing particles forward during validation, defaults to `"cuda"`.
     :type device_id: class:`Literal["cuda", "cpu"]`
@@ -96,13 +93,12 @@ class CFMTrainer(BaseTrainer):
         lr_scheduler_step: Literal["grad_step", "valid_step"] = "grad_step",
         time_sampler: Callable = torch.rand,
         callbacks: BaseCallBack | None = None,
-        grad_step_interval_log: int = 1000,
         num_time_steps: int = 100,
         solver_kwargs: dict[str, Any] = None,
         has_controls: bool = True,
         generate_from_noise: bool = False,
         noise_distribution: Callable[[Sequence[int]], Tensor] = torch.randn,
-        grad_steps_log_interval: bool | None = None,
+        grad_steps_log_interval: int | None = None,
         device_id: Literal["cuda", "cpu"] = "cuda",
         num_samples_per_validation_step: int | None = None,
         cfg_prob_unconditional: float = 0.1,
@@ -117,7 +113,6 @@ class CFMTrainer(BaseTrainer):
         self.lr_scheduler_step = lr_scheduler_step
         self.time_sampler = time_sampler
         self.callbacks = callbacks
-        self.grad_step_interval_log = grad_step_interval_log
         self.num_time_steps = num_time_steps
         self.solver_kwargs = solver_kwargs
         self.has_controls = has_controls

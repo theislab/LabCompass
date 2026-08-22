@@ -201,8 +201,8 @@ class FlowMap(FlowMatching):
         :param callbacks: (Optional) callbacks that will be called during training. Still work in progress, defaults to `None`.
         :type callbacks: class:`BaseCallBack`
 
-        :param grad_step_interval_log: The number of gradient steps after which to update the progress bar, defaults to `100`.
-        :type grad_step_interval_log: class:`int`
+        :param grad_steps_log_interval: The number of gradient steps after which to update the progress bar, defaults to `100`.
+        :type grad_steps_log_interval: class:`int`
 
         :param num_treatments_to_load: Specifies the maximum number of unique treatments to be loaded in a single batch.
             Defaults to `None`, in which case all unique treatments are loaded.

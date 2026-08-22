@@ -36,13 +36,12 @@ class FlowMapTrainer(BaseTrainer):
         lr_scheduler_step: Literal["grad_step", "valid_step"] = "grad_step",
         time_sampler: Callable = torch.rand,
         callbacks: BaseCallBack | None = None,
-        grad_step_interval_log: int = 1000,
         num_time_steps: int = 100,
         solver_kwargs: dict[str, Any] = None,
         has_controls: bool = True,
         generate_from_noise: bool = False,
         noise_distribution: Callable[[Sequence[int]], Tensor] = torch.randn,
-        grad_steps_log_interval: bool | None = None,
+        grad_steps_log_interval: int | None = None,
         device_id: Literal["cuda", "cpu"] = "cuda",
         num_samples_per_validation_step: int | None = None,
         cfg_prob_unconditional: float = 0.1,
@@ -59,7 +58,6 @@ class FlowMapTrainer(BaseTrainer):
         self.lr_scheduler_step = lr_scheduler_step
         self.time_sampler = time_sampler
         self.callbacks = callbacks
-        self.grad_step_interval_log = grad_step_interval_log
         self.num_time_steps = num_time_steps
         self.solver_kwargs = solver_kwargs
         self.has_controls = has_controls

@@ -46,7 +46,7 @@ def compute_r_squared(
     if isinstance(target, torch.Tensor):
         target = target.numpy()
     # computing r2 score
-    return r2_score(np.mean(pred, axis=0), np.mean(target, axis=0))
+    return r2_score(np.mean(target, axis=0), np.mean(pred, axis=0))
 
 
 def compute_e_distance(
@@ -245,7 +245,7 @@ def compute_wasserstein_distance(
 def compute_min_max_mse(
     pred: TensorLike,
     target: TensorLike
-) -> float:
+) -> tuple[np.ndarray, np.ndarray]:
     """Compute, for each entry along the leading axis of `pred`, the minimum and maximum per-cell MSE against `target`.
 
     For every index `i` along the first axis of `pred`, the pointwise (element-wise) mean squared error
@@ -288,9 +288,6 @@ def compute_cell_props(
     count how many of its `k` nearest neighbours fall in the `pred` block versus the `target` block; the
     proportion `num_pred_neighbours / (num_pred_neighbours + num_target_neighbours)` is recorded.
 
-    Note that the boundary between the `target` and `pred` blocks within the graph is hard-coded to
-    column index `1024`, so this function implicitly assumes `target` has exactly `1024` rows.
-
     :param pred: Predicted cells, of shape `(num_pred_cells, num_features)`.
     :type pred: class:`TensorLike`
 
@@ -308,10 +305,11 @@ def compute_cell_props(
     :rtype: class:`TensorLike`
     """
     graph = kneighbors_graph(torch.vstack([target, pred]).numpy(), n_neighbors=k, mode='connectivity')
+    num_target_cells = target.shape[0]
     props = []
     for _ in range(n_iter):
-        target_sampled_idx = np.random.choice(np.arange(0, target.shape[0]), size=1, replace=False)
-        pred_in_idx_neigh = np.where(graph[target_sampled_idx, 1024:].toarray().flatten() != 0)[0]
-        target_in_idx_neigh = np.where(graph[target_sampled_idx, :1024].toarray().flatten() != 0)[0]
+        target_sampled_idx = np.random.choice(np.arange(0, num_target_cells), size=1, replace=False)
+        pred_in_idx_neigh = np.where(graph[target_sampled_idx, num_target_cells:].toarray().flatten() != 0)[0]
+        target_in_idx_neigh = np.where(graph[target_sampled_idx, :num_target_cells].toarray().flatten() != 0)[0]
         props.append(len(pred_in_idx_neigh) / (len(target_in_idx_neigh) + len(pred_in_idx_neigh)))
     return np.array(props)

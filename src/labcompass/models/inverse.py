@@ -389,7 +389,7 @@ class InverseModel(BaseModel):
         is_discrete_dict: bool | dict[str, bool] | None = None,
         forward_model: BaseForwardModel | None = None,
         target_prediction_model: BaseModule | None = None, 
-        prior: torch.nn.Module | None = None,
+        prior: dict[str, torch.distributions.Distribution] | None = None,
         prior_weight: float | None = None,
         hard: bool = False,
         perturbation_initializer: Callable[[Any], torch.Tensor] | dict[str, Callable[[Any], torch.Tensor]] | None = None,
@@ -445,9 +445,10 @@ class InverseModel(BaseModel):
             :meth:`train_target_prediction_model`.
         :type target_prediction_model: class:`BaseModule | None`
 
-        :param prior: (Optional) dictionary of prior distributions over the perturbation covariates, used to add
-            a negative log-prior regularization term to the loss. Defaults to `None`.
-        :type prior: class:`torch.nn.Module | None`
+        :param prior: (Optional) dictionary mapping each perturbation covariate to a prior distribution (any
+            object exposing a `log_prob` method, e.g. a :class:`torch.distributions.Distribution`) over it, used
+            to add a negative log-prior regularization term to the loss. Defaults to `None`.
+        :type prior: class:`dict[str, torch.distributions.Distribution] | None`
 
         :param prior_weight: The weight of the negative log-prior term in the loss, only used when `prior` is
             provided. Defaults to `None`, in which case it is set to `1.0` and a warning is logged.
