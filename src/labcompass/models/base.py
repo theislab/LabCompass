@@ -1,11 +1,50 @@
+import importlib
+import importlib.abc
+import importlib.util
 import logging
 import os
+import sys
 
 import cloudpickle
 
 logger = logging.getLogger(__name__)
 
 __all__ = ["BaseModel"]
+
+_LEGACY_PACKAGE_NAME = "sc_exp_design"
+
+
+class _LegacyPackageLoader(importlib.abc.Loader):
+    """Redirects a legacy ``sc_exp_design.*`` import to its ``labcompass`` equivalent."""
+
+    def create_module(self, spec):
+        new_name = "labcompass" + spec.name[len(_LEGACY_PACKAGE_NAME) :]
+        return importlib.import_module(new_name)
+
+    def exec_module(self, module):
+        pass
+
+
+class _LegacyPackageFinder(importlib.abc.MetaPathFinder):
+    """Finds imports of the old ``sc_exp_design`` package name, renamed to ``labcompass``."""
+
+    def find_spec(self, fullname, path, target=None):
+        if fullname == _LEGACY_PACKAGE_NAME or fullname.startswith(f"{_LEGACY_PACKAGE_NAME}."):
+            return importlib.util.spec_from_loader(fullname, _LegacyPackageLoader())
+        return None
+
+
+def _install_legacy_module_alias() -> None:
+    """Ensures old ``sc_exp_design``-pickled checkpoints can still be unpickled.
+
+    ``cloudpickle`` stores each class's exact module path at save time, so
+    checkpoints saved before the ``sc_exp_design`` -> ``labcompass`` rename
+    reference a module that no longer exists. This installs an import
+    redirect so those lookups resolve to the renamed ``labcompass`` modules.
+    """
+    if any(isinstance(finder, _LegacyPackageFinder) for finder in sys.meta_path):
+        return
+    sys.meta_path.insert(0, _LegacyPackageFinder())
 
 
 class BaseModel:
@@ -68,6 +107,7 @@ class BaseModel:
         :raises TypeError: If the deserialized object is not an instance of the class :method:`load` was called on.
         """
         # loading model file
+        _install_legacy_module_alias()
         with open(file_name, "rb") as fp:
             model = cloudpickle.load(fp)
         
