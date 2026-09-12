@@ -421,7 +421,6 @@ class ValidationDataLoader(BaseCoupledDataLoader):
             # retrieving target data
             trtm_data = data.get_treatments(treatments=treatment)
             if self.batch_size is not None:
-                print("retrieving indices")
                 trtm_idxs = len(trtm_data)
                 trtm_idxs = np.random.choice(trtm_idxs, size=self.batch_size)
             else:

@@ -84,7 +84,7 @@ class TestDataLoaders(BaseDataTest):
             batch_size,
             state_transforms,
             has_controls=data_manager.has_controls,
-            device_id="mps",
+            device_id="cpu",
         )
 
         # sampling batch of train data and validating it
@@ -177,7 +177,7 @@ class TestDataLoaders(BaseDataTest):
             batch_size if use_batch_size else None,
             state_transforms,
             has_controls=data_manager.has_controls,
-            device_id="mps",
+            device_id="cpu",
         )
 
         # sampling batch of train data and validating it
