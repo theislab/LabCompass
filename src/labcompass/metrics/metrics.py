@@ -1,21 +1,24 @@
+import math
 from collections.abc import Callable
 from functools import partial
-import math
 from typing import Any, Literal
 
 import numpy as np
 import ot as pot
+import torch
 from sklearn.metrics import pairwise_distances, r2_score
 from sklearn.metrics.pairwise import rbf_kernel
 from sklearn.neighbors import kneighbors_graph
-import torch
 
 from labcompass.types import TensorLike
 
 __all__ = [
     "compute_r_squared",
-    "compute_sinkhorn_div",
     "compute_e_distance",
+    "compute_mmd",
+    "compute_wasserstein_distance",
+    "compute_min_max_mse",
+    "compute_cell_props",
 ]
 
 
@@ -206,12 +209,12 @@ def compute_wasserstein_distance(
     elif method == "sinkhorn":
         ot_fn = partial(pot.sinkhorn2, reg=reg, **solver_kwargs)
     else:
-        msg = f""
+        msg = ""
         raise ValueError(msg)
     # defaults to euclidean distance
     if cost_fn is None:
         cost_fn = lambda pred, target: torch.cdist(pred, target)**power
-    
+
     # computing weights
     pred_weights = pot.unif(pred.shape[0])
     target_weights = pot.unif(target.shape[0])

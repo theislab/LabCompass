@@ -1,15 +1,13 @@
 import abc
 from collections.abc import Callable, Iterator, Sequence
-import itertools
 from typing import Any, Literal
 
 import torch
 import torch.nn as nn
-import torch.optim as optim
 import torch.nn.functional as F
 
-from labcompass.networks.blocks import BaseModule, BaseForwardModel
-from labcompass.constants import DataFields, PredictionFields, ParamsFields
+from labcompass.constants import DataFields, ParamsFields, PredictionFields
+from labcompass.networks.blocks import BaseForwardModel, BaseModule
 from labcompass.networks.inference_networks import PerturbationApproximatePosterior
 
 __all__ = ["BaseConditionOptimizer", "MAPConditionOptimizer", "LangevinSampler", "NeuralInverseModel"]
@@ -19,8 +17,8 @@ class BaseConditionOptimizer(BaseModule):
     """"""
 
     def __init__(
-        self, 
-        optimal_condition: dict[str, torch.Tensor], 
+        self,
+        optimal_condition: dict[str, torch.Tensor],
         target_prediction_model: nn.Module,
         forward_model: BaseForwardModel,
         loss_fn: dict[str, Callable[[torch.Tensor, torch.Tensor], torch.Tensor]],
@@ -39,7 +37,7 @@ class BaseConditionOptimizer(BaseModule):
     ) -> None:
         """"""
         super().__init__()
-    
+
         self.optimal_condition = optimal_condition
         self.target_prediction_model = target_prediction_model
         self.forward_model = forward_model
@@ -51,7 +49,7 @@ class BaseConditionOptimizer(BaseModule):
         self.prior_weight = prior_weight
         self.hard = hard
         self.tau = tau
-        self.eps = eps 
+        self.eps = eps
         self.perturbation_initializer = perturbation_initializer
         self.perturbation_non_linearities = perturbation_non_linearities
         self.device_id = device_id
@@ -81,11 +79,11 @@ class BaseConditionOptimizer(BaseModule):
         ) -> torch.Tensor:
         """"""
         raise NotImplementedError
-    
+
     def get_optimized_e(
             self,
         ) -> Sequence[torch.nn.Parameter]:
-        optimized_perturbation_data_tmp = [self.optimized_perturbation_data[pert].detach() for pert in self.optimized_perturbation_data]        
+        optimized_perturbation_data_tmp = [self.optimized_perturbation_data[pert].detach() for pert in self.optimized_perturbation_data]
         return optimized_perturbation_data_tmp
 
     def differentiable_categorical(
@@ -110,8 +108,8 @@ class MAPConditionOptimizer(BaseConditionOptimizer):
     """"""
 
     def __init__(
-        self, 
-        optimal_condition: dict[str, torch.Tensor], 
+        self,
+        optimal_condition: dict[str, torch.Tensor],
         target_prediction_model: nn.Module,
         forward_model: nn.Module,
         loss_fn: Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
@@ -129,12 +127,12 @@ class MAPConditionOptimizer(BaseConditionOptimizer):
         **kwargs,
     ) -> None:
         """"""
-        
+
         super().__init__(
-            optimal_condition, 
+            optimal_condition,
             target_prediction_model,
             forward_model,
-            loss_fn, 
+            loss_fn,
             perturbation_covariates,
             perturbation_covariates_dims,
             is_discrete_dict,
@@ -147,8 +145,8 @@ class MAPConditionOptimizer(BaseConditionOptimizer):
             perturbation_non_linearities=perturbation_non_linearities,
             device_id=device_id,
         )
-        
-        # perturbation representation keys 
+
+        # perturbation representation keys
         self.perturbation_covariates = perturbation_covariates
 
         # initializing modules
@@ -165,7 +163,7 @@ class MAPConditionOptimizer(BaseConditionOptimizer):
     ) -> None:
         """"""
         self.optimized_perturbation_data = {}
-        
+
         for perturbation_representation, perturbation_covariates_dims in self.perturbation_covariates_dims.items():
             covariate_initializer = self.perturbation_initializer[perturbation_representation]
             self.optimized_perturbation_data[perturbation_representation] = nn.Parameter(covariate_initializer(1, perturbation_covariates_dims, requires_grad=True, device=self.device_id))
@@ -174,38 +172,38 @@ class MAPConditionOptimizer(BaseConditionOptimizer):
             self,
             X_controls: torch.Tensor,
         ) -> torch.Tensor:
-        # prepare batch information cellFlow           
+        # prepare batch information cellFlow
         batch_dict = {
             DataFields.SOURCE_STATE: X_controls,
         }
-        
+
         expanded_perturbation_data = {}
         for pert_key in self.optimized_perturbation_data:
             if not self.is_discrete_dict[pert_key]:
                 non_linearity = self.perturbation_non_linearities[pert_key]
                 expanded_perturbation_data[pert_key] = non_linearity(
                     self.optimized_perturbation_data[pert_key].expand(X_controls.shape[0], -1)
-                ) 
+                )
             else:
                 expanded_perturbation_data[pert_key] = self.differentiable_categorical(self.optimized_perturbation_data[pert_key].expand(X_controls.shape[0], -1))
-            
+
         batch_dict[DataFields.PERTURBATION_DATA] = expanded_perturbation_data
 
-        # pushing forward the particles 
+        # pushing forward the particles
         X_pert_pred = self.forward_model.predict(
             batch_dict,
             no_grad=False,
         )
-        
+
         # simulation
         class_pred = self.target_prediction_model(X_pert_pred)
-        
+
         # handling shape of optimal condition
         optimal_condition = {
             covariate: covariate_data.repeat(X_controls.shape[0], 1).to(X_controls.device) for covariate, covariate_data in self.optimal_condition.items()
         }
 
-        # compute loss 
+        # compute loss
         loss = self.compute_loss(class_pred, optimal_condition, self.optimized_perturbation_data)
 
         # constructing step output dictionary
@@ -223,14 +221,14 @@ class MAPConditionOptimizer(BaseConditionOptimizer):
             },
         }
         return loss, out_dict
-    
-    
+
+
 class LangevinSampler(BaseConditionOptimizer):
     """"""
 
     def __init__(
         self,
-        optimal_condition: dict[str, torch.Tensor], 
+        optimal_condition: dict[str, torch.Tensor],
         target_prediction_model: nn.Module,
         forward_model: nn.Module,
         loss_fn: Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
@@ -249,12 +247,12 @@ class LangevinSampler(BaseConditionOptimizer):
         **kwargs,
     ) -> None:
         """"""
-        
+
         super().__init__(
-            optimal_condition, 
+            optimal_condition,
             target_prediction_model,
             forward_model,
-            loss_fn, 
+            loss_fn,
             perturbation_covariates,
             perturbation_covariates_dims,
             is_discrete_dict,
@@ -267,8 +265,8 @@ class LangevinSampler(BaseConditionOptimizer):
             perturbation_non_linearities=perturbation_non_linearities,
             device_id=device_id,
         )
-            
-        self.perturbation_covariates = perturbation_covariates 
+
+        self.perturbation_covariates = perturbation_covariates
         self.is_discrete_dict = is_discrete_dict
         self.n_samples = n_samples
 
@@ -285,9 +283,9 @@ class LangevinSampler(BaseConditionOptimizer):
         self,
     ) -> None:
         """"""
-        # Optimized perturbation representation data 
-        self.optimized_perturbation_data = {} 
-        
+        # Optimized perturbation representation data
+        self.optimized_perturbation_data = {}
+
         for perturbation_representation, perturbation_covariates_dims in self.perturbation_covariates_dims.items():
             covariate_initializer = self.perturbation_initializer[perturbation_representation]
             self.optimized_perturbation_data[perturbation_representation] = covariate_initializer(
@@ -305,9 +303,9 @@ class LangevinSampler(BaseConditionOptimizer):
         target = {
             covariate: covariate_data.repeat(self.n_samples, X_controls.shape[0], 1).to(X_controls.device) for covariate, covariate_data in self.optimal_condition.items()
         }
-        X_controls = X_controls.unsqueeze(0).expand(self.n_samples, -1, -1) 
-        
-        # prepare batch information cellFlow           
+        X_controls = X_controls.unsqueeze(0).expand(self.n_samples, -1, -1)
+
+        # prepare batch information cellFlow
         batch_dict = {
             DataFields.SOURCE_STATE: X_controls,
         }
@@ -315,23 +313,23 @@ class LangevinSampler(BaseConditionOptimizer):
         for pert_key in self.optimized_perturbation_data:
             if not self.is_discrete_dict[pert_key]:
                 non_linearity = self.perturbation_non_linearities[pert_key]
-                expanded_perturbation_data[pert_key] = non_linearity( 
-                    self.optimized_perturbation_data[pert_key].unsqueeze(1).expand(-1, X_controls.shape[1], -1) 
+                expanded_perturbation_data[pert_key] = non_linearity(
+                    self.optimized_perturbation_data[pert_key].unsqueeze(1).expand(-1, X_controls.shape[1], -1)
                 )
             else:
                 expanded_perturbation_data[pert_key] = self.differentiable_categorical(self.optimized_perturbation_data[pert_key].unsqueeze(1).expand(-1, X_controls.shape[1], -1))
-                       
+
         batch_dict[DataFields.PERTURBATION_DATA] = expanded_perturbation_data
 
-        # pushing forward the particles 
+        # pushing forward the particles
         X_pert_pred = self.forward_model.predict(
             batch_dict,
             no_grad=False,
         )
-        
+
         class_pred = self.target_prediction_model(X_pert_pred)
         loss = self.compute_loss(class_pred, target, self.optimized_perturbation_data)
-        
+
         # constructing step output dictionary
         out_dict = {
             DataFields.SOURCE_STATE: X_controls.detach().cpu(),
@@ -355,7 +353,7 @@ class NeuralInverseModel(BaseConditionOptimizer):
 
     def __init__(
         self,
-        optimal_condition: dict[str, torch.Tensor], 
+        optimal_condition: dict[str, torch.Tensor],
         target_prediction_model: nn.Module,
         forward_model: nn.Module,
         loss_fn: Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
@@ -379,10 +377,10 @@ class NeuralInverseModel(BaseConditionOptimizer):
         """"""
 
         super().__init__(
-            optimal_condition, 
+            optimal_condition,
             target_prediction_model,
             forward_model,
-            loss_fn, 
+            loss_fn,
             perturbation_covariates_dims,
             perturbation_covariates,
             is_discrete_dict,
@@ -412,7 +410,7 @@ class NeuralInverseModel(BaseConditionOptimizer):
         """"""
         input_dim = self.state_dim
         for optimal_covariate in self.optimal_condition.values():
-            input_dim = input_dim + optimal_covariate.shape[0] 
+            input_dim = input_dim + optimal_covariate.shape[0]
         return input_dim
 
     def _init_modules(
@@ -436,7 +434,7 @@ class NeuralInverseModel(BaseConditionOptimizer):
     ) -> Iterator[nn.Parameter]:
         """"""
         return self.perturbation_prediction_model.parameters()
-    
+
     def to(
         self,
         device: torch.device,
@@ -460,7 +458,7 @@ class NeuralInverseModel(BaseConditionOptimizer):
             # when discrete
             if is_discrete_covariate:
                 self.differentiable_categorical(covariate_data)
-            
+
             # gaussian noise model
             elif covariate_noise_model == "gaussian":
                 # parsing parameter dictionaries
@@ -480,9 +478,9 @@ class NeuralInverseModel(BaseConditionOptimizer):
                 pass
 
             else:
-                msg = f""
+                msg = ""
                 raise ValueError(msg)
-            
+
             perturbation_data[covariate] = covariate_data
         return perturbation_data
 
@@ -503,7 +501,7 @@ class NeuralInverseModel(BaseConditionOptimizer):
         # preparing perturbation params
         pert_data = self.__prepare_perturbation_data(pert_params)
 
-        # prepare batch information cellFlow           
+        # prepare batch information cellFlow
         batch_dict = {
             DataFields.SOURCE_STATE: control_states,
             DataFields.PERTURBATION_DATA: pert_data,

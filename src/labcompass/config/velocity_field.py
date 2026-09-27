@@ -21,7 +21,7 @@ class NeuralVelocityFieldConfig:
     :type flow_dim: class: `int`
 
     :param encode_state: Whether to encode separately the state on which to compute the velocity field using an :class: `MLPBlock`,
-        or simply concatenate it directly with time and conditions before being given as input to the VF decoder. 
+        or simply concatenate it directly with time and conditions before being given as input to the VF decoder.
     :type encode_state: class: `bool`
 
     :param state_encoder_output_dim: The output dimensions for the state encoder.
@@ -117,7 +117,7 @@ class NeuralVelocityFieldConfig:
     :type use_source_as_condition: class: `bool`
 
     :type encode_source: Whether to encode the information about the source using a separate :class: `MLPBlock` before concatenation with state, time and condition in the latent space.
-        When `False` (and :param: `use_source_as_condition` is `True`), source states will be directly concatenated. 
+        When `False` (and :param: `use_source_as_condition` is `True`), source states will be directly concatenated.
         Only used if :param: `use_source_as_condition` is `True`, defaults to `False`.
     :type encode_source: class: `bool`
 
@@ -150,7 +150,7 @@ class NeuralVelocityFieldConfig:
     :param resnet_normalization: The normalization used by the residual network.
         Only used when :param: `use_resnet_blocks` is `True`, defaults to `None`.
     :type resnet_normalization: class: `Literal["layer", "batch"] | None`
-    
+
     :param use_classifier_free_guidance: Whether to use classifier-free guidance, defaults to ´False´.
     :type use_classifier_free_guidance: class: `bool`
 
@@ -188,7 +188,7 @@ class NeuralVelocityFieldConfig:
     resnet_normalization: Literal["layer", "batch"] | None = None
     use_classifier_free_guidance: bool = False
     cfg_null_condition_token: float = -1.0
-    
+
     def __post_init__(self) -> None:
         """
         Compatibility checks and edits for a valid configuration. It performs the following checks:
@@ -203,7 +203,7 @@ class NeuralVelocityFieldConfig:
         """
         # sanity check on mlp configurations
         mlp_kwargs_verifier = partial(
-            MLPConfigFields.verify_keys, 
+            MLPConfigFields.verify_keys,
             require_input_dim_key=False,
             require_output_dim_key=False,
         )
@@ -243,17 +243,17 @@ class NeuralVelocityFieldConfig:
                 self.perturbation_layers_after_pooling["input_dim"] = self.perturbation_layers_after_pooling_input_dim
                 self.perturbation_layers_after_pooling["output_dim"] = self.perturbation_encoder_output_dim
             else:
-                for condition, layers_dict in self.perturbation_layers_before_pooling.items():
+                for layers_dict in self.perturbation_layers_before_pooling.values():
                     msg = f"`layers_dict` is expected to be an instance of `dict`, found {type(layers_dict)}"
                     assert isinstance(layers_dict, dict), msg
-                    msg = f"`layers_dict` is expected to contain the \"input_dim\" key, which was not found."
+                    msg = "`layers_dict` is expected to contain the \"input_dim\" key, which was not found."
                     assert "input_dim" in layers_dict.keys(), msg
                     msg = f"`layers_dict[\"input_dim\"] is expected to be an `int`, found {type(layers_dict['input_dim'])}"
-                    assert isinstance(layers_dict["input_dim"], int), msg          
+                    assert isinstance(layers_dict["input_dim"], int), msg
         else:
             msg = f"With {self.use_guidance=} an unguided flow model will be initialized, thus the settings for the condition encoder will be ignored."
             logger.warning(msg)
-        
+
         # sanity check on use classifier free guidance
         if self.use_classifier_free_guidance:
             msg = f"With {self.use_classifier_free_guidance=} you need to instantiate a guided flow, but found {self.use_guidance=}."
@@ -294,7 +294,7 @@ class NeuralVelocityFieldConfig:
             if isinstance(layers_dict, dict):
                 input_dim = layers_dict["input_dim"]
             else:
-                msg = f""
+                msg = ""
                 raise TypeError(msg)
             dim = dim + input_dim
         return dim
@@ -313,24 +313,24 @@ class NeuralVelocityFieldConfig:
 
         :rtype: class: `int`
         """
-        # Initialize the dim as the output of the pooling layer 
+        # Initialize the dim as the output of the pooling layer
         dim = 0
 
         # Perturbations to pull
         perturbation_covariate_pooled = get_conditions_to_pool(
             self.perturbation_layers_before_pooling,
             self.perturbation_covariates_not_pooled
-        )    
-        # Pooled layers 
+        )
+        # Pooled layers
         if len(perturbation_covariate_pooled) > 0:
             for perturbation_to_pool in perturbation_covariate_pooled:
                 covariate_pool_dict = self.perturbation_layers_before_pooling[perturbation_to_pool]
                 if dim == 0:
                     dim = dim + covariate_pool_dict["output_dim"]
-                msg = f"The output layers of the pooled variables must all have the same dimensionality."
+                msg = "The output layers of the pooled variables must all have the same dimensionality."
                 assert covariate_pool_dict["output_dim"] == dim, msg
-        
-        # Not pooled layers 
+
+        # Not pooled layers
         if self.perturbation_covariates_not_pooled is not None:
             for condition in self.perturbation_covariates_not_pooled:
                 layers_dict = self.perturbation_layers_before_pooling[condition]
@@ -375,7 +375,7 @@ class NeuralVelocityFieldConfig:
     ) -> int:
         """Returns the latent dimension of the states."""
         if self.encode_state:
-            return self.state_encoder_output_dim 
+            return self.state_encoder_output_dim
         return self.flow_dim
 
     @property
@@ -394,8 +394,8 @@ class NeuralVelocityFieldConfig:
         It adds the correct dimensions for each different case.
 
         :rtype: class: `int`
-        """    
-        # concatenation state, conditions, source and time 
+        """
+        # concatenation state, conditions, source and time
         if self.conditioning_type == "concatenation":
             return self.state_latent_dim + self.time_latent_dim + self.perturbation_latent_dim + self.source_latent_dim
         # resnet block
@@ -403,7 +403,7 @@ class NeuralVelocityFieldConfig:
             return self.state_latent_dim
         # film block
         elif self.conditioning_type == "film":
-            return self.state_latent_dim + self.time_latent_dim        
+            return self.state_latent_dim + self.time_latent_dim
 
     @property
     def initialize_source_encoder(
@@ -414,7 +414,7 @@ class NeuralVelocityFieldConfig:
         when both :attr:`NeuralVelocityFieldConfig.use_source_as_condition` and :attr:`NeuralVelocityFieldConfig.encode_source`
         are set to `True`, otherwise it returns `False`.
 
-        :rtype: class: `bool` 
+        :rtype: class: `bool`
         """
         if self.use_source_as_condition:
             if self.encode_source:

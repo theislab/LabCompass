@@ -9,7 +9,6 @@ from labcompass.metrics import Metrics
 from labcompass.transforms import Transform
 from labcompass.types import TensorLike
 
-
 __all__ = [
     "BaseCallBack",
     "MetricsCallBack",
@@ -18,6 +17,7 @@ __all__ = [
 
 class BaseCallBack:
     """Base class defining the callback interface invoked by :meth:`BaseTrainer.fit` at the different stages of training."""
+
     callback_type: Literal["computational", "logging"]
 
     def run_on_train_begin(
@@ -99,7 +99,7 @@ class MetricsCallBack(ComputationalCallBack):
             metric = vars(Metrics())[metric_id]
             metrics[metric_id] = metric(preds, target)
         return metrics
-    
+
     def run_on_valid_step(
         self,
         predictions_dict: dict[str, dict[str, TensorLike]],
@@ -114,17 +114,17 @@ class MetricsCallBack(ComputationalCallBack):
         """
         # defining output dictionary
         metrics = {}
-        
+
         # iterating over the predictions for each condition
         for perturbation, perturbation_prediction_data in predictions_dict.items():
             # parsing prediction data dictionary
             predictions = perturbation_prediction_data[PredictionFields.PREDICTION_DATA]
             targets = perturbation_prediction_data[DataFields.TARGET_STATE]
-            
+
             # computing the metrics for the current perturbation
             perturbation_metrics = self._run_on_valid_step(predictions, targets)
 
-            # updating the metrics 
+            # updating the metrics
             metrics.update(
                 {
                     f"{perturbation}_{metric_id}": metric_value for metric_id, metric_value in perturbation_metrics.items()

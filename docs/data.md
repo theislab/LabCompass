@@ -7,10 +7,7 @@
 .. autosummary::
     :toctree: generated/data
 
-    data.BaseDataStruct
-    data.PredictionData
-    data.TrainData
-    data.PredictionDataLoader
+    data.AnnotatedPerturbationData
     data.TrainDataLoader
     data.ValidationDataLoader
     data.DataManager

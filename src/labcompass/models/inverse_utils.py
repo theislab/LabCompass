@@ -33,11 +33,11 @@ class LangevinOptimizer(Optimizer):
         noise_scale: float = 1e-1,
     ) -> None:
         sqrt_eta = torch.sqrt(torch.tensor(eta))
-        defaults = dict(
-            eta=eta,
-            sqrt_eta=sqrt_eta,
-            noise_scale=noise_scale
-        )
+        defaults = {
+            "eta": eta,
+            "sqrt_eta": sqrt_eta,
+            "noise_scale": noise_scale
+        }
 
         super().__init__(
             params,
@@ -77,7 +77,7 @@ class LangevinOptimizer(Optimizer):
             eta = group["eta"]
             sqrt_eta = group["sqrt_eta"]
             noise_scale = group["noise_scale"]
-            
+
             for p in group["params"]:
                 if p.grad is None:
                     continue
@@ -88,11 +88,11 @@ class LangevinOptimizer(Optimizer):
 
                 # Add Gaussian noise scaled by sqrt(eta)
                 noise = torch.randn_like(p.data) * sqrt_eta * noise_scale
-                
+
                 # computing update term
                 update = grad + noise
 
                 # Langevin update step
                 p.data.add_(-update)
-        
+
         return loss

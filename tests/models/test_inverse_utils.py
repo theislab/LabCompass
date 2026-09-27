@@ -1,12 +1,12 @@
 import numpy as np
 import torch
 
-from labcompass.constants import DataFields
-from labcompass.networks.blocks import BaseModule, BaseForwardModel
 from labcompass.config.velocity_field import NeuralVelocityFieldConfig
-from labcompass.models.inverse_utils import LangevinOptimizer
+from labcompass.constants import DataFields
 from labcompass.models.flow_matching import FlowMatching
 from labcompass.models.inverse import InverseModel
+from labcompass.models.inverse_utils import LangevinOptimizer
+from labcompass.networks.blocks import BaseForwardModel, BaseModule
 from labcompass.sym import get_annotated_perturbation_data
 from labcompass.utils import set_reproducibility
 
@@ -38,7 +38,7 @@ train_adata, sym_dict = get_annotated_perturbation_data(
 )
 
 class TestInverseUtils:
-    
+
     @staticmethod
     def forward_pass(
         X_controls: torch.Tensor,
@@ -53,9 +53,9 @@ class TestInverseUtils:
         target = {
             covariate: covariate_data.repeat(n_samples, X_controls.shape[0], 1).to(X_controls.device) for covariate, covariate_data in target.items()
         }
-        X_controls = X_controls.unsqueeze(0).expand(n_samples, -1, -1) 
+        X_controls = X_controls.unsqueeze(0).expand(n_samples, -1, -1)
 
-        # prepare batch information cellFlow           
+        # prepare batch information cellFlow
         batch_dict = {
             DataFields.SOURCE_STATE: X_controls,
         }
@@ -64,7 +64,7 @@ class TestInverseUtils:
             expanded_perturbation_data[pert_key] = cond[pert_key].unsqueeze(1).expand(-1, X_controls.shape[1], -1)
         batch_dict[DataFields.PERTURBATION_DATA] = expanded_perturbation_data
 
-        # pushing forward the particles 
+        # pushing forward the particles
         X_pert_pred = forward_model.predict(
             batch_dict,
             no_grad=False,
@@ -83,7 +83,7 @@ class TestInverseUtils:
         noise=None
     ) -> dict[str, torch.Tensor]:
         """"""
-        out = {}        
+        out = {}
         for pert, pert_data in cond.items():
             grad = torch.autograd.grad(loss, pert_data, create_graph=False, retain_graph=True)[0]
             with torch.no_grad():  # Fix: Avoid unnecessary detaching/reseting requires_grad
@@ -194,7 +194,7 @@ class TestInverseUtils:
         self.prepare_inverse_model()
 
         # retrieving control states
-        x_controls = torch.from_numpy(train_adata[train_adata.obs.control == True].X).cuda()
+        x_controls = torch.from_numpy(train_adata[train_adata.obs.control == True].X).cuda()  # noqa: E712
 
         cond_init = self.langevin_inverse_model.inverse_model.optimized_perturbation_data
         cond_init_clone0 = {cov:init.clone().detach().requires_grad_() for cov, init in cond_init.items()}
@@ -205,22 +205,22 @@ class TestInverseUtils:
         assert torch.equal(cond_init['repr_treatment_treatment_shift'], cond_init_clone1['repr_treatment_treatment_shift'])
 
         # defining store for clones
-        clones0_store = [cond_init_clone0['repr_treatment_treatment_shift'].clone().detach()]
-        clones1_store = [cond_init_clone1['repr_treatment_treatment_shift'].clone().detach()]
+        [cond_init_clone0['repr_treatment_treatment_shift'].clone().detach()]
+        [cond_init_clone1['repr_treatment_treatment_shift'].clone().detach()]
 
         # defining store for losses
-        clones0_loss_store = [torch.tensor(np.inf)]
-        clones1_loss_store = [torch.tensor(np.inf)]
+        [torch.tensor(np.inf)]
+        [torch.tensor(np.inf)]
 
         print("starting optimization at: ", cond_init['repr_treatment_treatment_shift'])
 
         # attaching the optimizer to the first clone
         optim = LangevinOptimizer(list(cond_init_clone0.values()), noise_scale=0.00)
 
-        for step in range(n_iters):
+        for _step in range(n_iters):
 
             cond_init_clone1 = {cov:init.clone().detach().requires_grad_() for cov, init in cond_init_clone1.items()}
-            
+
             # sampling batch
             batch_idxs = np.random.choice(np.arange(x_controls.shape[0]), batch_size)
             x_controls_batch = x_controls[batch_idxs]
@@ -269,7 +269,7 @@ class TestInverseUtils:
 
                 # computed losses should be equal
                 assert torch.equal(loss_clone0, loss_clone1)
-            
+
             # we should have moved somewhere
             assert not torch.equal(cond_init["repr_treatment_treatment_shift"], cond_init_clone0["repr_treatment_treatment_shift"])
             assert not torch.equal(cond_init["repr_treatment_treatment_shift"], cond_init_clone1["repr_treatment_treatment_shift"])
@@ -283,7 +283,7 @@ class TestInverseUtils:
         self.prepare_inverse_model()
 
         # retrieving control states
-        x_controls = torch.from_numpy(train_adata[train_adata.obs.control == True].X).cuda()
+        x_controls = torch.from_numpy(train_adata[train_adata.obs.control == True].X).cuda()  # noqa: E712
 
         cond_init = self.langevin_inverse_model.inverse_model.optimized_perturbation_data
         cond_init_clone0 = {cov:init.clone().detach().requires_grad_() for cov, init in cond_init.items()}
@@ -300,16 +300,16 @@ class TestInverseUtils:
 
         # defining the store for the results
         clone0_store = torch.zeros((n_iters, n_samples, sym_conf["d"]))
-        clone0_loss_store = torch.zeros((n_iters))
-        
+        clone0_loss_store = torch.zeros(n_iters)
+
         clone1_store = torch.zeros((n_iters, n_samples, sym_conf["d"]))
-        clone1_loss_store = torch.zeros((n_iters))
+        clone1_loss_store = torch.zeros(n_iters)
 
         # setting reproducibility
         set_reproducibility(seed)
 
         for step in range(n_iters):
-            
+
             # sampling batch
             batch_idxs = np.random.choice(np.arange(x_controls.shape[0]), batch_size)
             x_controls_batch = x_controls[batch_idxs]
@@ -371,7 +371,7 @@ class TestInverseUtils:
                 optim.param_groups[0]["eta"],
                 optim.param_groups[0]["sqrt_eta"],
             )
-            
+
             # we should have moved somewhere
             assert not torch.equal(cond_init["repr_treatment_treatment_shift"], cond_init_clone1["repr_treatment_treatment_shift"])
 

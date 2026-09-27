@@ -1,14 +1,11 @@
-import abc
 from collections.abc import Sequence
-from itertools import product
 from dataclasses import dataclass
-from typing import Any
 
 import anndata
 import numpy as np
 
 from labcompass.constants import DataFields
-from labcompass.data.container import DataContainer, BatchMixin
+from labcompass.data.container import BatchMixin, DataContainer
 from labcompass.types import TensorLike
 
 __all__ = [
@@ -20,7 +17,7 @@ __all__ = [
 class AnnotatedPerturbationData:
     """
     Data structure for annotated perturbation data.
-    
+
     :param adata: The underlying annotated data object which to enforce the data model on.
         Should always be provided
     :type adata: class: `AnnData`
@@ -53,7 +50,7 @@ class AnnotatedPerturbationData:
         Defaulst to `None`.
     :type perturbations_in_obsm: class: `Sequence[str] | None`
     """
-    
+
     adata: anndata.AnnData
     control_key: str | None
     state_data: TensorLike
@@ -69,8 +66,7 @@ class AnnotatedPerturbationData:
         """
         Registers the indices of control and treatment data for more efficient dataloading.
         """
-
-        # pre-allocating attributes        
+        # pre-allocating attributes
         self.control_idxs = None
         self.control_data = None
 
@@ -88,16 +84,16 @@ class AnnotatedPerturbationData:
         # storing control data
         if self.has_controls:
             # sanity check
-            msg = f""
+            msg = ""
             assert self.control_key is not None, msg
 
             # register indices and state data
-            control_idxs = np.argwhere(self.adata.obs[self.control_key] == True)[:, 0]
+            control_idxs = np.argwhere(self.adata.obs[self.control_key] == True)[:, 0]  # noqa: E712
             self.control_data = self.data[control_idxs]
             self.control_idxs = np.arange(len(self.control_data))
 
             # storing perturbation data
-            self.treatment_idxs = np.argwhere(self.adata.obs[self.control_key] == False)[:, 0]
+            self.treatment_idxs = np.argwhere(self.adata.obs[self.control_key] == False)[:, 0]  # noqa: E712
 
         else:
             self.treatment_idxs = np.arange(len(self.adata))
@@ -105,7 +101,7 @@ class AnnotatedPerturbationData:
             self.treatment_idxs_per_condition = {
                 DataFields.CONDITION_VALUES: self.treatment_idxs,
                 **{
-                    treatment: np.argwhere(self.adata.obs[[pert for pert in self.perturbations]] == treatment)[:, 0] 
+                    treatment: np.argwhere(self.adata.obs[list(self.perturbations)] == treatment)[:, 0]
                         for treatment in self.seen_combinations
                 }
             }
@@ -141,7 +137,7 @@ class AnnotatedPerturbationData:
             has_controls=self.has_controls,
             perturbations=self.perturbations
         )
-    
+
     def __len__(
         self,
     ) -> int:
@@ -160,7 +156,7 @@ class AnnotatedPerturbationData:
         # case 0: Seen combinatorial perturbation is None. No specific treatment is to be retrieved.
         if self.seen_combinations is None:
             # sanity check: we should not pass the treatments
-            msg = f""
+            msg = ""
             assert treatments is None, msg
             treatments = DataFields.CONDITION_VALUES
         # case 0: Seen combinatorial perturbation is not None.
@@ -182,7 +178,7 @@ class AnnotatedPerturbationData:
     ) -> DataContainer:
         """
         Retrieve control group data.
-        
+
         Can only be called when :attr: `AnnotatedPerturbationData.has_controls` is `True` and :attr: `AnnotatedPerturbationData.control_key`
         is specified.
 
@@ -194,12 +190,12 @@ class AnnotatedPerturbationData:
         """
         # sanity check
         if self.has_controls:
-            msg = f""
+            msg = ""
             assert self.control_key is not None, msg
         else:
             msg = "Controls are not available in this dataset (has_controls=False)."
             raise ValueError(msg)
-        
+
         # collect control ids and features
         batch_idxs = self.control_idxs
         if batch_size is not None:
@@ -225,10 +221,10 @@ class AnnotatedPerturbationData:
         :rtype: Dict[str, TensorLike]
         """
         # retrieve indices
-        idxs = self._get_treatment_idxs(treatments)        
+        idxs = self._get_treatment_idxs(treatments)
         if batch_size is not None:
             idxs = np.random.choice(idxs, size=batch_size)
-        
+
         # slice data
         trtm_data = self.data[idxs]
         return trtm_data

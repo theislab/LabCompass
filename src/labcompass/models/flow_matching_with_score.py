@@ -1,14 +1,11 @@
 import logging
-import os
 from collections.abc import Mapping
 from typing import Any, Literal
 
 import torch
 
 from labcompass.config.velocity_field import NeuralVelocityFieldConfig
-
 from labcompass.data import TrainDataLoader, ValidationDataLoader
-from labcompass.models.base import BaseModel
 from labcompass.models.flow_matching import FlowMatching
 from labcompass.networks.velocity_field_with_score import NeuralVelocityFieldWithScore
 from labcompass.training import BaseCallBack
@@ -75,19 +72,19 @@ class FlowMatchingWithScore(FlowMatching):
             msg = "When generating from noise you need to use source as conditions."
             raise ValueError(msg)
         elif (not self.data_manager.has_controls) and (not self.generate_from_noise):
-            msg = f"When no controls are available you need to generate from noise."
+            msg = "When no controls are available you need to generate from noise."
             raise ValueError(msg)
 
         self.cvf_config = cvf_config
-        
-        # given a dimensionality and a configuration of hparams, initialize a flow model 
+
+        # given a dimensionality and a configuration of hparams, initialize a flow model
         self.velocity_field = NeuralVelocityFieldWithScore(
             config=self.cvf_config,
         )
         self.velocity_field = self.velocity_field.float()
         self.velocity_field = self.velocity_field.to(self.device)
 
-        # optimizer and scheduler 
+        # optimizer and scheduler
         self.optimizer = optimizer_class(
             self.velocity_field.parameters(),
             **optimizer_kwargs,

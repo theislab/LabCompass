@@ -3,17 +3,13 @@ from collections.abc import Sequence
 from typing import Any, Literal
 
 import anndata
-import numpy as np
-from sklearn.preprocessing import OneHotEncoder, LabelEncoder
 
-from labcompass.constants import DataFields
 from labcompass.data.data import AnnotatedPerturbationData
 from labcompass.data.schemas import (
-    StateDataSchema,
     PerturbationDataSchema,
+    StateDataSchema,
     TargetDataSchema,
 )
-from labcompass.types import TensorLike
 
 logger = logging.getLogger(__name__)
 
@@ -26,13 +22,14 @@ class DataManager:
     """
     Class for managing perturbation-related data in single-cell experiments.
     """
+
     def __init__(
         self,
         adata: anndata.AnnData | None = None,
         sample_rep: str | None = None,
         control_key: str | None = None,
         perturbations: str | Sequence[str] | None = None,
-        perturbations_in_obsm: str | Sequence[str] | None = None, 
+        perturbations_in_obsm: str | Sequence[str] | None = None,
         perturbation_covariates: dict[str, str | Sequence[str]] | None = None,
         perturbation_reps: dict[str, str | Sequence[str]] | None = None,
         load_target_covariates: bool = False,
@@ -69,26 +66,26 @@ class DataManager:
 
         :param perturbation_covariates: DIctionary mapping each perturbation in :param: `perturbations` to the set of its perturbation covariates.
             The perturbation covariates in :param: `perturbation_covariates` are associated to each perturbation on a cell level basis
-            and are supposed to vary over the cells for a given perturbation. Such covariates are to be found in :attr: `adata.obsm`. 
+            and are supposed to vary over the cells for a given perturbation. Such covariates are to be found in :attr: `adata.obsm`.
             For example, for a given drug this could be given by the dosage or the time of the treatment application on a given cell.
             More generally, this can be given by any other feature associated to the current perturbation that can vary across cells.
-            Defaults to `None`. 
+            Defaults to `None`.
         :type perturbation_covariates:
 
         :param perturbation_reps: Maps each perturbation in :param: `perturbations` to its target representation.
             The representations in :param:`perturbation_covariate_reps` are the same over cell with the same perturbation.
             For example, for a given drug this could be given by their chemical representation or any other feature that
             is constant across observations treated with the same perturbation.
-            For all perturbations in :param: `perturbations` not appearing in :param: `perturbations_in_obsm`, 
-            the values specified in :param: `perturbation_reps` should map to keys in :attr: `adata.uns` where to retrieve 
+            For all perturbations in :param: `perturbations` not appearing in :param: `perturbations_in_obsm`,
+            the values specified in :param: `perturbation_reps` should map to keys in :attr: `adata.uns` where to retrieve
             the representations for their unique values. For the perturbations that instead appear in :param: `perturbations_in_obsm`,
             it should map to the corresponding representations to be found in :attr: `adata.obsm`. Defaults to `None`.
         :type perturbation_reps: class: `dict[str, str | Sequence[str]]`
- 
+
         :param load_target_covariates: Flag indicating whether to load target covariates during the dataloading.
             This will represent the quantities that we want to optimize for by choosing the perturbations, defaults to `False`.
         :type load_target_covariates:
-        
+
         :param target_covariates: Dictionary mapping each string identifier for the target covariates to be loaded to their
             target representation: This can be either `"label"` for loading labels, `"one_hot"` for loading one hot encoded
             vectors or `"identity"` to keep the retrieved representation as is.
@@ -96,7 +93,7 @@ class DataManager:
             in :param: `target_covariates_in_obsm`, in which case their representation is to be retrieved from :attr: `obsm`.
             Defaults to `None`.
         :type target_covariates: class: `dict[str, Literal["one_hot", "label", "identity"]] | None`
-        
+
         :param target_covariates_in_obsm: Optional sequence of string identifiers indicating the target covariates to be retrieved from
             the :attr: `obsm` attribute of :param: `adata`, defaults to `None`.
         :type target_covariates_in_obsm: class: `Sequence[str] | None`.
@@ -105,7 +102,6 @@ class DataManager:
             Defaults to `None`.
         :type target_covariates_kwargs: class: `dict[str, Any]`
         """
-
         # storing attributes
         self.adata = adata
         self.sample_rep = sample_rep
@@ -138,7 +134,7 @@ class DataManager:
         if self.perturbations is not None:
             # sanity check
             if self.perturbation_reps is None:
-                msg = f"When modeling perturbations you need to specify the reprs in `perturbation_reps`, `None` found."
+                msg = "When modeling perturbations you need to specify the reprs in `perturbation_reps`, `None` found."
                 raise ValueError(msg)
             self.perturbation_data_schema = PerturbationDataSchema(
                 self.adata,
@@ -193,11 +189,11 @@ class DataManager:
         target_data = None
         if self.load_target_covariates:
             target_data = self.target_data_schema.get_data(adata)
-        
+
         # constructing data object
         return AnnotatedPerturbationData(
             adata,
-            self.control_key, 
+            self.control_key,
             state_data,
             perturbation_data,
             target_data=target_data,
@@ -211,8 +207,8 @@ class DataManager:
         self,
     ) -> bool:
         """Flag indicating whether a notion of control states applies to the current data.
-        
-        Automatically inferred by the presence of :attr: `self.control_key`    
+
+        Automatically inferred by the presence of :attr: `self.control_key`
         """
         if self.control_key is None:
             return False

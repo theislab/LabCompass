@@ -1,5 +1,4 @@
 import logging
-import os
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any, Literal
 
@@ -7,8 +6,8 @@ import torch
 from anndata import AnnData
 from torch import Tensor
 
-from labcompass.constants import DataFields
 from labcompass.config.velocity_field import NeuralVelocityFieldConfig
+from labcompass.constants import DataFields
 from labcompass.couplings import (
     IndependentCoupling,
     OTCoupling,
@@ -55,7 +54,7 @@ class FlowMatching(BaseModel):
 
     :param device_id: The identifier for the device where to do the computations, defaults to `"cuda"`.
     :type device_id: class:`Literal["cuda", "cpu"]`
-    
+
     :param generate_from_noise: Controls if the source samples are Gaussian (True) or control cells (False).
     :type num_training_steps: class:`bool`
 
@@ -75,7 +74,7 @@ class FlowMatching(BaseModel):
         generate_from_noise: bool = False,
         noise_distribution: Callable[[Sequence[int]], Tensor] = torch.randn,
     ) -> None:
-        # initialize the Flow model 
+        # initialize the Flow model
         if flow_type == "constant_noise":
             flow_class = ConstantNoiseFlow
         elif flow_type == "encoding_decoding":
@@ -85,20 +84,20 @@ class FlowMatching(BaseModel):
         elif flow_type == "variance_preserving":
             flow_class = VariancePreservingFlow
         else:
-            msg = f""
+            msg = ""
             raise ValueError(msg)
         # setting optional flow kwargs
         if flow_kwargs is None:
             flow_kwargs = {}
         self.flow = flow_class(**flow_kwargs)
 
-        # initialize the coupling logic 
+        # initialize the coupling logic
         if coupling_type == "independent":
             coupling_class = IndependentCoupling
         elif coupling_type == "ot":
             coupling_class = OTCoupling
         else:
-            msg = f""
+            msg = ""
             raise ValueError(msg)
         # setting optional coupling kwargs
         if coupling_kwargs is None:
@@ -143,11 +142,11 @@ class FlowMatching(BaseModel):
         Once initialized the :class: `DataManager` class, it calls the :method: `DataManager.get_data` method to
         retrieve a structured representation of the analyzed dataset.
         """
-        # sanity check when considering perturbation in .obsm 
+        # sanity check when considering perturbation in .obsm
         if isinstance(self.coupling, OTCoupling) and perturbations_in_obsm is not None:
             msg = "With perturbations in obsm the coupling must be independent"
             raise ValueError(msg)
-        
+
         data_manager = DataManager(
             train_adata,
             sample_rep=sample_rep,
@@ -229,19 +228,19 @@ class FlowMatching(BaseModel):
             msg = "When generating from noise you need to use source as conditions."
             raise ValueError(msg)
         elif (not self.data_manager.has_controls) and (not self.generate_from_noise):
-            msg = f"When no controls are available you need to generate from noise."
+            msg = "When no controls are available you need to generate from noise."
             raise ValueError(msg)
 
         self.cvf_config = cvf_config
-        
-        # given a dimensionality and a configuration of hparams, initialize a flow model 
+
+        # given a dimensionality and a configuration of hparams, initialize a flow model
         self.velocity_field = NeuralVelocityField(
             config=self.cvf_config,
         )
         self.velocity_field = self.velocity_field.float()
         self.velocity_field = self.velocity_field.to(self.device)
 
-        # optimizer and scheduler 
+        # optimizer and scheduler
         self.optimizer = optimizer_class(
             self.velocity_field.parameters(),
             **optimizer_kwargs,
@@ -395,7 +394,7 @@ class FlowMatching(BaseModel):
         num_samples: int | None = None,
         batch_size: int | None = None,
         num_time_steps: int | None = None,
-        fix_noise: bool = False, 
+        fix_noise: bool = False,
         solver_kwargs: dict[str, Any] | None = None,
         cfg_guidance_strength: float = 1.0,
     ) -> dict[str, Tensor]:
@@ -420,7 +419,7 @@ class FlowMatching(BaseModel):
         :param num_time_steps: Number of time steps which to integrate the dynamics over during inference.
             If provided, it will be used instead of :attr: `self.num_time_steps` . Defaults to `None`.
         :type num_time_steps: class:`int | None`
-        
+
         :param fix_noise: Whether the noise  for the prediction is fixed and present in the batch as a source.
         :type fix_noise: class: `bool`
 
@@ -431,13 +430,13 @@ class FlowMatching(BaseModel):
         :param cfg_guidance_strength: Strength of the guidance term for sampling.
             Only used when :attr: `self.cvf_config.use_classifier_free_guidance` is set to `True`, defaults to `1.0`.
         :type cfg_guidance_strength: class: `float`
-        
+
         :return: Tensor of shape `(batch_size, self.flow_dim)` if :param:`return_trajectory` is `False`, otherwise Tensor of shape `(batch_size, self.num_time_steps, self.flow_dim)`
         :rtype: class:`torch.Tensor`
         """
         # handling source
         source = None
-        if self.data_manager.has_controls or fix_noise: 
+        if self.data_manager.has_controls or fix_noise:
             source = batch[DataFields.SOURCE_STATE]
 
         # handling conditions
@@ -466,8 +465,8 @@ class FlowMatching(BaseModel):
             elif (condition is not None):
                 ref_batch_size = list(condition.values())[0].shape[:-1]
                 # sanity check
-                for condition_covariate, condition_data in condition.items():
-                    msg = f""
+                for condition_data in condition.values():
+                    msg = ""
                     assert condition_data.shape[:-1] == ref_batch_size, msg
                 batch_size = ref_batch_size
             # otherwise we retrieve it from the dataloaders

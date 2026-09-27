@@ -10,16 +10,18 @@ __all__ = ["ODESolver"]
 
 class VF(nn.Module):
     """
-    A class representing a Vector Field (VF) that computes the drift (rate of change) 
+    A class representing a Vector Field (VF) that computes the drift (rate of change)
     of a process at a given time `t` and state `xt`. This class is often used in
-    stochastic processes and differential equations, where the drift function is used 
+    stochastic processes and differential equations, where the drift function is used
     to model the evolution of a state.
 
-    Attributes:
-        drift_fn (Callable): A function that computes the drift (rate of change) 
+    Attributes
+    ----------
+        drift_fn (Callable): A function that computes the drift (rate of change)
                               at a given time `t` and state `xt`.
 
-    Methods:
+    Methods
+    -------
         __init__: Initializes the VF object with a drift function.
         forward: Computes the drift at a given time `t` and state `xt` using the drift function.
     """
@@ -32,8 +34,8 @@ class VF(nn.Module):
         Initializes the Vector Field (VF) with a specified drift function.
 
         Args:
-            drift_fn (Callable): A function that computes the drift (rate of change) 
-                                  at a given time `t` and state `xt`. 
+            drift_fn (Callable): A function that computes the drift (rate of change)
+                                  at a given time `t` and state `xt`.
                                   The function should take two arguments: `t` and `xt`.
         """
         super().__init__()
@@ -49,9 +51,9 @@ class VF(nn.Module):
         """
         Computes the drift (rate of change) at a given time `t` and state `xt`.
 
-        The time `t` is repeated to match the batch size of `xt` before passing both 
-        `t` and `xt` to the drift function. The function then computes the drift (rate 
-        of change) at each time point and state using the drift function provided during 
+        The time `t` is repeated to match the batch size of `xt` before passing both
+        `t` and `xt` to the drift function. The function then computes the drift (rate
+        of change) at each time point and state using the drift function provided during
         initialization.
 
         Args:
@@ -60,8 +62,9 @@ class VF(nn.Module):
             *args: Additional arguments passed to the drift function.
             **kwargs: Additional keyword arguments passed to the drift function.
 
-        Returns:
-            Tensor: The drift (rate of change) at each time step and state, as computed 
+        Returns
+        -------
+            Tensor: The drift (rate of change) at each time step and state, as computed
                     by the drift function.
         """
         t = t.repeat(*xt.shape[:-1])
@@ -72,7 +75,7 @@ class ODESolver:
     """
     A class for solving ordinary differential equations (ODEs) or stochastic differential equations (SDEs)
     using neural network-based solvers. This class supports both ODEs and SDEs with various configurations for
-    drift and diffusion terms. 
+    drift and diffusion terms.
     """
 
     def __init__(
@@ -88,12 +91,12 @@ class ODESolver:
         Args:
             drift_fn (Callable[[Tensor, Tensor], Tensor]): The drift function defining the rate of change.
             num_time_steps (int, optional): The number of time steps to use for integration. Defaults to 500.
-            solver_kwargs (dict, optional): Additional solver arguments (e.g., solver type, tolerance). 
+            solver_kwargs (dict, optional): Additional solver arguments (e.g., solver type, tolerance).
                                             Defaults to None (sets default values).
-            gamma_fn (Callable[[Tensor, Tensor], Tensor], optional): A function for the diffusion term (SDE). 
+            gamma_fn (Callable[[Tensor, Tensor], Tensor], optional): A function for the diffusion term (SDE).
                                                                     Defaults to None (for ODE).
             sde_type (str, optional): The type of SDE ('ito' or 'stratonovich'). Defaults to 'ito'.
-            noise_type (str, optional): The type of noise ('scalar', 'additive', 'diagonal', 'general'). 
+            noise_type (str, optional): The type of noise ('scalar', 'additive', 'diagonal', 'general').
                                         Defaults to 'diagonal'.
             device_id (str, optional): The computation device ('cuda' or 'cpu'). Defaults to 'cuda'.
         """
@@ -118,15 +121,16 @@ class ODESolver:
         return_trajectory: bool = False,
     ) -> Tensor:
         """
-        Solves the ODE or SDE system starting from the given initial state `source`. Optionally returns the 
+        Solves the ODE or SDE system starting from the given initial state `source`. Optionally returns the
         trajectory over time or just the final state.
 
         Args:
             source (Tensor): The initial state of the system at time t=0.
-            return_trajectory (bool, optional): Whether to return the entire trajectory over time or just 
+            return_trajectory (bool, optional): Whether to return the entire trajectory over time or just
                                                  the final state. Defaults to False (returns final state).
 
-        Returns:
+        Returns
+        -------
             Tensor: The final state at the last time step, or the full trajectory if `return_trajectory=True`.
         """
         vf = VF(self.drift_fn)

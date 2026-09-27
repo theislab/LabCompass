@@ -1,6 +1,5 @@
 import torch
 
-
 __all__ = ["KKTConditions"]
 
 
@@ -146,7 +145,7 @@ class KKTConditions:
             col_blocks = []
             for cgrad in ineq_grads_active:
                 # block = torch.einsum("bnm,bpm->bp", rgrad, cgrad)
-                cgrad = cgrad[..., 0, :] 
+                cgrad = cgrad[..., 0, :]
                 block = torch.einsum("bn,bp->bnp", rgrad, cgrad)
                 col_blocks.append(block)
             col_blocks = torch.concatenate(col_blocks, dim=-1)
@@ -191,7 +190,7 @@ class KKTConditions:
         loss = self.loss_fn(x1)
         grad_outputs = torch.ones_like(loss)
         rhs_full = -torch.autograd.grad(loss, x1, create_graph=True, grad_outputs=grad_outputs)[0]
-    
+
         # rhs_active: flatten per-sample, per-active constraint
         rhs_active_list = []
         for b in range(batch_size):
@@ -242,4 +241,4 @@ class KKTConditions:
         # Now full_lambdas_list[i] has shape [batch, dim_of_constraint_i]
         # Return as a list instead of trying to reshape
         return full_lambdas_list
-        
+

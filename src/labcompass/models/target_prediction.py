@@ -2,15 +2,13 @@ import logging
 from collections.abc import Mapping, Sequence
 from typing import Any, Literal
 
-from anndata import AnnData
 import torch
+from anndata import AnnData
 
 from labcompass.data.dataloaders import SequentialDataLoader, SequentialValDataLoader
 from labcompass.data.datamanager import DataManager
-
-
-from labcompass.networks.inference_networks import PerturbationApproximatePosterior
 from labcompass.models.base import BaseModel
+from labcompass.networks.inference_networks import PerturbationApproximatePosterior
 from labcompass.training import BaseCallBack, TargetPredictionTrainer
 from labcompass.transforms import Transform
 
@@ -26,6 +24,7 @@ class TargetPredictionModel(BaseModel):
     :param device_id: The identifier for the device where to do the computations, defaults to `"cuda"`.
     :type device_id: class:`Literal["cuda", "cpu"]`
     """
+
     def __init__(
         self,
         device_id: Literal["cuda", "cpu"] = "cuda",
@@ -177,13 +176,13 @@ class TargetPredictionModel(BaseModel):
             msg = f"When `target_covariates_dims` is of type `int`, the respective perturbations should contain only one element, found {len(target_covariates)}"
             assert len(target_covariates) == 1, msg
             target_covariates_dims = {target_covariates[0]: target_covariates_dims}
-        
+
         if isinstance(target_covariates_noise_models, str):
             msg = f"When `target_covariates_noise_models` is of type `str`, the respective perturbations should contain only one element, found {len(target_covariates)}"
             assert len(target_covariates) == 1, msg
             target_covariates_noise_models = {target_covariates[0]: target_covariates_noise_models}
         if target_covariates_noise_models is None:
-            target_covariates_noise_models = {target_covariate: None for target_covariate in target_covariates}
+            target_covariates_noise_models = dict.fromkeys(target_covariates)
 
         if target_covariates_predictor_kwargs is None:
             target_covariates_predictor_kwargs = {
@@ -191,16 +190,16 @@ class TargetPredictionModel(BaseModel):
             }
 
         # checking types
-        msg = f""
+        msg = ""
         assert isinstance(target_covariates, Sequence), msg
 
-        msg = f""
+        msg = ""
         assert isinstance(target_covariates_dims, dict), msg
 
-        msg = f""
+        msg = ""
         assert isinstance(target_covariates_noise_models, dict), msg
 
-        msg = f""
+        msg = ""
         assert isinstance(target_covariates_predictor_kwargs, dict), msg
 
         # storing the settings here as attributes
@@ -226,7 +225,7 @@ class TargetPredictionModel(BaseModel):
         self.target_prediction_model = self.target_prediction_model.float()
         self.target_prediction_model = self.target_prediction_model.to(self.device)
 
-        # optimizer and scheduler 
+        # optimizer and scheduler
         self.target_prediction_optimizer = optimizer_class(
             self.target_prediction_model.parameters(),
             **optimizer_kwargs,
@@ -284,7 +283,7 @@ class TargetPredictionModel(BaseModel):
         :type loss_fn_kwargs: class:`dict[str, Any] | None`
         """
         # sanity checks
-        msg = f"You need to have instantitated the target predictor model by calling `prepare_target_prediction_model`"
+        msg = "You need to have instantitated the target predictor model by calling `prepare_target_prediction_model`"
         assert self.target_prediction_model is not None, msg
 
         # initializing data loader

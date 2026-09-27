@@ -2,21 +2,16 @@ import logging
 from collections.abc import Callable, Sequence
 from typing import Any, Literal
 
-import torch
 import numpy as np
+import torch
 from torch import Tensor
 
-from labcompass.constants import DataFields, LossFields, PredictionFields, VFStepFields
-from labcompass.data import (
-    BaseDataLoader,
-    TrainDataLoader,
-    ValidationDataLoader,
-)
+from labcompass.constants import DataFields, LossFields, PredictionFields
 from labcompass.flows import BaseFlow
 from labcompass.networks import NeuralVelocityField
 from labcompass.ode import push_forward
-from labcompass.training.callbacks import BaseCallBack
 from labcompass.training.base import BaseTrainer
+from labcompass.training.callbacks import BaseCallBack
 from labcompass.types import TensorLike
 
 logger = logging.getLogger(__name__)
@@ -123,7 +118,7 @@ class CFMTrainer(BaseTrainer):
         self.num_samples_per_validation_step = num_samples_per_validation_step
         self.cfg_prob_unconditional = cfg_prob_unconditional
         self.validation_cfg_guidance_strength = validation_cfg_guidance_strength
-        self.num_grad_accumulation_steps = num_grad_accumulation_steps 
+        self.num_grad_accumulation_steps = num_grad_accumulation_steps
 
     @property
     def model(
@@ -151,7 +146,7 @@ class CFMTrainer(BaseTrainer):
                 latent = torch.randn_like(source)
         else:
             source = None
-            msg = f""
+            msg = ""
             assert self.generate_from_noise, msg
             latent = self.noise_distribution(target.shape).to(target.device)
 
@@ -216,12 +211,12 @@ class CFMTrainer(BaseTrainer):
         if self.num_samples_per_validation_step is not None:
             num_samples = self.num_samples_per_validation_step
             if not self.generate_from_noise:
-                msg = f""
+                msg = ""
                 logger.warning(msg)
                 num_samples = 1
         else:
             num_samples = 1
-        msg = f""
+        msg = ""
         assert isinstance(num_samples, int), msg
         # handling the shape of the target when we sample multiple predictions
         target = target.unsqueeze(0)
@@ -236,7 +231,7 @@ class CFMTrainer(BaseTrainer):
         # list to store all the results
         predictions = []
         targets = []
-        
+
         # dictionary to store the results per perturbation
         predictions_dict = {}
 
@@ -258,7 +253,7 @@ class CFMTrainer(BaseTrainer):
                 PredictionFields.PREDICTION_DATA: perturbation_predictions,
                 DataFields.TARGET_STATE: perturbation_targets
             }
-        
+
         # concatenating the results for all conditions
         predictions = np.concatenate(predictions, axis=0)
         targets = np.concatenate(targets, axis=0)

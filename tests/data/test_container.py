@@ -1,9 +1,8 @@
 import numpy as np
-import torch
 import pytest
+import torch
 
 from labcompass.data.container import BatchMixin, DataContainer
-
 
 
 class TestDataContainer:
@@ -24,17 +23,17 @@ class TestDataContainer:
         }
 
         # initializing mapped batch data with correct data
-        batch = BatchMixin(data_dict)
+        BatchMixin(data_dict)
 
         # initializing with wrong type
         with pytest.raises(TypeError):
             data_dict.update({"wrong_element": torch.randn((num_cells, num_genes))})
-            batch_error = BatchMixin(data_dict)
+            BatchMixin(data_dict)
 
         # initializing with wrong batch size
         with pytest.raises(ValueError):
             data_dict.update({"wrong_element": np.random.randn(num_cells - 1, num_genes)})
-            batch_error = BatchMixin(data_dict)
+            BatchMixin(data_dict)
 
     @pytest.mark.parametrize("load_perturbation_data", [False, True])
     @pytest.mark.parametrize("load_target_data", [False, True])
@@ -69,4 +68,4 @@ class TestDataContainer:
 
         # slicing with random indices
         batch_idxs = np.random.choice(num_cells, size=batch_size)
-        batch_data = data[batch_idxs]
+        data[batch_idxs]

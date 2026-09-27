@@ -1,8 +1,8 @@
 import logging
 from typing import Any
 
-from sklearn.preprocessing import LabelEncoder, OneHotEncoder
 import numpy as np
+from sklearn.preprocessing import LabelEncoder, OneHotEncoder
 
 from labcompass.constants import DataFields
 
@@ -49,9 +49,9 @@ def label_encode(
 
     # we require only one dimension when using label encoding
     if data.ndim != 1:
-        msg = f""
+        msg = ""
         raise ValueError(msg)
-    
+
     # retrieving encoder
     encoder = LabelEncoder()
     # when we specify the target categories of interest

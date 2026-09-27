@@ -8,14 +8,12 @@
     :toctree: generated/training
 
     training.CFMTrainer
-    training.MetricsCallBack
+    training.TargetPredictionTrainer
+    training.InverseModelTrainer
     training.BaseCallBack
+    training.MetricsCallBack
+    training.WandBLogger
     training.binary_classification_loss
-    training.compute_cond_vars_inference_loss
-    training.compute_latent_perturbation_inference_loss
-    training.compute_latent_perturbation_regularization_loss
-    training.reconstruction_loss_noise_model
     training.compute_pert_inference_loss
-    training.gaussian_rec_loss
-    training.kl_div_standard_normal
+    training.reconstruction_loss_noise_model
 ```

@@ -77,8 +77,6 @@ def get_dummy_adata(
         feature representation and the continuous target covariate.
     :rtype: class:`anndata.AnnData`
     """
-
-
     # defining treatment data
     treatment0_label = "treatment0"
     treatment1_label = "treatment1"
@@ -104,13 +102,13 @@ def get_dummy_adata(
     }
 
     # defining function for retrieving all the perturbation data associated to a treatment
-    def get_treatment_data():        
+    def get_treatment_data():
         # (perturbation covariates) sampling dosages
-        dosages = np.random.uniform(size=(tot_perturbed_cells, )) 
+        dosages = np.random.uniform(size=(tot_perturbed_cells, ))
         # (perturbation covariates) sampling times
         times = np.random.uniform(size=(tot_perturbed_cells, ))
         # (perturbation reps) retrieving perturbation ids
-        perturbation_ids =  np.concatenate([np.ones((num_perturbed_cells))*u for u in range(1, num_unique_treatments + 1)])
+        perturbation_ids =  np.concatenate([np.ones(num_perturbed_cells)*u for u in range(1, num_unique_treatments + 1)])
         # (perturbation reps) retrieving perturbation labels
         perturbation_labels = np.vectorize(id_to_label_map.get)(perturbation_ids)
         # (perturbation reps) retrieving perturbation group label
@@ -139,7 +137,7 @@ def get_dummy_adata(
     treatment1_group_labels = treatment1_group_labels[shuffled_indices]
 
     # defining perturbation data for control states
-    control_dosages = np.zeros((num_control_cells, )) 
+    control_dosages = np.zeros((num_control_cells, ))
     control_times = np.zeros((num_control_cells, ))
     control_pertubation_labels = np.array(["control" for _ in range(num_control_cells)])
     control_perturbation_features = np.zeros((num_control_cells, num_perturbation_feats))
@@ -200,7 +198,7 @@ def get_dummy_adata(
 
     # defining mappings for uns
     def get_one_hot(label_id, num_labels):
-        arr = np.zeros((num_labels))
+        arr = np.zeros(num_labels)
         arr[label_id] = 1
         return arr
     uns = {

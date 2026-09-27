@@ -4,7 +4,6 @@ from typing import Literal
 from labcompass.config.velocity_field import NeuralVelocityFieldConfig
 
 
-
 @dataclass(slots=True)
 class NeuralFlowMapConfig(NeuralVelocityFieldConfig):
     """Object for configuring :class:`NeuralFlowMap` objects.

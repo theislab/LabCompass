@@ -1,20 +1,20 @@
+import itertools
 from collections.abc import Callable, Sequence
 from typing import Any, Literal
 
 import anndata
 import numpy as np
 import torch
-import itertools
 
-from labcompass.types import TensorLike
 from labcompass.sym.gmm import (
     AnnotatedGaussianMixtureModel,
     DoseResolvedAnnotatedGaussianMixtureModel,
     MultiAttributeAnnotatedGaussianMixtureModel,
 )
+from labcompass.types import TensorLike
 from labcompass.utils import set_reproducibility
 
-__all__ = ["get_annotated_perturbation_data"] 
+__all__ = ["get_annotated_perturbation_data"]
 
 
 def __get_means(
@@ -25,7 +25,7 @@ def __get_means(
     """"""
     feature_range = np.linspace(-mean_range, mean_range, linespace_width)
     combinations = np.array(list(itertools.permutations(feature_range.tolist(), 2)))
-    trtm_means = np.random.choice(len(combinations), U)  # sample combinations of dimension means 
+    trtm_means = np.random.choice(len(combinations), U)  # sample combinations of dimension means
     trtm_means = combinations[trtm_means]
     trtm_means = torch.from_numpy(trtm_means).float()
     return trtm_means
@@ -63,7 +63,7 @@ def __get_covariances(
         raise NotImplementedError
     else:
         msg = f"{covariance_type=} is not supported, choose among `[\"isotropic\", \"anisotropic\", \"full_covariance\"]`"
-        raise ValueError
+        raise ValueError(msg)
 
 
 def __generate_perturbation_data(
@@ -97,22 +97,21 @@ def __generate_perturbation_data(
 
     # sanity check on the input
     if multi_attribute:
-        msg = f""
+        msg = ""
         assert isinstance(U, dict), msg
     else:
-        msg = f""
+        msg = ""
         assert isinstance(U, int), msg
 
     if isinstance(uniform_range, int | float):
-        uniform_range = {cat_id: uniform_range for cat_id in n_cat.keys()}
-    msg = f""
+        uniform_range = dict.fromkeys(n_cat.keys(), uniform_range)
+    msg = ""
     assert isinstance(uniform_range, dict), msg
 
     if isinstance(non_linearity, Callable):
-        non_linearity = {cat_id: non_linearity for cat_id in n_cat.keys()}
+        non_linearity = dict.fromkeys(n_cat.keys(), non_linearity)
 
     # total number of samples
-    N = N0 + d*Nu
 
     # mean for perturbations
     if multi_attribute:
@@ -298,7 +297,7 @@ def __generate_perturbation_data(
                     trtm_means,
                 ),
                 dim=0,
-            ) 
+            )
 
     # (optional) hadling the dosages
     if dose_resolved:
@@ -343,11 +342,11 @@ def __generate_perturbation_data(
             }
     else:
         perturbation_ids = perturbation_ids[random_perm_idx].numpy()
-        if return_perturbation_representation: 
+        if return_perturbation_representation:
             trtm_means = trtm_means[perturbation_ids].numpy()
         if dose_resolved:
             dosages = dosages[random_perm_idx].numpy()
-    
+
     # constructing output dictionary
     out = {
         "gmm": gmm,
@@ -497,10 +496,9 @@ def get_annotated_perturbation_data(
         optionally `"treatment_means"` / `"dosages"`).
     :rtype: class:`tuple[anndata.AnnData, dict[str, Any]]`
     """
-
     if isinstance(n_cat, int):
         n_cat = {category_label: n_cat}
-    msg = f""
+    msg = ""
     assert isinstance(n_cat, dict), msg
 
     # generating data
@@ -533,8 +531,6 @@ def get_annotated_perturbation_data(
     states = sym_dictionary["states"]
     perturbation_ids = sym_dictionary["perturbation_ids"]
     categories = sym_dictionary["categories"]
-    if return_perturbation_representation:
-        treatment_means = sym_dictionary["treatment_means"]
     if dose_resolved:
         dosages = sym_dictionary["dosages"]
 
@@ -563,7 +559,7 @@ def get_annotated_perturbation_data(
             } for covariate_label in perturbation_labels.keys()
         }
         for perturbation_label in perturbation_labels_one_hot.values():
-            for idx, perturbation_one_hot in enumerate((perturbation_label.values())):
+            for idx, perturbation_one_hot in enumerate(perturbation_label.values()):
                 np.put(perturbation_one_hot, [idx], [1])
     else:
         perturbation_ids_to_labels = {
@@ -600,15 +596,15 @@ def get_annotated_perturbation_data(
     if multi_attribute:
         perturbation_shift = {
             covariate_label: {
-                control_label: torch.zeros((d)).numpy(),
+                control_label: torch.zeros(d).numpy(),
                 **{
                     perturbation_ids_to_label[(idx + 1)]: comp["mean"].numpy() for idx, comp in enumerate(gmm.parameters[covariate_label])
-                } 
+                }
             } for covariate_label, perturbation_ids_to_label in perturbation_ids_to_labels.items()
         }
     else:
         perturbation_shift = {
-            control_label: torch.zeros((d)).numpy(),
+            control_label: torch.zeros(d).numpy(),
             **{
                 perturbation_ids_to_labels[(idx + 1)]: comp["mean"].numpy() for idx, comp in enumerate(gmm.parameters)
             }
@@ -630,13 +626,8 @@ def get_annotated_perturbation_data(
         # handling obs attribute of annotated data
         obs = {
             control_label: is_control,
-            **{
-                cat_id: cat_labels for cat_id, cat_labels in category_labels.items()
-            },
-            **{
-                covariate_label: covariate_perturbation_label
-                for covariate_label, covariate_perturbation_label in perturbation_labels.items()
-            }
+            **dict(category_labels.items()),
+            **dict(perturbation_labels.items())
         }
         if dose_resolved:
             obs.update(
@@ -645,7 +636,7 @@ def get_annotated_perturbation_data(
                 }
             )
 
-        # handling uns attribute of annotated data        
+        # handling uns attribute of annotated data
         uns = {
             **{
                 f"{cat_id}_label": cat_labels for cat_id, cat_labels in category_labels_to_ids.items()
@@ -667,9 +658,7 @@ def get_annotated_perturbation_data(
         obs = {
             treatment_label: perturbation_labels,
             control_label: is_control,
-            **{
-                cat_id: cat_labels for cat_id, cat_labels in category_labels.items()
-            },
+            **dict(category_labels.items()),
 
         }
         if dose_resolved:

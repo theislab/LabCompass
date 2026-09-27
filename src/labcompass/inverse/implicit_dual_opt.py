@@ -1,5 +1,5 @@
-from labcompass.inverse.loss_guidance import LossGuidedFlow
 from labcompass.inverse.kkt import KKTConditions
+from labcompass.inverse.loss_guidance import LossGuidedFlow
 from labcompass.models import FlowMatching
 
 

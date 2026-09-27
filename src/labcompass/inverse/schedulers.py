@@ -21,7 +21,7 @@ class ConstantLambdaScheduler(LambdaScheduler):
         **kwargs
     ):
         self.lmax = lmax
-    
+
     def __call__(self, t, *args, **kwargs):
         return self.lmax * torch.ones((*t.shape[:-1], 1), device=t.device)
 

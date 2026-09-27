@@ -1,13 +1,12 @@
 import logging
 
 import torch
-import numpy as np
 from torch import Tensor
 
-from labcompass.utils import match_shapes
 from labcompass.constants import DataFields, LossFields
 from labcompass.training.flow_matching import CFMTrainer
 from labcompass.types import TensorLike
+from labcompass.utils import match_shapes
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +33,7 @@ class CFMTrainerWithScore(CFMTrainer):
                 latent = torch.randn_like(source)
         else:
             source = None
-            msg = f""
+            msg = ""
             assert self.generate_from_noise, msg
             latent = self.noise_distribution(target.shape).to(target.device)
 

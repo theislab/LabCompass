@@ -22,7 +22,7 @@ class TestDataLoaders(BaseDataTest):
         num_unique_target_values: int,
         dim_target_covariates: int,
         target_covariates_in_obsm: str,
-        perturbations_in_obsm: Sequence[str] | None, 
+        perturbations_in_obsm: Sequence[str] | None,
         sample_rep: None | str,
         control_key: None | str,
         perturbations: None | str | Sequence[str],
@@ -38,7 +38,7 @@ class TestDataLoaders(BaseDataTest):
             sample_rep,
             control_key,
             perturbations,
-            perturbations_in_obsm, 
+            perturbations_in_obsm,
             perturbation_covariates,
             perturbation_reps,
             load_target_covariates,
@@ -47,7 +47,7 @@ class TestDataLoaders(BaseDataTest):
             sample_rep,
             control_key,
             perturbations,
-            perturbations_in_obsm, 
+            perturbations_in_obsm,
             perturbation_covariates,
             perturbation_reps,
             load_target_covariates,
@@ -113,7 +113,7 @@ class TestDataLoaders(BaseDataTest):
         num_unique_target_values: int,
         dim_target_covariates: int,
         target_covariates_in_obsm: str,
-        perturbations_in_obsm: Sequence[str] | None, 
+        perturbations_in_obsm: Sequence[str] | None,
         num_treatments_to_load: int,
         sample_rep: None | str,
         control_key: None | str,
@@ -131,7 +131,7 @@ class TestDataLoaders(BaseDataTest):
             sample_rep,
             control_key,
             perturbations,
-            perturbations_in_obsm, 
+            perturbations_in_obsm,
             perturbation_covariates,
             perturbation_reps,
             load_target_covariates,
@@ -140,7 +140,7 @@ class TestDataLoaders(BaseDataTest):
             sample_rep,
             control_key,
             perturbations,
-            perturbations_in_obsm, 
+            perturbations_in_obsm,
             perturbation_covariates,
             perturbation_reps,
             load_target_covariates,
@@ -183,7 +183,7 @@ class TestDataLoaders(BaseDataTest):
         # sampling batch of train data and validating it
         validation_batch = validation_dataloader.sample()
 
-        # check that we have the correct perturbaation keys        
+        # check that we have the correct perturbaation keys
         seen_combinatorial_perturbations = data.seen_combinations
         perturbations_with_rep = data.perturbations
 
@@ -196,20 +196,20 @@ class TestDataLoaders(BaseDataTest):
 
             # check that we have the correct key
             if data.perturbations is None:
-                expected_key = "unconditional"
+                pass
             else:
                 # concatenate perturbation names
                 if perturbations_with_rep is None:
                     msg = f"When {seen_combinatorial_perturbations=} and `data.perturbations_in_obsm` is not None, `perturbations_with_rep` should be not None. Found None."
                     raise ValueError(msg)
-                treatment = [perturbation for perturbation in perturbations_with_rep]
-                expected_key = "_".join(treatment)
+                treatment = list(perturbations_with_rep)
+                "_".join(treatment)
 
         # when we can construct groups
         else:
-            if data_manager.perturbation_data_schema.allow_grouped_couplings:            
+            if data_manager.perturbation_data_schema.allow_grouped_couplings:
                 # retrieve expected perturbation ids
-                expected_keys = ["_".join(treatment) for treatment in seen_combinatorial_perturbations]
+                ["_".join(treatment) for treatment in seen_combinatorial_perturbations]
 
             #     if set_num_treatments_to_load:
             #         # check that we have the correct number of batches
@@ -248,7 +248,7 @@ class TestDataLoaders(BaseDataTest):
 
 
         # for each element verify that the batch dictionary is correct
-        for perturbation, perturbation_batch in validation_batch.items():
+        for _perturbation, perturbation_batch in validation_batch.items():
             # print(perturbation, perturbation_batch.keys())
             validate_batch(
                 perturbation_batch,

@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from typing import Any, Literal
+from typing import Literal
 
 import anndata
 import numpy as np
@@ -36,19 +36,19 @@ class TestDataSchema:
                 adata,
                 sample_rep,
             )
-        
+
         # retrieving the data
         state_data = state_data_schema.get_data()
 
         # check type
         if not isinstance(state_data, np.ndarray):
-            msg = f""
+            msg = ""
             raise TypeError(msg)
-        
+
         # check shape
         expected_shape = (num_cells, num_genes)
         if state_data.shape != expected_shape:
-            msg = f""
+            msg = ""
             raise ValueError(msg)
 
 
@@ -98,7 +98,7 @@ class TestDataSchema:
                         perturbations_in_obsm,
                         perturbation_covariates,
                     )
-    
+
         # initializing schema
         perturbation_schema = labcompass.data.schemas.PerturbationDataSchema(
             adata,
@@ -183,7 +183,7 @@ class TestDataSchema:
         """"""
         # throwing error at schema initialization
         if INVALID_KEY in target_covariates.keys():
-            with pytest.raises(KeyError):    
+            with pytest.raises(KeyError):
                 target_schema = labcompass.data.schemas.TargetDataSchema(
                     adata,
                     target_covariates,
@@ -191,7 +191,7 @@ class TestDataSchema:
                     target_covariates_kwargs=None,
                 )
 
-        # initializing target data schema 
+        # initializing target data schema
         target_schema = labcompass.data.schemas.TargetDataSchema(
             adata,
             target_covariates,

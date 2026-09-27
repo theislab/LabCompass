@@ -15,6 +15,13 @@ from labcompass.training.utils import (
 
 __all__ = [
     "CFMTrainer",
+    "TargetPredictionTrainer",
+    "InverseModelTrainer",
     "BaseCallBack",
     "MetricsCallBack",
+    "WandBLogger",
+    "TrainingCallBacks",
+    "binary_classification_loss",
+    "compute_pert_inference_loss",
+    "reconstruction_loss_noise_model",
 ]

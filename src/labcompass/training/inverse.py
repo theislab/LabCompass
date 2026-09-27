@@ -1,16 +1,13 @@
-from typing import Any, Literal
+from typing import Literal
 
 import torch
 from torch import Tensor
 
 from labcompass.constants import DataFields, LossFields
 from labcompass.networks.blocks import BaseModule
-from labcompass.networks.neural_noise_models import MLPGaussianNoiseModel
 from labcompass.training.base import BaseTrainer
 from labcompass.training.callbacks import BaseCallBack
-from labcompass.training.utils import compute_pert_inference_loss
 from labcompass.types import TensorLike
-
 
 __all__ = ["InverseModelTrainer", ]
 
@@ -60,7 +57,7 @@ class InverseModelTrainer(BaseTrainer):
     ) -> None:
         """"""
         super().__init__()
-        
+
         self.inverse_model = inverse_model
         self.forward_model = forward_model
         self.target_prediction_model = target_prediction_model
@@ -69,7 +66,7 @@ class InverseModelTrainer(BaseTrainer):
         self.lr_scheduler_step = lr_scheduler_step
         self.callbacks = callbacks
         self.grad_steps_log_interval = grad_steps_log_interval
-        self.num_grad_accumulation_steps = num_grad_accumulation_steps 
+        self.num_grad_accumulation_steps = num_grad_accumulation_steps
 
     @property
     def model(
@@ -91,9 +88,9 @@ class InverseModelTrainer(BaseTrainer):
         # parsing batch dictonary
         source_states = batch[DataFields.STATE_DATA]
 
-        loss, out_dict = self.inverse_model(source_states)    
+        loss, out_dict = self.inverse_model(source_states)
         return loss, {LossFields.LOSS: loss.item(), **out_dict}
-        
+
     def _validation_step(
         self,
         batch: dict[str, TensorLike],

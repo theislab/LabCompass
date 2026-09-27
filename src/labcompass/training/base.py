@@ -1,6 +1,5 @@
 import abc
-from collections.abc import Callable, Sequence
-from typing import Any, Literal
+from collections.abc import Sequence
 
 import matplotlib.pyplot as plt
 import torch
@@ -125,7 +124,7 @@ class BaseTrainer(abc.ABC):
                         logs=log_dict,
                     )
             prog_bar.update()
-        
+
             # validation step
             if do_validation:
                 if (grad_step + 1) % valid_freq == 0 and grad_step > 0:
@@ -154,7 +153,7 @@ class BaseTrainer(abc.ABC):
             keys_to_plot = (keys_to_plot, )
         # sanity checks
         for key in keys_to_plot:
-            msg = f""
+            msg = ""
             assert key in self.training_logs.keys(), msg
         # retrieving the logs we want to plot
         logs_to_plot = {log_id: log_data for log_id, log_data in self.training_logs.items() if log_id in keys_to_plot}

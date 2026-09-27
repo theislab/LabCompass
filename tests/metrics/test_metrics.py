@@ -27,7 +27,7 @@ class TestMetrics:
         n_iter: int,
         method: Literal["exact", "sinkhorn"]
     ) -> None:
-        
+
         batch_size = 128
         num_samples = 250
         dim = 10
@@ -46,6 +46,6 @@ class TestMetrics:
         assert e_distance >= 0.0
         assert mmd >= 0.0
         assert np.all((0.0 <= cell_props) & (cell_props <= 1.0))
-        assert np.all((min_mse >= 0.0)) 
-        assert np.all((max_mse >= 0.0))
+        assert np.all(min_mse >= 0.0)
+        assert np.all(max_mse >= 0.0)
         assert wasserstein_distance >= 0.0

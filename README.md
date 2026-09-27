@@ -43,8 +43,6 @@ provides a family of models for the design and analysis of perturbation experime
 
 ## Example usage
 
-Additional worked examples are available as notebooks in [docs/notebooks](docs/notebooks).
-
 ```{python}
 >>> # importing the required packages
 >>> import labcompass
@@ -52,7 +50,7 @@ Additional worked examples are available as notebooks in [docs/notebooks](docs/n
 >>> # initializing the AnnData object with the train data
 >>> train_adata = ad.AnnData(...)
 >>> # retrieving the default configurations
->>> config = labcompass.networks.NeuralVelocityFieldConfig()
+>>> config = labcompass.config.NeuralVelocityFieldConfig()
 >>> # initializing the model with default settings
 >>> cfm = labcompass.models.FlowMatching()
 >>> # preparing the train data

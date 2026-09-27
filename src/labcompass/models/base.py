@@ -82,9 +82,9 @@ class BaseModel:
         # checking that the fixle exists
         if os.path.exists(dump_path):
             if not overwrite:
-                msg = f""
+                msg = ""
                 raise RuntimeError(msg)
-            msg = f""
+            msg = ""
             logger.warning(msg)
 
         # saving the model
@@ -95,14 +95,14 @@ class BaseModel:
     def load(
         cls,
         file_name: str,
-    ) -> "FlowMatching":
+    ) -> "BaseModel":
         """Loads a pickled model instance from disk.
 
         :param file_name: Path to the pickled model file to load.
         :type file_name: class:`str`
 
         :return: The deserialized model instance.
-        :rtype: class:`FlowMatching`
+        :rtype: class:`BaseModel`
 
         :raises TypeError: If the deserialized object is not an instance of the class :method:`load` was called on.
         """
@@ -110,10 +110,10 @@ class BaseModel:
         _install_legacy_module_alias()
         with open(file_name, "rb") as fp:
             model = cloudpickle.load(fp)
-        
+
         # veriying types
         if type(model) is not cls:
-            msg = f""
+            msg = ""
             raise TypeError(msg)
-        
+
         return model

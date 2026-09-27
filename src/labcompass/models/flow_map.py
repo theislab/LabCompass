@@ -1,21 +1,18 @@
-import logging
-import os
-from collections.abc import Callable, Sequence, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any, Literal
-
 
 import torch
 
+from labcompass.config.flow_map import NeuralFlowMapConfig
 from labcompass.constants import DataFields
 from labcompass.data import TrainDataLoader, ValidationDataLoader
+from labcompass.models import FlowMatching
+from labcompass.networks import NeuralVelocityField
+from labcompass.networks.flow_map_net import NeuralFlowMap
 from labcompass.ode.utils import get_initial_state_and_condition
 from labcompass.training import BaseCallBack
 from labcompass.training.flow_map import FlowMapTrainer
 from labcompass.transforms import Transform
-from labcompass.config.flow_map import NeuralFlowMapConfig
-from labcompass.models import FlowMatching
-from labcompass.networks import NeuralVelocityField
-from labcompass.networks.flow_map_net import NeuralFlowMap
 
 
 class FlowMap(FlowMatching):
@@ -129,19 +126,19 @@ class FlowMap(FlowMatching):
             msg = "When generating from noise you need to use source as conditions."
             raise ValueError(msg)
         elif (not self.data_manager.has_controls) and (not self.generate_from_noise):
-            msg = f"When no controls are available you need to generate from noise."
+            msg = "When no controls are available you need to generate from noise."
             raise ValueError(msg)
 
         self.cvf_config = cvf_config
-        
-        # given a dimensionality and a configuration of hparams, initialize a flow model 
+
+        # given a dimensionality and a configuration of hparams, initialize a flow model
         self.flow_map = NeuralFlowMap(
             config=self.cvf_config,
         )
         self.flow_map = self.flow_map.float()
         self.flow_map = self.flow_map.to(self.device)
 
-        # optimizer and scheduler 
+        # optimizer and scheduler
         self.optimizer = optimizer_class(
             self.flow_map.parameters(),
             **optimizer_kwargs,
@@ -301,7 +298,7 @@ class FlowMap(FlowMatching):
         num_samples: int | None = None,
         batch_size: int | None = None,
         num_time_steps: int | None = None,
-        fix_noise: bool = False, 
+        fix_noise: bool = False,
     ) -> dict[str, torch.Tensor]:
         """Generates the predictions by integrating the dynamics with the learnt velocity field for a given initial condition
 
@@ -324,7 +321,7 @@ class FlowMap(FlowMatching):
         :param num_time_steps: Number of time steps which to integrate the dynamics over during inference.
             If provided, it will be used instead of :attr: `self.num_time_steps` . Defaults to `None`.
         :type num_time_steps: class:`int | None`
-        
+
         :param fix_noise: Whether the noise  for the prediction is fixed and present in the batch as a source.
         :type fix_noise: class: `bool`
 
@@ -335,13 +332,13 @@ class FlowMap(FlowMatching):
         :param cfg_guidance_strength: Strength of the guidance term for sampling.
             Only used when :attr: `self.cvf_config.use_classifier_free_guidance` is set to `True`, defaults to `1.0`.
         :type cfg_guidance_strength: class: `float`
-        
+
         :return: Tensor of shape `(batch_size, self.flow_dim)` if :param:`return_trajectory` is `False`, otherwise Tensor of shape `(batch_size, self.num_time_steps, self.flow_dim)`
         :rtype: class:`torch.Tensor`
         """
         # handling source
         source = None
-        if self.data_manager.has_controls or fix_noise: 
+        if self.data_manager.has_controls or fix_noise:
             source = batch[DataFields.SOURCE_STATE]
 
         # handling conditions
@@ -357,8 +354,8 @@ class FlowMap(FlowMatching):
             # their first dimension coincides
             if (source is not None) and (condition is not None):
                 # sanity check
-                for condition_covariate, condition_data in condition.items():
-                    msg = f""
+                for _condition_covariate, condition_data in condition.items():
+                    msg = ""
                     assert condition_data.shape[:-1] == source.shape[:-1], msg
                 batch_size = source.shape[:-1]
             # when we only have the source states (unconditional generation)
@@ -370,8 +367,8 @@ class FlowMap(FlowMatching):
             elif (condition is not None):
                 ref_batch_size = list(condition.values())[0].shape[:-1]
                 # sanity check
-                for condition_covariate, condition_data in condition.items():
-                    msg = f""
+                for _condition_covariate, condition_data in condition.items():
+                    msg = ""
                     assert condition_data.shape[:-1] == ref_batch_size, msg
                 batch_size = ref_batch_size
             # otherwise we retrieve it from the dataloaders
@@ -408,7 +405,7 @@ class FlowMap(FlowMatching):
         # prepare time steps
         if time_steps is None:
             time_steps = torch.linspace(0.0, 1.0, num_steps+1)
-        
+
         X_s = initial_state
         traj = [X_s]
         for idx, s in enumerate(time_steps[:-1]):
@@ -418,6 +415,6 @@ class FlowMap(FlowMatching):
             X_s = map_fn(s_tensor, t_tensor, X_s)
             traj.append(X_s)
         if return_trajectory:
-            traj = torch.stack(traj, axis=0)    
+            traj = torch.stack(traj, axis=0)
             return traj
         return X_s

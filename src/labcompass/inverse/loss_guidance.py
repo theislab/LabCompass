@@ -3,10 +3,9 @@ from functools import partial
 import torch
 from torchdiffeq import odeint
 
-from labcompass.utils import match_shapes
+from labcompass.models import FlowMap, FlowMatching
 from labcompass.networks import NeuralVelocityField
-from labcompass.models import FlowMatching, FlowMap
-
+from labcompass.utils import match_shapes
 
 __all__ = ["LossGuidedFlow"]
 
@@ -376,10 +375,9 @@ class LossGuidedFlow:
             integration.
         :rtype: class:`tuple[np.ndarray, Tensor, Tensor]`
         """
-
         # create store for loss function and lambda schedueler values
         self._loss_history = []
-        self._lambda_history = [] 
+        self._lambda_history = []
 
         # default values for the solver arguments
         if solver_kwargs is None:
