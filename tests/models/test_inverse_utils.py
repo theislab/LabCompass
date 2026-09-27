@@ -1,14 +1,14 @@
 import numpy as np
 import torch
 
-from sc_exp_design.constants import DataFields
-from sc_exp_design.networks.blocks import BaseModule, BaseForwardModel
-from sc_exp_design.config.velocity_field import NeuralVelocityFieldConfig
-from sc_exp_design.models.inverse_utils import LangevinOptimizer
-from sc_exp_design.models.flow_matching import FlowMatching
-from sc_exp_design.models.inverse import InverseModel
-from sc_exp_design.sym import get_annotated_perturbation_data
-from sc_exp_design.utils import set_reproducibility
+from labcompass.constants import DataFields
+from labcompass.networks.blocks import BaseModule, BaseForwardModel
+from labcompass.config.velocity_field import NeuralVelocityFieldConfig
+from labcompass.models.inverse_utils import LangevinOptimizer
+from labcompass.models.flow_matching import FlowMatching
+from labcompass.models.inverse import InverseModel
+from labcompass.sym import get_annotated_perturbation_data
+from labcompass.utils import set_reproducibility
 
 # defining batch size
 batch_size = 64

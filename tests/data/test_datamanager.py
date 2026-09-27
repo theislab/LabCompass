@@ -5,7 +5,7 @@ import anndata
 import pytest
 import torch
 
-import sc_exp_design
+import labcompass
 
 from .base_data_test import BaseDataTest
 from .utils import validate_batch, validate_parametrized_inputs
@@ -79,7 +79,7 @@ class TestDataManager(BaseDataTest):
         )
 
         # initializing data manager
-        data_manager = sc_exp_design.data.DataManager(
+        data_manager = labcompass.data.DataManager(
             adata,
             sample_rep=sample_rep,
             control_key=control_key,

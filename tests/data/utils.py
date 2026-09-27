@@ -3,8 +3,8 @@ from typing import Any, Literal
 
 import pytest
 
-from sc_exp_design.constants import DataFields
-from sc_exp_design.data import DataContainer
+from labcompass.constants import DataFields
+from labcompass.data import DataContainer
 
 
 def validate_batch(

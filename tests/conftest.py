@@ -5,7 +5,7 @@ import pytest
 import anndata
 import numpy as np
 
-from sc_exp_design.sym import get_dummy_adata
+from labcompass.sym import get_dummy_adata
 
 
 @pytest.fixture
@@ -173,13 +173,11 @@ def adata(
     num_unique_groups: int,
     num_control_cells: int,
     num_perturbed_cells: int,
-    num_genes: int,
     num_unique_target_values: int,
     num_perturbation_feats: int,
     tot_perturbed_cells: int,
     num_cells: int,
     states: np.ndarray,
-    dim_target_covariates: int,
     target_covariates_in_obsm: str,
     target_covariate_in_obsm_data: np.ndarray,
     perturbations_in_obsm: str,
@@ -190,13 +188,11 @@ def adata(
         num_unique_groups,
         num_control_cells,
         num_perturbed_cells,
-        num_genes,
         num_unique_target_values,
         num_perturbation_feats,
         tot_perturbed_cells,
         num_cells,
         states,
-        dim_target_covariates,
         target_covariates_in_obsm,
         target_covariate_in_obsm_data,
         perturbations_in_obsm,

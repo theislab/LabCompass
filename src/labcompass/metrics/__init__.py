@@ -1,0 +1,58 @@
+from collections.abc import Callable
+from dataclasses import dataclass
+from functools import partial
+
+import numpy as np
+
+from labcompass.metrics.metrics import (
+    compute_e_distance,
+    compute_r_squared,
+    compute_mmd,
+    compute_wasserstein_distance,
+    compute_min_max_mse,
+    compute_cell_props
+)
+from labcompass.metrics.classification_metrics import (
+    compute_accuracy,
+    compute_f1,
+    compute_precision,
+    compute_recall,
+    compute_roc_auc
+)
+from labcompass.types import TensorLike
+
+__all__ = [
+    "Metrics",
+]
+
+
+@dataclass(frozen=True)
+class Metrics:
+    """Registry of evaluation metric callables, bundling default distributional/regression and classification metrics.
+
+    Each field is a callable of the form `Callable[[TensorLike, TensorLike], float]` taking `(pred, target)`
+    and returning a scalar score, bound by default to one of the `compute_*` functions in
+    :mod:`labcompass.metrics.metrics` and :mod:`labcompass.metrics.classification_metrics`. Several
+    classification fields are bound via `functools.partial` to a specific averaging mode (`"micro"`,
+    `"macro"`, or `"weighted"`) of the underlying metric.
+    """
+
+    r_squared: Callable[[TensorLike, TensorLike], float] = compute_r_squared
+    energy_distance: Callable[[TensorLike, TensorLike], float] = compute_e_distance
+    maximum_mean_discrepancy: Callable[[TensorLike, TensorLike], float] = compute_mmd
+    wasserstein_distance: Callable[[TensorLike, TensorLike], float] = compute_wasserstein_distance
+    sinkhorn_divergence: Callable[[TensorLike, TensorLike], float] = partial(compute_wasserstein_distance, method="sinkhorn")
+    min_max_mse: Callable[[TensorLike, TensorLike], float] = compute_min_max_mse
+    cell_props: Callable[[TensorLike, TensorLike], float] = compute_cell_props
+    accuracy: Callable[[TensorLike, TensorLike], float] = compute_accuracy
+    micro_f1_score: Callable[[TensorLike, TensorLike], float] = partial(compute_f1, average="micro")
+    micro_precision: Callable[[TensorLike, TensorLike], float] = partial(compute_precision, average="micro")
+    micro_recall: Callable[[TensorLike, TensorLike], float] = partial(compute_recall, average="micro")
+    macro_f1_score: Callable[[TensorLike, TensorLike], float] = partial(compute_f1, average="macro")
+    macro_precision: Callable[[TensorLike, TensorLike], float] = partial(compute_precision, average="macro")
+    macro_recall: Callable[[TensorLike, TensorLike], float] = partial(compute_recall, average="macro")
+    weighted_f1_score: Callable[[TensorLike, TensorLike], float] = partial(compute_f1, average="weighted")
+    weighted_precision: Callable[[TensorLike, TensorLike], float] = partial(compute_precision, average="weighted")
+    weighted_recall: Callable[[TensorLike, TensorLike], float] = partial(compute_recall, average="weighted")
+    micro_roc_auc: Callable[[TensorLike, TensorLike], float] = partial(compute_roc_auc, average="micro")
+    macro_roc_auc: Callable[[TensorLike, TensorLike], float] = partial(compute_roc_auc, average="macro")

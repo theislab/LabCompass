@@ -4,8 +4,8 @@ from typing import Any, Literal
 import pytest
 import torch
 
-import sc_exp_design
-from sc_exp_design.constants import ParamsFields, VFStepFields
+import labcompass
+from labcompass.constants import ParamsFields, VFStepFields
 
 # dimensionalities
 batch_size = 4
@@ -141,7 +141,7 @@ class TestNeuralVelocityField:
             use_classifier_free_guidance = False
 
         # initializing configurations
-        config = sc_exp_design.config.NeuralVelocityFieldConfig(
+        config = labcompass.config.NeuralVelocityFieldConfig(
             flow_dim,
             encode_state=encode_state,
             state_encoder_output_dim=state_latent_dim,
@@ -168,7 +168,7 @@ class TestNeuralVelocityField:
         )
 
         # forward pass on velocity field
-        cvf = sc_exp_design.networks.NeuralVelocityField(
+        cvf = labcompass.networks.NeuralVelocityField(
             config,
         )
         vf = cvf.forward(t_test, x_test, cond, source=source)

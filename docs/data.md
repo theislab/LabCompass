@@ -2,7 +2,7 @@
 
 ```{eval-rst}
 .. module:: data
-.. currentmodule:: sc_exp_design
+.. currentmodule:: labcompass
 
 .. autosummary::
     :toctree: generated/data

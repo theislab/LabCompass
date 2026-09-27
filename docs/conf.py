@@ -18,8 +18,8 @@ sys.path.insert(0, str(HERE / "extensions"))
 
 # NOTE: If you installed your project in editable mode, this might be stale.
 #       If this is the case, reinstall it to refresh the metadata
-info = metadata("scExpDesign")
-project_name = info["Name"]
+info = metadata("LabCompass")
+project_name = "LabCompass"  # PyPI/import name is lowercase; this is the display + GitHub repo name
 author = info["Author"]
 copyright = f"{datetime.now():%Y}, {author}."
 version = info["Version"]
@@ -36,7 +36,7 @@ needs_sphinx = "4.0"
 
 html_context = {
     "display_github": True,  # Integrate GitHub
-    "github_user": "lorenzo-consoli",
+    "github_user": "theislab",
     "github_repo": project_name,
     "github_version": "main",
     "conf_py_path": "/docs/",

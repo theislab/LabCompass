@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import pytest
 
-from sc_exp_design.data.container import BatchMixin, DataContainer
+from labcompass.data.container import BatchMixin, DataContainer
 
 
 
