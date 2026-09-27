@@ -4,7 +4,6 @@ import pytest
 
 from labcompass.config import NeuralVelocityFieldConfig
 
-
 INVALID_STRING = "invalid_string"
 
 
@@ -28,7 +27,7 @@ class TestNeuralVelocityFieldConfig:
                 ValueError,
                 # match=r'is not supported. Possible values are \[\"concatenation\", \"resnet\", \"film\"\]'
             ):
-                cvf_config = NeuralVelocityFieldConfig(
+                NeuralVelocityFieldConfig(
                     flow_dim=num_genes,
                     conditioning_type=conditioning_type,
                     perturbation_layers_before_pooling=perturbation_layers_before_pooling,
@@ -41,7 +40,7 @@ class TestNeuralVelocityFieldConfig:
                 )
                 return None
         else:
-            cvf_config = NeuralVelocityFieldConfig(
+            NeuralVelocityFieldConfig(
                 flow_dim=num_genes,
                 conditioning_type=conditioning_type,
                 perturbation_layers_before_pooling=perturbation_layers_before_pooling,
@@ -60,7 +59,7 @@ class TestNeuralVelocityFieldConfig:
             {"condition": {"input_dim": 2, }},
             {"condition": {"output_dim":2, }}
         ]
-    )        
+    )
     def test_config_init_perturbation_layers_before_pooling(
         self,
         num_genes: int,
@@ -71,7 +70,7 @@ class TestNeuralVelocityFieldConfig:
                 AssertionError,
                 # match=r"You need to pass a dictionary in the proper format as the `self.perturbation_layers_before_pooling` attribute, found `None`",
             ):
-                cvf_config = NeuralVelocityFieldConfig(
+                NeuralVelocityFieldConfig(
                     flow_dim=num_genes,
                     perturbation_layers_before_pooling=perturbation_layers_before_pooling,
                     use_guidance=True,
@@ -84,7 +83,7 @@ class TestNeuralVelocityFieldConfig:
                 return None
         elif "input_dim" not in perturbation_layers_before_pooling["condition"].keys() or "output_dim" not in perturbation_layers_before_pooling["condition"].keys():
             with pytest.raises(AssertionError):
-                cvf_config = NeuralVelocityFieldConfig(
+                NeuralVelocityFieldConfig(
                     flow_dim=num_genes,
                     perturbation_layers_before_pooling=perturbation_layers_before_pooling,
                     use_guidance=True,
@@ -96,7 +95,7 @@ class TestNeuralVelocityFieldConfig:
                 )
                 return None
         else:
-            cvf_config = NeuralVelocityFieldConfig(
+            NeuralVelocityFieldConfig(
                 flow_dim=num_genes,
                 perturbation_layers_before_pooling=perturbation_layers_before_pooling,
                 use_guidance=True,
@@ -330,7 +329,7 @@ class TestNeuralVelocityFieldConfig:
                 AssertionError,
                 # match=r"The output layers of the pooled variables must all have the same dimensionality\."
             ):
-                cvf_config = NeuralVelocityFieldConfig(
+                NeuralVelocityFieldConfig(
                     flow_dim=num_genes,
                     perturbation_layers_before_pooling=perturbation_layers_before_pooling,
                     use_guidance=True,
@@ -342,7 +341,7 @@ class TestNeuralVelocityFieldConfig:
                 )
                 return None
         else:
-            cvf_config = NeuralVelocityFieldConfig(
+            NeuralVelocityFieldConfig(
                 flow_dim=num_genes,
                 perturbation_layers_before_pooling=perturbation_layers_before_pooling,
                 use_guidance=True,

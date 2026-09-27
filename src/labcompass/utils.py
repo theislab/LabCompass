@@ -1,10 +1,10 @@
-from collections.abc import Sequence
 import logging
+import math
 import random
+from collections.abc import Sequence
 from typing import Any
 
 import numpy as np
-import math
 import torch
 from torch import Tensor
 
@@ -31,7 +31,7 @@ def match_shapes(
     :type `input`: `float | Tensor`
 
     :param `target`: The target tensor whose shape will be matched. It only supports 2-dimensional tensors.
-    :type `target`: `Tensor`    
+    :type `target`: `Tensor`
     """
     # sanity check on inputs
     msg = f"`input` must be either a `float` or `Tensor`, found {type(input)}"
@@ -50,7 +50,7 @@ def match_shapes(
     # input is tensor
     if isinstance(input, Tensor):
         # case 1 (1-element tensor): extract float value then recursive call
-        # note: already handles the case when input.ndim == 1 but we only have one value 
+        # note: already handles the case when input.ndim == 1 but we only have one value
         if input.numel() == 1:
             input = input.item()
             return match_shapes(input, target)
@@ -61,7 +61,7 @@ def match_shapes(
             assert input.shape[0] == target.shape[0], msg
 
             return torch.unsqueeze(input, dim=1)
-        
+
         # case 3 (2-dimensional tensor with dummy trailing dimension): keep unchanges
         if input.ndim == 2:
             msg = f"When `input` is a `torch.tensor` with `input.ndim == 2`, `input` and `target` should share the same batch size, found {input.shape[0]=} and {target.shape[0]=}"
@@ -71,7 +71,7 @@ def match_shapes(
             assert input.shape[1] == 1, msg
 
             return input
-    
+
         # raise value error if the cases are not matched
         raise ValueError
 
@@ -122,8 +122,8 @@ def get_conditions_to_pool(
     return covariates_to_pool
 
 
-def sinusoidal_time_features(t: torch.Tensor, 
-                             num_freqs: int = 128, 
+def sinusoidal_time_features(t: torch.Tensor,
+                             num_freqs: int = 128,
                              max_period: int = 10000):
     """Create sinusoidal timestep embeddings.
     :param timesteps: a 1-D Tensor of N indices, one per batch element. These may be fractional.
@@ -133,13 +133,13 @@ def sinusoidal_time_features(t: torch.Tensor,
     """
     if len(t.shape)==1:
         t = t.unsqueeze(1)
-        
+
     half = num_freqs // 2
     freqs = torch.exp(
         -math.log(max_period)
-        * torch.arange(start=0, 
-                       end=half, 
-                       dtype=torch.float32, 
+        * torch.arange(start=0,
+                       end=half,
+                       dtype=torch.float32,
                        device=t.device)
         / half
     )
@@ -155,11 +155,11 @@ def coerce_string_to_sequence(
     allow_none: bool = False,
 ) -> Sequence[str]:
     """Configures the covariates metadata and performs some additional sanity checks
-    
+
     :param identifiers: Sequence of covariate identifiers for the current perturbation.
     :type identifiers: class: `Sequence[str] | str`
 
-    :param adata_field_key: Key indicating the field in the annotated data object 
+    :param adata_field_key: Key indicating the field in the annotated data object
         where such identifiers are to be found.
     :type adata_field_key: class `Literal["uns", "obsm"]`
 
@@ -179,7 +179,7 @@ def coerce_string_to_sequence(
         msg = f"Only one element provided in {identifiers=}. Setting it to a sequence."
         logger.info(msg)
         identifiers = (identifiers, )
-    
+
     # optionally check that we only have one identifier
     if allow_only_one_element:
         if isinstance(identifiers, Sequence):

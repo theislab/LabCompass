@@ -4,7 +4,7 @@ from typing import Any, Literal
 
 import torch
 
-from labcompass.networks.velocity_field import NeuralVelocityField 
+from labcompass.networks.velocity_field import NeuralVelocityField
 from labcompass.ode.solvers import ODESolver
 from labcompass.types import TensorLike
 
@@ -69,19 +69,19 @@ def get_initial_state_and_condition(
         batch_size = source.shape[: -1]
     if batch_size is None:
         batch_size = (1, )
-    
+
     if isinstance(batch_size, int):
         batch_size = (batch_size,)
-    
+
     # handling number of samples
     if num_samples is not None:
         if not generate_from_noise:
-            msg = f""
+            msg = ""
             logger.warning(msg)
             num_samples = 1
     else:
         num_samples = 1
-    msg = f""
+    msg = ""
     assert isinstance(num_samples, int), msg
     if condition is not None:
         condition = {
@@ -95,7 +95,7 @@ def get_initial_state_and_condition(
     initial_state = source
     if initial_state is None:
         initial_state = noise_distribution((num_samples, *batch_size, flow_dim)).squeeze(dim=0).to(device)
-    msg = f""
+    msg = ""
     assert initial_state is not None, msg
     return initial_state, condition
 

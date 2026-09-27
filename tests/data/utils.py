@@ -1,8 +1,6 @@
 from collections.abc import Sequence
 from typing import Any, Literal
 
-import pytest
-
 from labcompass.constants import DataFields
 from labcompass.data import DataContainer
 
@@ -89,7 +87,7 @@ def validate_batch(
                 else:
                     expected_shape = (batch_size, 1)
             else:
-                msg = f""
+                msg = ""
                 raise TypeError(msg)
 
             if target_data[covariate].shape != expected_shape:
@@ -101,7 +99,7 @@ def validate_parametrized_inputs(
     sample_rep: None | str,
     control_key: None | str,
     perturbations: None | str | Sequence[str],
-    perturbations_in_obsm: Sequence[str] | None, 
+    perturbations_in_obsm: Sequence[str] | None,
     perturbation_covariates: dict[str, str | Sequence[str]] | None,
     perturbation_reps: dict[str, str | Sequence[str]] | None,
     load_target_covariates: bool,
@@ -137,7 +135,7 @@ def validate_parametrized_inputs(
         sample_rep,
         control_key,
         perturbations,
-        perturbations_in_obsm, 
+        perturbations_in_obsm,
         perturbation_covariates,
         perturbation_reps,
         load_target_covariates,

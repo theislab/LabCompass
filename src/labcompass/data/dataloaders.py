@@ -1,8 +1,7 @@
 import abc
-import gc
+import random
 from collections.abc import Sequence
 from typing import Literal
-import random
 
 import numpy as np
 import torch
@@ -83,7 +82,6 @@ class BaseCoupledDataLoader(BaseDataLoader):
         :return: Returns the data of the batch in a dictionary.
         :rtype: class: `dict[str, TensorLike | dict[str, TensorLike]]`
         """
-
         # treatment states
         trtm_data = self.data.get_treatments(self.batch_size, treatments)
         trtm_states = trtm_data.state_data
@@ -92,7 +90,7 @@ class BaseCoupledDataLoader(BaseDataLoader):
         source_idx, target_idx = None, None
         if self.has_controls:
             # sanity check
-            msg = f""
+            msg = ""
             assert control_states is not None, msg
             # matching the two groups
             source_idx, target_idx = self.coupling.match_groups(control_states, trtm_states)
@@ -111,7 +109,7 @@ class BaseCoupledDataLoader(BaseDataLoader):
         out_dict = {DataFields.TARGET_STATE: target}
         del target
         if self.has_controls:
-            out_dict[DataFields.SOURCE_STATE] = source 
+            out_dict[DataFields.SOURCE_STATE] = source
             del source
 
         # handling perturbation data
@@ -120,7 +118,7 @@ class BaseCoupledDataLoader(BaseDataLoader):
             condition = trtm_perts.apply(lambda e: self._move_to_tensor_and_slice(e, target_idx))
             out_dict[DataFields.PERTURBATION_DATA] = condition
             del trtm_perts, condition
-            
+
         if self.data.target_data is not None:
             trtm_perts_target_rep = DataMixin(trtm_data.target_data)
             trtm_perts_target_rep = trtm_perts_target_rep.apply(lambda e: self._move_to_tensor_and_slice(e, target_idx))
@@ -134,6 +132,7 @@ class SequentialDataLoader(BaseDataLoader):
     """
     Class defining unpaired sequential data loading
     """
+
     def __init__(
         self,
         data: AnnotatedPerturbationData,
@@ -161,7 +160,7 @@ class SequentialDataLoader(BaseDataLoader):
         self.state_transforms = state_transforms
         self.device_id = device_id
         self.device = torch.device(self.device_id)
-    
+
     def sample(
         self,
     ) -> dict[str, TensorLike | dict[str, TensorLike]]:
@@ -193,7 +192,7 @@ class SequentialDataLoader(BaseDataLoader):
             for covariate, covariate_data in self.data.perturbation_data.items():
                 perturbation_data[covariate] = self._move_to_tensor_and_slice(covariate_data, batch_idxs)
             out[DataFields.PERTURBATION_DATA] = perturbation_data
-        
+
         # retrieving optional target covariates
         if self.data.target_data is not None:
             target_data = {}
@@ -250,7 +249,7 @@ class SequentialValDataLoader(BaseDataLoader):
             for covariate, covariate_data in self.data.perturbation_data.items():
                 perturbation_data[covariate] = self._move_to_tensor_and_slice(covariate_data, batch_idxs)
             out[DataFields.PERTURBATION_DATA] = perturbation_data
-        
+
         # retrieving optional target covariates
         if self.data.target_data is not None:
             target_data = {}
@@ -319,7 +318,7 @@ class TrainDataLoader(BaseCoupledDataLoader):
         """
         Samples the treatment for the current batch when using Optimal Transport couplings.
         This is needed as the OT problem should be solved individually for each perturbation.
-        
+
         :return: String identifier for the perturbation used in the current batch of data.
             When :attr: `self.data.seen_combinatorial_perturbations` is `None`, it returns `None`.
         :rtype: class: `Sequence[str] | None`
@@ -406,7 +405,7 @@ class ValidationDataLoader(BaseCoupledDataLoader):
         self,
         data: AnnotatedPerturbationData,
     ):
-        
+
         # retrieving the perturbations to validate on for the current batch
         treatments = self.__sample_perturbation_id(data)
 
@@ -454,11 +453,11 @@ class ValidationDataLoader(BaseCoupledDataLoader):
         self,
     ):
         return {
-            f"{name}_{self._parse_perturbation_id(data, pert)}": sample_dict 
+            f"{name}_{self._parse_perturbation_id(data, pert)}": sample_dict
                 for name, data in self.data.items()
                     for pert, sample_dict in self._pre_sample_data(data).items()
         }
-            
+
 
     def __sample_perturbation_id(
         self,
@@ -467,7 +466,7 @@ class ValidationDataLoader(BaseCoupledDataLoader):
         """
         Samples the treatment for the current batch when using Optimal Transport couplings.
         This is needed as the OT problem should be solved individually for each perturbation.
-        
+
         :return: String identifier for the perturbations to be loaded in the current batch of data.
             When :attr: `self.data.seen_combinatorial_perturbations` is `None`, it returns `(None, )`.
             This is also the case when there are perturbations present in :attr: `self.data.perturbations_in_obsm`.
@@ -491,13 +490,13 @@ class ValidationDataLoader(BaseCoupledDataLoader):
                 return "unconditional"
             else:
                 # concatenate perturbation names
-                if not data.allow_grouped_couplings:            
+                if not data.allow_grouped_couplings:
                     # concatenate perturbation names
-                    treatment = [perturbation for perturbation in data.perturbations]
+                    treatment = list(data.perturbations)
                     return "_".join(treatment)
 
                 else:
-                    msg = f"When `self.data.seen_combinations` is provided `treatment` should not be None."
+                    msg = "When `self.data.seen_combinations` is provided `treatment` should not be None."
                     raise ValueError(msg)
         else:
             treatment = [str(e) for e in treatment]

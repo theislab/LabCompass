@@ -9,9 +9,11 @@
 
     networks.BaseModule
     networks.MLPBlock
+    networks.FiLMBlock
     networks.SelfAttentionBlock
     networks.ConditionEncoder
     networks.MLPGaussianNoiseModel
     networks.NeuralVelocityField
-    networks.NeuralVelocityFieldConfig
+    networks.NeuralVelocityFieldWithScore
+    networks.NeuralFlowMap
 ```

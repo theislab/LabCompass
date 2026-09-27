@@ -33,7 +33,7 @@ class TestFlowMatching:
         return_trajectory: bool,
         no_grad: bool,
     ) -> None:
-        
+
         # setting arguments for data
         control_key = "is_control" if use_controls else None
         use_source_as_condition = use_controls and generate_from_noise
@@ -78,7 +78,7 @@ class TestFlowMatching:
                 perturbation_reps=perturbation_reps,
                 perturbations_in_obsm=perturbations_in_obsm if use_perturbations_in_obsm else None,
             )
-            
+
             assert flow_matching.data_manager is not None
             assert flow_matching.train_data is not None
 
@@ -128,7 +128,7 @@ class TestFlowMatching:
                 ):
                     flow_matching.prepare_model(cvf_config)
                     return None
-            elif (not use_controls) and (not generate_from_noise):    
+            elif (not use_controls) and (not generate_from_noise):
                 with pytest.raises(
                     ValueError,
                     # match="When no controls are available use_source_as_condition should be False."
@@ -151,8 +151,8 @@ class TestFlowMatching:
                 source_states = None
                 if use_controls:
                     source_states = torch.ones((batch_size, num_genes)).to(flow_matching.device)
-                
-                # predicting                
+
+                # predicting
                 preds = flow_matching.predict(
                     {
                         "condition": {cov: torch.ones((batch_size, cov_dict["input_dim"])).to(flow_matching.device) for cov, cov_dict in perturbation_layers_before_pooling.items()},

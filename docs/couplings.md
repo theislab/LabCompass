@@ -8,7 +8,6 @@
     :toctree: generated/couplings
 
     couplings.Coupling
-    couplings.FixedCoupling
     couplings.IndependentCoupling
     couplings.OTCoupling
 ```

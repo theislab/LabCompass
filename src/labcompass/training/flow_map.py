@@ -2,19 +2,18 @@ import logging
 from collections.abc import Callable, Sequence
 from typing import Any, Literal
 
-import torch
 import numpy as np
+import torch
 from torch import Tensor
 
-from labcompass.constants import DataFields, LossFields, PredictionFields
-
 from labcompass.config.flow_map import NeuralFlowMapConfig
+from labcompass.constants import DataFields, LossFields, PredictionFields
 from labcompass.flows import BaseFlow
 from labcompass.networks import NeuralVelocityField
 from labcompass.networks.flow_map_net import NeuralFlowMap
 from labcompass.ode import get_initial_state_and_condition
-from labcompass.training.callbacks import BaseCallBack
 from labcompass.training.base import BaseTrainer
+from labcompass.training.callbacks import BaseCallBack
 from labcompass.types import TensorLike
 
 logger = logging.getLogger(__name__)
@@ -68,7 +67,7 @@ class FlowMapTrainer(BaseTrainer):
         self.num_samples_per_validation_step = num_samples_per_validation_step
         self.cfg_prob_unconditional = cfg_prob_unconditional
         self.validation_cfg_guidance_strength = validation_cfg_guidance_strength
-        self.num_grad_accumulation_steps = num_grad_accumulation_steps 
+        self.num_grad_accumulation_steps = num_grad_accumulation_steps
         self.velocity_field = velocity_field
         self.weight_fn = weight_fn
 
@@ -93,7 +92,7 @@ class FlowMapTrainer(BaseTrainer):
 
         # forward pass on neural networks with jvp
         xts_hat, dXdt = torch.func.jvp(
-            self.flow_map.get_map_fn(condition, source=source), 
+            self.flow_map.get_map_fn(condition, source=source),
             (s, t, xs),
             (torch.zeros_like(s), torch.ones_like(t), torch.zeros_like(xs)),
         )
@@ -114,11 +113,11 @@ class FlowMapTrainer(BaseTrainer):
         # sample ground truth interpolant and compute corresponding velocity field
         xt = self.flow.compute_x_t(t, latent, target)
         ut = self.flow.compute_u_t(t, latent, target, xt)
-    
+
         # forward pass on neural networks
         xst_hat = self.flow_map(t, s, xt, condition, source=source)
         _, dXdt = torch.func.jvp(
-            self.flow_map.get_map_fn(condition, source=source), 
+            self.flow_map.get_map_fn(condition, source=source),
             (s, t, xst_hat),
             (torch.zeros_like(s), torch.ones_like(t), torch.zeros_like(xst_hat)),
         )
@@ -141,7 +140,7 @@ class FlowMapTrainer(BaseTrainer):
                 latent = torch.randn_like(source)
         else:
             source = None
-            msg = f""
+            msg = ""
             assert self.generate_from_noise, msg
             latent = self.noise_distribution(target.shape).to(target.device)
 
@@ -214,7 +213,7 @@ class FlowMapTrainer(BaseTrainer):
 
         # prepare time steps
         time_steps = torch.linspace(0.0, 1.0, self.num_time_steps+1)
-        
+
         X_s = initial_state
         traj = [X_s]
         for idx, s in enumerate(time_steps[:-1]):
@@ -231,12 +230,12 @@ class FlowMapTrainer(BaseTrainer):
         if self.num_samples_per_validation_step is not None:
             num_samples = self.num_samples_per_validation_step
             if not self.generate_from_noise:
-                msg = f""
+                msg = ""
                 logger.warning(msg)
                 num_samples = 1
         else:
             num_samples = 1
-        msg = f""
+        msg = ""
         assert isinstance(num_samples, int), msg
         # handling the shape of the target when we sample multiple predictions
         target = target.unsqueeze(0)
@@ -251,7 +250,7 @@ class FlowMapTrainer(BaseTrainer):
         # list to store all the results
         predictions = []
         targets = []
-        
+
         # dictionary to store the results per perturbation
         predictions_dict = {}
 
@@ -273,7 +272,7 @@ class FlowMapTrainer(BaseTrainer):
                 PredictionFields.PREDICTION_DATA: perturbation_predictions,
                 DataFields.TARGET_STATE: perturbation_targets
             }
-        
+
         # concatenating the results for all conditions
         predictions = np.concatenate(predictions, axis=0)
         targets = np.concatenate(targets, axis=0)

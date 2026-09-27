@@ -1,5 +1,5 @@
-import logging
 import abc
+import logging
 from collections.abc import Callable
 from functools import partial
 from typing import Any, Literal
@@ -100,10 +100,10 @@ class OTCoupling(Coupling):
             ot_fn = partial(pot.partial.entropic_partial_wasserstein, reg=reg, **solver_kwargs)
         elif method == "unbalanced":
             if reg is None:
-                msg = f"{method=} requires `reg` to be a `float`, `None` found" 
+                msg = f"{method=} requires `reg` to be a `float`, `None` found"
                 raise ValueError(msg)
             if reg_m is None:
-                msg = f"{method=} requires `reg_m` to be a `float`, `None` found" 
+                msg = f"{method=} requires `reg_m` to be a `float`, `None` found"
                 raise ValueError(msg)
             ot_fn = partial(pot.unbalanced.sinkhorn_knopp_unbalanced, reg=reg, reg_m=reg_m, **solver_kwargs)
         # defaults to euclidean distance
@@ -159,7 +159,7 @@ class OTCoupling(Coupling):
             msg = f"Non finite values found in `coupling_matrix` \n {coupling_matrix=} \n {source=} \n {target=} \n {distance_matrix.mean()=} \n {distance_matrix.max()=}"
             logger.warning(msg)
         if np.abs(coupling_matrix.sum()) < 1e-8:
-            msg = f""
+            msg = ""
             logger.warning(msg)
             coupling_matrix = np.ones_like(coupling_matrix) / coupling_matrix.size
         # retrieving coupling probabilities
@@ -175,7 +175,7 @@ class OTCoupling(Coupling):
         source_idxs, target_idxs = np.divmod(
             choices,
             coupling_matrix.shape[1]
-        ) 
+        )
         return source_idxs, target_idxs
 
 

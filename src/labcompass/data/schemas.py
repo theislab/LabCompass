@@ -21,7 +21,7 @@ __all__ = [
 @dataclass
 class BaseDataSchema(abc.ABC):
     """Base class for handling data schemas given an underlying :object: `anndata.AnnData`.
-    
+
     :param adata: The annotated data object on which to validate and enforce the data schema.
     :type adata: class: `anndata.AnnData`
     """
@@ -34,7 +34,7 @@ class BaseDataSchema(abc.ABC):
         adata: anndata.AnnData,
     ) -> None:
         """Verifies the input :class: `anndata.AnnData`. This method should be overridden by derived classes.
-        
+
         :param adata: The input annotated data to verify.
         :type adata: class: `anndata.AnnData`
         """
@@ -56,7 +56,7 @@ class BaseDataSchema(abc.ABC):
         """Checks that a given key identifier is present in a selected attribute of the input annotated data.
 
         When such key is not found in the target field, it raises a :class: `KeyError`.
-        
+
         :param adata: The input annotated data to verify.
         :type adata: class: `anndata.AnnData`
 
@@ -83,7 +83,7 @@ class BaseDataSchema(abc.ABC):
 
         When a key is not found in the target field, it raises a :class: `KeyError`. Coerces single string
         to a sequence then calls :method: `self.__validate_covariates_metadata` while iterating over it.
-        
+
         :param adata: The input annotated data to verify.
         :type adata: class: `anndata.AnnData`
 
@@ -100,7 +100,7 @@ class BaseDataSchema(abc.ABC):
         # checking that the representations are found in adata_field_key
         for identifier in identifiers:
             self.__validate_covariates_metadata(adata, identifier, adata_field_key)
-        
+
     def resolve_adata(
         self,
         adata: anndata.AnnData | None = None,
@@ -143,7 +143,7 @@ class StateDataSchema(BaseDataSchema):
         self,
     ) -> None:
         """Performs sanity checks on the annotated data object.
-        
+
         It verifies that the :attr: `sample_rep` key appears in :attr: `self.adata.obsm` when provided.
         """
         self._validate_adata(self.adata)
@@ -170,14 +170,14 @@ class StateDataSchema(BaseDataSchema):
         adata: anndata.AnnData | None = None,
     ) -> np.ndarray:
         """Enforces the data schema and returns the compiled state data.
-        
+
         :param adata: Optional annotated data object on which to enforce the schema.
             When not provided, it will automatically use :attr: `self.adata`.
         :type adata: class: `anndata.AnnData | None`
         """
         # handling adata
         adata = self.resolve_adata(adata)
-        
+
         # validating data
         self._validate_adata(adata)
 
@@ -192,7 +192,7 @@ class StateDataSchema(BaseDataSchema):
 @dataclass
 class PerturbationDataSchema(BaseDataSchema):
     """Schema for handling perturbation data.
-    
+
     :param adata: The annotated data object on which to validate and enforce the data schema.
     :type adata: class: `anndata.AnnData`
 
@@ -226,7 +226,7 @@ class PerturbationDataSchema(BaseDataSchema):
     :param perturbation_covariates: Optional dictionary mapping perturbations in :param: `perturbations`
         to their modeled covariates to be found in :attr: `self.adata.obsm`.
         These will be the perturbation covariates that are associated to each perturbation on a cell-level basis, while still
-        providing the possibility to use grouped couplings. 
+        providing the possibility to use grouped couplings.
         When passed, such covariates will need to be found inside :attr: `self.adata.obsm`.
     :type perturbation_covariates: class: `dict[str, str | Sequence[str]] | None`
     """
@@ -271,13 +271,13 @@ class PerturbationDataSchema(BaseDataSchema):
         :param perturbation: The string identifier for the perturbation whose arguments to verify.
         :type perturbation: class: `str`
         """
-        # check that each perturbation identifiers is of the expected type    
+        # check that each perturbation identifiers is of the expected type
         if not isinstance(perturbation, str):
             msg = f"Perturbation {perturbation} is expected to be a string, found {type(perturbation)}"
             raise TypeError(msg)
 
-        # check that it appears in the rep dictionary                    
-        if not perturbation in self.perturbation_reps.keys():
+        # check that it appears in the rep dictionary
+        if perturbation not in self.perturbation_reps.keys():
             msg = f"Perturbation {perturbation} not found in `self.perturbation_reps`."
             raise KeyError(msg)
 
@@ -319,7 +319,7 @@ class PerturbationDataSchema(BaseDataSchema):
 
             * For the other perturbations, it verifies that they appear as column in :attr: `adata.obs`.
 
-            * Checks that each representation passed in :attr: `self.perturbation_reps[perturbation]` 
+            * Checks that each representation passed in :attr: `self.perturbation_reps[perturbation]`
                 shares the same keys, which are then used to infer the unique values which to
                 define groups for matched couplings on.
 
@@ -327,7 +327,7 @@ class PerturbationDataSchema(BaseDataSchema):
                 :attr: `adata.obsm` as expected.
 
         :param adata: The input annotated data to verify.
-        :type adata: class: `anndata.AnnData` 
+        :type adata: class: `anndata.AnnData`
 
         :param perturbation: The string identifier for the perturbation whose arguments to verify.
         :type perturbation: class: `str`
@@ -345,7 +345,7 @@ class PerturbationDataSchema(BaseDataSchema):
             for rep in reps:
                 keys = list(adata.uns[rep].keys())
                 if reference_keys != keys:
-                    msg = f""
+                    msg = ""
                     raise ValueError(msg)
             self._validate_covariates_metadata(adata, reps, "uns")
             # optionally retrieving the covariates for the current perturbation
@@ -399,10 +399,10 @@ class PerturbationDataSchema(BaseDataSchema):
             # retrieving the only representation
             reps = reps[0]
             # storing data
-            covariate_feats_key = f"{DataFields.CONDITION_FEATS}_{perturbation}_{reps}" 
+            covariate_feats_key = f"{DataFields.CONDITION_FEATS}_{perturbation}_{reps}"
             perturbation_data[covariate_feats_key] = adata.obsm[reps]
             return perturbation_data
-        
+
         # storing representations
         covariate_data = adata.obs[perturbation].values
         # iterating over each representation
@@ -415,7 +415,7 @@ class PerturbationDataSchema(BaseDataSchema):
             # storing data
             covariate_rep_key = f"{DataFields.CONDITION_REP}_{perturbation}_{rep}"
             perturbation_data[covariate_rep_key] = covariate_reps
-        
+
         # optionally retrieving additional covariates
         if self.perturbation_covariates is not None:
             # retrieving covariates
@@ -440,7 +440,7 @@ class PerturbationDataSchema(BaseDataSchema):
         # configure perturbations in obsm
         self.perturbations_in_obsm = coerce_string_to_sequence(self.perturbations_in_obsm, allow_none=True)
 
-        # configure perturbation 
+        # configure perturbation
         self.perturbations = coerce_string_to_sequence(self.perturbations)
 
         # check each perturbation individually
@@ -465,7 +465,7 @@ class PerturbationDataSchema(BaseDataSchema):
         adata: anndata.AnnData | None = None,
     ) -> BatchMixin:
         """Enforces the data schema and returns the compiled perturbation data.
-        
+
         :param adata: Optional annotated data object on which to enforce the schema.
             When not provided, it will automatically use :attr: `self.adata`.
         :type adata: class: `anndata.AnnData | None`
@@ -478,7 +478,7 @@ class PerturbationDataSchema(BaseDataSchema):
 
         # raise error when we do not have perturbations
         if self.perturbations is None:
-            msg = f"No perturbation passed, cannot retrieve the data."
+            msg = "No perturbation passed, cannot retrieve the data."
             raise RuntimeError(msg)
 
         # otherwise retrieve the data for each perturbation
@@ -496,15 +496,15 @@ class PerturbationDataSchema(BaseDataSchema):
         adata: anndata.AnnData,
     ) -> Sequence[Sequence[str]] | None:
         """Returns a sequence of unique perturbation combinations appearing in the data.
-        
+
         :param adata: The input annotated data which to retrieve the seen combinations from.
-        :type adata: class: `anndata.AnnData` 
+        :type adata: class: `anndata.AnnData`
         """
         # no perturbation to group over
         if not self.allow_grouped_couplings:
             return None
         # get all unique values from the perturbation columns
-        combs = adata.obs[[pert for pert in self.perturbations]].drop_duplicates().values.tolist()
+        combs = adata.obs[list(self.perturbations)].drop_duplicates().values.tolist()
         return [tuple(comb) for comb in combs]
 
     @property
@@ -533,7 +533,7 @@ class TargetDataSchema(BaseDataSchema):
         in :param: `target_covariates_in_obsm`, in which case their representation is to be retrieved from :attr: `obsm`.
         Defaults to `None`.
     :type target_covariates: class: `dict[str, Literal["one_hot", "label", "identity"]] | None`
-    
+
     :param target_covariates_in_obsm: Optional sequence of string identifiers indicating the target covariates to be retrieved from
         the :attr: `obsm` attribute of :param: `adata`, defaults to `None`.
     :type target_covariates_in_obsm: class: `Sequence[str] | None`.
@@ -563,7 +563,6 @@ class TargetDataSchema(BaseDataSchema):
     ) -> None:
         """Performs sanity checks on the configurations and updates the attributes for a valid configuration.
         """
-
         # handling optional covariate keywargs
         if self.target_covariates_kwargs is None:
             self.target_covariates_kwargs = {}
@@ -599,14 +598,13 @@ class TargetDataSchema(BaseDataSchema):
     ) -> np.ndarray:
         """
         Retrieves the data for a given target covariate identifier.
-        
+
         :param target_covariate: Identifier for the current target covariate for which to retrieve the data.
         :type target_covariate: class: `str`
 
         :param adata: Annotated data object on which to enforce the data schema for the current perturbation.
         :type adata: class: `anndata.AnnData`
         """
-
         # when target covariate is in obsm
         if target_covariate in self.target_covariates_in_obsm:
             # retrieving target data
@@ -620,7 +618,7 @@ class TargetDataSchema(BaseDataSchema):
         target_covariate_reps = self.target_covariates[target_covariate]
         # retrieving the keywod argument to get the target representation
         covariate_target_rep_kwargs = self.target_covariates_kwargs[target_covariate]
-        # Collect the condition target covariate from the adata.obs 
+        # Collect the condition target covariate from the adata.obs
         covariate_data = adata.obs[[target_covariate]].values
 
         # one hot encoding
@@ -629,7 +627,7 @@ class TargetDataSchema(BaseDataSchema):
 
         # label encoding
         elif target_covariate_reps == "label":
-            covariate_data = label_encode(covariate_data, covariate_target_rep_kwargs) 
+            covariate_data = label_encode(covariate_data, covariate_target_rep_kwargs)
 
         # no encoding
         elif target_covariate_reps == "identity":
@@ -647,14 +645,14 @@ class TargetDataSchema(BaseDataSchema):
         adata: anndata.AnnData | None = None,
     ) -> BatchMixin:
         """Enforces the data schema and returns the compiled perturbation data.
-        
+
         :param adata: Optional annotated data object on which to enforce the schema.
             When not provided, it will automatically use :attr: `self.adata`.
         :type adata: class: `anndata.AnnData | None`
         """
         # handling adata
         adata = self.resolve_adata(adata)
-        
+
         # validating data
         self._validate_adata(adata)
 

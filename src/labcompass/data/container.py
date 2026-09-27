@@ -1,7 +1,6 @@
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-import logging
-from typing import Any, ClassVar, Type
+from typing import Any, ClassVar
 
 import numpy as np
 
@@ -12,7 +11,7 @@ __all__ = ["DataContainer"]
 
 class DataMixin(dict):
     """"""
-    _required_type: ClassVar[Type[Any] | None] = None
+    _required_type: ClassVar[type[Any] | None] = None
 
     def __init__(
         self,
@@ -23,15 +22,15 @@ class DataMixin(dict):
         # creating empty dictionary
         if mapping is None:
             mapping = {}
-        
+
         # adding keyword arguments
         if kwargs is not None:
             mapping.update(kwargs)
-    
+
         # verifying that the keys are strings
         for key in mapping.keys():
             if not isinstance(key, str):
-                msg = f""
+                msg = ""
                 raise ValueError(msg)
 
         # calling parent constructor
@@ -82,7 +81,7 @@ class DataMixin(dict):
                 value = function(value, *args, **kwargs)
             out_dict[key] = value
         return self.__class__(**out_dict)
-    
+
     def apply(
         self,
         function: Callable[[Any], Any],
@@ -101,7 +100,7 @@ class DataMixin(dict):
     @property
     def data_type(
         self,
-    ) -> Type[Any]:
+    ) -> type[Any]:
         """"""
         if len(self) == 0:
             return self._required_type
@@ -110,7 +109,7 @@ class DataMixin(dict):
 
 class ArrayMixin(DataMixin):
     """"""
-    _required_type: ClassVar[Type[Any]] = np.ndarray | np.generic
+    _required_type: ClassVar[type[Any]] = np.ndarray | np.generic
 
 
 class BatchMixin(ArrayMixin):
@@ -125,7 +124,7 @@ class BatchMixin(ArrayMixin):
         super()._verify_inputs()
 
         # iterating over the elements
-        for key, value in self.items():
+        for _key, value in self.items():
             # verifying that the required dimensions match
             self.__verify_shape(value)
 
@@ -136,17 +135,17 @@ class BatchMixin(ArrayMixin):
         """"""
         # we need at least self._minimum_dims + 1 dimensions
         if data.ndim < self._minimum_dims:
-            msg = f""
+            msg = ""
             raise ValueError(msg)
 
         # retrieving reference dims
         reference_dims = next(iter(self.values())).shape[:self._minimum_dims]
 
         # iterating over the number of required dimensions
-        for dim, reference_dim in enumerate(reference_dims):
+        for dim, _reference_dim in enumerate(reference_dims):
             # raise error if does not match
             if data.shape[dim] != reference_dims[dim]:
-                msg = f""
+                msg = ""
                 raise ValueError(msg)
 
     @property
@@ -160,7 +159,7 @@ class BatchMixin(ArrayMixin):
 @dataclass
 class DataContainer:
     """Data structure for batch data.
-    
+
     Handles jointly the data modalities to access them via slicing.
 
     :param state_data: The state data for the current batch.
@@ -172,6 +171,7 @@ class DataContainer:
     :param target_data: Optional target data for the current batch.
     :type target_data: class `dict[str, np.ndarray] | None`
     """
+
     state_data: np.ndarray
     perturbation_data: BatchMixin | None
     target_data: BatchMixin | None
@@ -180,7 +180,6 @@ class DataContainer:
         self,
     ) -> None:
         """Checks that all the data shares the same batch size"""
-
         # check type state data
         if not isinstance(self.state_data, np.ndarray):
             msg = f"State data of the wrong type. Expected `np.ndarray`, found {type(self.state_data)}."
@@ -202,7 +201,7 @@ class DataContainer:
         if self.target_data is not None:
             # check type
             if not isinstance(self.target_data, BatchMixin):
-                msg = f""
+                msg = ""
                 raise ValueError(msg)
 
             # raise error if shapes don't match
@@ -215,7 +214,7 @@ class DataContainer:
         function: Callable,
     ) -> "DataContainer":
         """Applies a function to the data.
-        
+
         :param function: The function to be called on each array.
         :type function: class: `Callable`
         """
@@ -256,8 +255,8 @@ class DataContainer:
         # state data
         state_data = self.state_data[idx]
 
-        # perturbation data  
-        perturbation_data = None   
+        # perturbation data
+        perturbation_data = None
         if self.perturbation_data is not None:
             perturbation_data = self.perturbation_data.slice_arrays(idx)
 

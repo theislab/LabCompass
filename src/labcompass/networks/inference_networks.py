@@ -1,12 +1,7 @@
-import itertools
-import logging
-from collections.abc import Callable, Iterator
 from typing import Any, Literal
 
-import torch
 from torch import Tensor, nn
 
-from labcompass.constants import VFStepFields
 from labcompass.networks.blocks import BaseModule, MLPBlock
 from labcompass.networks.neural_noise_models import MLPGaussianNoiseModel
 
@@ -23,7 +18,7 @@ class BaseApproximatePosterior(BaseModule):
     ) -> None:
 
         super().__init__()
-    
+
     def _get_noise_model(
         self,
         noise_model: Literal["gaussian"] | None,
@@ -35,14 +30,17 @@ class BaseApproximatePosterior(BaseModule):
             noise_model (str | None): The type of noise model to be used. Can be
                                     'gaussian', or None.
 
-        Returns:
+        Returns
+        -------
             BaseModule: A module corresponding to the specified noise model.
                         If no model is provided, defaults to MLPBlock.
 
-        Raises:
+        Raises
+        ------
             NotImplementedError: If an unsupported noise model is provided.
 
-        Notes:
+        Notes
+        -----
             - If `noise_model` is None, and `self._raise_error_if_none` is False, the method will return `MLPBlock`.
             - If `noise_model` is "gaussian", it returns the `MLPGaussianNoiseModel`.
         """
@@ -60,11 +58,12 @@ class BaseApproximatePosterior(BaseModule):
 
 class PerturbationApproximatePosterior(BaseApproximatePosterior):
     """
-    A class that constructs perturbation-based approximate posteriors for multiple target covariates. 
-    It allows for the specification of noise models, covariate-specific configurations, and supports 
+    A class that constructs perturbation-based approximate posteriors for multiple target covariates.
+    It allows for the specification of noise models, covariate-specific configurations, and supports
     various training and evaluation modes.
 
-    Attributes:
+    Attributes
+    ----------
         _raise_error_if_none (bool): Flag indicating whether to raise an error if no noise model is provided.
         input_dim (int): The input dimension of the model.
         freeze_grads (bool): Flag to freeze gradients during training.
@@ -73,7 +72,8 @@ class PerturbationApproximatePosterior(BaseApproximatePosterior):
         covariate_kwargs (dict): A dictionary containing additional keyword arguments for covariate-specific configurations.
         pert_approximate_posterior (dict): A dictionary storing the initialized perturbation approximate posterior modules for each covariate.
 
-    Methods:
+    Methods
+    -------
         __init__: Initializes the PerturbationApproximatePosterior object.
         _init_modules: Initializes the perturbation approximate posterior modules for each covariate.
         to: Moves the model and its components to the specified device.
@@ -105,7 +105,6 @@ class PerturbationApproximatePosterior(BaseApproximatePosterior):
             noise_models (dict, optional): A dictionary of noise models for each covariate. Defaults to None.
             covariate_kwargs (dict, optional): A dictionary of covariate-specific configurations. Defaults to None.
         """
-
         super().__init__()
         self.input_dim = input_dim
         self.freeze_grads = freeze_grads
@@ -114,7 +113,7 @@ class PerturbationApproximatePosterior(BaseApproximatePosterior):
         self.covariate_kwargs = covariate_kwargs
         self.use_shared_representation = use_shared_representation
         self.latent_dim = latent_dim
-        self.encoder_mlp_kwargs = encoder_mlp_kwargs  
+        self.encoder_mlp_kwargs = encoder_mlp_kwargs
 
         self._init_modules()
 
@@ -143,7 +142,8 @@ class PerturbationApproximatePosterior(BaseApproximatePosterior):
 
         Populates the `pert_approximate_posterior` attribute with the initialized modules for each covariate.
 
-        Raises:
+        Raises
+        ------
             KeyError: If a covariate ID in `target_output_dims` does not have a corresponding noise model or configuration.
         """
         modules = {}
@@ -179,7 +179,8 @@ class PerturbationApproximatePosterior(BaseApproximatePosterior):
         Args:
             input_pert_posterior (Tensor): The input tensor representing the perturbation posterior.
 
-        Returns:
+        Returns
+        -------
             dict[str, dict[str, Tensor]]: A dictionary containing the perturbation parameters for each covariate.
         """
         # cloning to preserve the gradients
@@ -187,7 +188,7 @@ class PerturbationApproximatePosterior(BaseApproximatePosterior):
         # freezing the grads
         if self.freeze_grads:
             input_pert_posterior = input_pert_posterior.detach()
-        
+
         # optional encoder
         if self.use_shared_representation:
             input_pert_posterior = self.pert_approximate_posterior["encoder"](input_pert_posterior)

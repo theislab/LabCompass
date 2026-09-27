@@ -1,13 +1,12 @@
 import abc
-import itertools
-from collections.abc import Iterator, Sequence
+from collections.abc import Sequence
 from typing import Any, Literal
 
 import torch
 from torch import Tensor, nn
 
-from labcompass.types import MLPConfigFields
 from labcompass.constants import DataFields
+from labcompass.types import MLPConfigFields
 from labcompass.utils import get_conditions_to_pool
 
 __all__ = ["ConditionEncoder", "BaseModule", "MLPBlock", "SelfAttentionBlock", "AttentionPooling"]
@@ -45,7 +44,7 @@ class BaseForwardModel(BaseModule):
     ) -> torch.Tensor:
         """"""
         raise NotImplementedError
-    
+
     def predict(
         self,
         batch: dict[str, torch.Tensor | dict[str, torch.Tensor]],
@@ -567,7 +566,7 @@ class ConditionEncoder(BaseModule):
         elif self.pooling == "sum":
             self.pooling_layer = lambda x: torch.sum(x, dim=1)
         elif self.pooling == "self_attention":
-            msg = f""
+            msg = ""
             raise NotImplementedError(msg)
         else:
             msg = f"{self.pooling=} not available, possible options are `['mean', 'self_attention']`"
@@ -621,11 +620,11 @@ class ConditionEncoder(BaseModule):
                         if covariate in self.covariates_to_pool
                     ],
                     dim=-1,
-                )  # B x N_conditions x D 
+                )  # B x N_conditions x D
         else:
             encoded_covariates_pooled = torch.stack(
                 [encoded_covariate for covariate, encoded_covariate in encoded_covariates.items()], dim=1
-            )  # B x N_conditions x D 
+            )  # B x N_conditions x D
 
         if encoded_covariates_pooled is not None:
             # pooling the covariates
@@ -639,7 +638,7 @@ class ConditionEncoder(BaseModule):
                 z = torch.concatenate((z, encoded_covariates_not_pooled), dim=-1)
         elif self.covariates_not_pooled is not None and encoded_covariates_pooled is None:
             z = encoded_covariates_not_pooled
-        
+
         # layers after pooling
         z = self.modules_dict["after_pooling"](z)
         return z
@@ -656,6 +655,7 @@ class ResnetBlock(BaseModule):
         embedding_dim (int, optional): Dimensionality of the conditional embedding. Defaults to 128.
         normalization (str, optional): Type of normalization to use: 'layer', 'batch', or None. Defaults to None.
     """
+
     def __init__(
         self,
         in_dim: int,
@@ -738,7 +738,8 @@ class ResnetBlock(BaseModule):
             x (torch.Tensor): Input tensor of shape (B, in_dim).
             cond (torch.Tensor): Conditional tensor of shape (B, embedding_dim).
 
-        Returns:
+        Returns
+        -------
             torch.Tensor: Output tensor of shape (B, out_dim).
         """
         h = self.net1(x)
@@ -760,6 +761,7 @@ class FiLMBlock(BaseModule):
         cond_dim (int): Condition feature dimention.
         out_dim (int, optional): Output feature dimension. Defaults to in_dim.
     """
+
     def __init__(
         self,
         in_dim: int,
@@ -769,7 +771,7 @@ class FiLMBlock(BaseModule):
 
         self.in_dim = in_dim
         self.cond_dim = cond_dim
-        
+
         self._init_modules()
 
     def _init_modules(
@@ -786,7 +788,8 @@ class FiLMBlock(BaseModule):
             x (torch.Tensor): Input tensor of shape (B, in_dim).
             cond (torch.Tensor): Conditional tensor of shape (B, embedding_dim).
 
-        Returns:
+        Returns
+        -------
             torch.Tensor: Output tensor of shape (B, out_dim).
         """
         gamma_beta = self.film_generator(cond)

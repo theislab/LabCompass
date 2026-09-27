@@ -26,12 +26,17 @@ classifiers = [
 ]
 dependencies = [
   "anndata",
-  # for debug logging (referenced from the issue template)
-  "session-info",
+  "cloudpickle",
+  "matplotlib",
+  "numpy",
+  "omegaconf",
+  "pot",
+  "scikit-learn",
+  "scipy",
   "torch>=1.11.0",
-  "scanpy",
-  "torchdyn",
-  "pot"
+  "torchdiffeq",
+  "tqdm",
+  "wandb",
 ]
 optional-dependencies.dev = [
   "pre-commit",
@@ -113,7 +118,7 @@ lint.ignore = [
   "E731", # Do not assign a lambda expression, use a def -> lambda expression assignments are convenient
   "E741", # allow I, O, l as variable names -> I is the identity matrix
 ]
-lint.per-file-ignores."*/__init__.py" = [ "F401" ]
+lint.per-file-ignores."*/__init__.py" = [ "F401", "I001" ] # import order in __init__ files resolves circular imports
 lint.per-file-ignores."docs/*" = [ "I" ]
 lint.per-file-ignores."tests/*" = [ "D" ]
 lint.pydocstyle.convention = "numpy"
@@ -140,5 +145,4 @@ skip = [
   "docs/changelog.md",
   "docs/references.bib",
   "docs/references.md",
-  "docs/notebooks/example.ipynb",
 ]

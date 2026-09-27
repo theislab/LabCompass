@@ -1,9 +1,8 @@
 from collections.abc import Sequence
 
-import pytest
-
 import anndata
 import numpy as np
+import pytest
 
 from labcompass.sym import get_dummy_adata
 

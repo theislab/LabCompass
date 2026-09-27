@@ -11,8 +11,7 @@ from labcompass.training.callbacks import BaseCallBack
 from labcompass.training.utils import compute_pert_inference_loss
 from labcompass.types import TensorLike
 
-
-__all__ = ["InverseModelTrainer"]
+__all__ = ["TargetPredictionTrainer"]
 
 
 class TargetPredictionTrainer(BaseTrainer):
@@ -61,7 +60,7 @@ class TargetPredictionTrainer(BaseTrainer):
         self.lr_scheduler_step = lr_scheduler_step
         self.callbacks = callbacks
         self.grad_steps_log_interval = grad_steps_log_interval
-        self.num_grad_accumulation_steps = num_grad_accumulation_steps 
+        self.num_grad_accumulation_steps = num_grad_accumulation_steps
         self.loss_fn_kwargs = {} if loss_fn_kwargs is None else loss_fn_kwargs
 
     @property
@@ -113,7 +112,7 @@ class TargetPredictionTrainer(BaseTrainer):
             loss_fn_kwargs=self.loss_fn_kwargs
         )
         return loss, {LossFields.LOSS: loss.item(), **log_dict}
-    
+
     def _validation_step(
         self,
         batch: dict[str, TensorLike],

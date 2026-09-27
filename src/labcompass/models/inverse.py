@@ -5,20 +5,17 @@ from typing import Any, Literal
 import numpy as np
 import torch
 
-from labcompass.constants import DataFields
 from labcompass.data.dataloaders import AnnotatedPerturbationData, SequentialDataLoader
-from labcompass.models.flow_matching import FlowMatching
+from labcompass.models.base import BaseModel
 from labcompass.models.inverse_utils import LangevinOptimizer
-from labcompass.networks.blocks import BaseModule, BaseForwardModel
+from labcompass.networks.blocks import BaseForwardModel, BaseModule
+from labcompass.networks.inference_networks import PerturbationApproximatePosterior
 from labcompass.networks.inverse import (
-    BaseConditionOptimizer,
-    MAPConditionOptimizer,
     LangevinSampler,
+    MAPConditionOptimizer,
     NeuralInverseModel,
 )
-from labcompass.networks.inference_networks import PerturbationApproximatePosterior
-from labcompass.models.base import BaseModel
-from labcompass.training import BaseCallBack, TargetPredictionTrainer, InverseModelTrainer
+from labcompass.training import BaseCallBack, InverseModelTrainer, TargetPredictionTrainer
 from labcompass.transforms import Transform
 
 logger = logging.getLogger(__name__)
@@ -54,6 +51,7 @@ class InverseModel(BaseModel):
     :param device_id: The identifier for the device where to do the computations, defaults to `"cuda"`.
     :type device_id: class:`Literal["cuda", "cpu"]`
     """
+
     def __init__(
         self,
         forward_model: BaseForwardModel | None = None,
@@ -63,15 +61,15 @@ class InverseModel(BaseModel):
     ) -> None:
         # sanity check on the input
         if state_dim is None:
-            msg = f""
+            msg = ""
             assert forward_model is not None, msg
             state_dim = forward_model.cvf_config.flow_dim
         else:
-            msg = f""
+            msg = ""
             assert isinstance(state_dim, int), msg
             # if we pass the forward model we take the dimensionality from there
             if (forward_model is not None) and state_dim != forward_model.cvf_config.flow_dim:
-                msg = f""
+                msg = ""
                 logger.warning(msg)
                 state_dim = forward_model.cvf_config.flow_dim
 
@@ -82,7 +80,7 @@ class InverseModel(BaseModel):
         elif inverse_method == "neural":
             inverse_method_class = NeuralInverseModel
         else:
-            msg = f""
+            msg = ""
             raise ValueError(msg)
 
         self.forward_model = forward_model
@@ -187,7 +185,7 @@ class InverseModel(BaseModel):
             assert len(target_covariates) == 1, msg
             target_covariates_noise_models = {target_covariates[0]: target_covariates_noise_models}
         if target_covariates_noise_models is None:
-            target_covariates_noise_models = {target_covariate: None for target_covariate in target_covariates}
+            target_covariates_noise_models = dict.fromkeys(target_covariates)
 
         if target_covariates_predictor_kwargs is None:
             target_covariates_predictor_kwargs = {
@@ -195,16 +193,16 @@ class InverseModel(BaseModel):
             }
 
         # checking types
-        msg = f""
+        msg = ""
         assert isinstance(target_covariates, Sequence), msg
 
-        msg = f""
+        msg = ""
         assert isinstance(target_covariates_dims, dict), msg
 
-        msg = f""
+        msg = ""
         assert isinstance(target_covariates_noise_models, dict), msg
 
-        msg = f""
+        msg = ""
         assert isinstance(target_covariates_predictor_kwargs, dict), msg
 
         # storing the settings here as attributes
@@ -230,7 +228,7 @@ class InverseModel(BaseModel):
         self.target_prediction_model = self.target_prediction_model.float()
         self.target_prediction_model = self.target_prediction_model.to(self.device)
 
-        # optimizer and scheduler 
+        # optimizer and scheduler
         self.target_prediction_optimizer = optimizer_class(
             self.target_prediction_model.parameters(),
             **optimizer_kwargs,
@@ -293,18 +291,18 @@ class InverseModel(BaseModel):
         :type grad_steps_log_interval: class:`int`
         """
         # sanity checks
-        msg = f"You need to have instantitated the target predictor model by calling `prepare_target_prediction_model`"
+        msg = "You need to have instantitated the target predictor model by calling `prepare_target_prediction_model`"
         assert self.target_prediction_model is not None, msg
 
         if train_data is None:
-            msg = f""
+            msg = ""
             assert self.forward_model is not None, msg
             train_data = self.forward_model.train_data
 
-        msg = f""
+        msg = ""
         assert isinstance(train_data, AnnotatedPerturbationData), msg
 
-        msg = f""
+        msg = ""
         assert train_data.target_reprs is not None, msg
 
         # initializing data loader
@@ -349,7 +347,7 @@ class InverseModel(BaseModel):
         self.target_prediction_model_trained = True
 
     def attach_target_prediction_model(
-        self, 
+        self,
         other,
     ) -> None:
         """
@@ -359,7 +357,7 @@ class InverseModel(BaseModel):
             msg = "Expected an instance of InverseModel"
             raise TypeError(msg)
 
-        msg = f""
+        msg = ""
         assert other.target_prediction_model_trained, msg
 
         # Copy attributes set in prepare_target_prediction_model
@@ -379,16 +377,16 @@ class InverseModel(BaseModel):
         self.target_predictor_validation_dataloader = other.target_predictor_validation_dataloader
         self.target_predictor_validation_data = other.target_predictor_validation_data
         self.target_prediction_model_trained = other.target_prediction_model_trained
-    
+
     def prepare_inverse_model(
         self,
-        optimal_condition: torch.Tensor | dict[str, torch.Tensor], 
+        optimal_condition: torch.Tensor | dict[str, torch.Tensor],
         loss_fn: dict[str, Callable[[torch.Tensor, torch.Tensor], torch.Tensor]] | Callable[[torch.Tensor, torch.Tensor], torch.Tensor],
         perturbation_covariates: str | Sequence[str],
         perturbation_covariates_dims: int | dict[str, int],
         is_discrete_dict: bool | dict[str, bool] | None = None,
         forward_model: BaseForwardModel | None = None,
-        target_prediction_model: BaseModule | None = None, 
+        target_prediction_model: BaseModule | None = None,
         prior: dict[str, torch.distributions.Distribution] | None = None,
         prior_weight: float | None = None,
         hard: bool = False,
@@ -539,59 +537,59 @@ class InverseModel(BaseModel):
         """
         # we need to have at least one trained target predictor
         if target_prediction_model is None:
-            msg = f"You need to have trained the target predictor model by calling `train_target_prediction_model`."
+            msg = "You need to have trained the target predictor model by calling `train_target_prediction_model`."
             assert self.target_prediction_model_trained, msg
             target_prediction_model = self.target_prediction_model
 
         # we need to have at least one forward model
         if forward_model is None:
-            msg = f""
+            msg = ""
             assert self.forward_model is not None, msg
             forward_model = self.forward_model
 
         # preparing input with some sanity checks
         if isinstance(optimal_condition, torch.Tensor):
-            msg = f""
+            msg = ""
             assert len(self.target_covariates) == 1, msg
             optimal_condition = {self.target_covariates[0]: optimal_condition}
-        
+
         if isinstance(loss_fn, Callable):
-            msg = f""
+            msg = ""
             assert len(self.target_covariates) == 1, msg
             loss_fn = {self.target_covariates[0]: loss_fn}
-        
+
         if isinstance(perturbation_covariates, str):
             perturbation_covariates = (perturbation_covariates, )
-        
+
         if isinstance(perturbation_covariates_dims, int):
             msg = f"When `perturbation_covariates_dims` is of type `int`, the respective perturbations should contain only one element, found {len(perturbation_covariates)}"
             assert len(perturbation_covariates) == 1, msg
             perturbation_covariates_dims = {perturbation_covariates[0]: perturbation_covariates_dims}
-        
+
         if isinstance(is_discrete_dict, bool):
             msg = f"When `is_discrete_dict` is of type `bool`, the respective perturbations should contain only one element, found {len(perturbation_covariates)}"
             assert len(perturbation_covariates) == 1, msg
             is_discrete_dict = {perturbation_covariates[0]: is_discrete_dict}
         if is_discrete_dict is None:
-            msg = f""
+            msg = ""
             logger.warning(msg)
-            is_discrete_dict = {covariate: False for covariate in perturbation_covariates}
+            is_discrete_dict = dict.fromkeys(perturbation_covariates, False)
 
         if isinstance(perturbation_initializer, Callable):
             msg = f"When `perturbation_initializer` is of type `Callable`, the respective perturbations should contain only one element, found {len(perturbation_covariates)}"
             assert len(perturbation_covariates) == 1, msg
             perturbation_initializer = {perturbation_covariates[0]: perturbation_initializer}
         if perturbation_initializer is None:
-            msg = f"No initialization passed, setting to normal by default."
+            msg = "No initialization passed, setting to normal by default."
             logger.warning(msg)
-            perturbation_initializer = {perturbation_covariate:torch.randn for perturbation_covariate in perturbation_covariates}
-        
+            perturbation_initializer = dict.fromkeys(perturbation_covariates, torch.randn)
+
         if isinstance(perturbation_non_linearities, Callable | torch.nn.Module):
             msg = f"When `perturbation_non_linearities` is of type `Callable | torch.nn.Module`, the respective perturbations should contain only one element, found {len(perturbation_covariates)}"
             assert len(perturbation_covariates) == 1, msg
             perturbation_non_linearities = {perturbation_covariates[0]: perturbation_non_linearities}
         if perturbation_non_linearities is None:
-            msg = f"No non-linearity passed, setting to identity by default."
+            msg = "No non-linearity passed, setting to identity by default."
             logger.warning(msg)
             perturbation_non_linearities = {perturbation_covariate: torch.nn.Identity() for perturbation_covariate in perturbation_covariates}
 
@@ -600,19 +598,19 @@ class InverseModel(BaseModel):
             assert len(perturbation_covariates) == 1, msg
             perturbation_covariates_noise_models = {perturbation_covariates[0]: perturbation_covariates_noise_models}
         if perturbation_covariates_noise_models is None:
-            msg = f""
+            msg = ""
             logger.warning(msg)
-            perturbation_covariates_noise_models = {covariate: None for covariate in perturbation_covariates}
-        
+            perturbation_covariates_noise_models = dict.fromkeys(perturbation_covariates)
+
         if perturbation_covariates_predictor_kwargs is None:
-            msg = f""
+            msg = ""
             logger.warning(msg)
             perturbation_covariates_predictor_kwargs = {
                 covariate: {} for covariate in perturbation_covariates
             }
 
         if perturbation_encoder_mlp_kwargs is None:
-            msg = f""
+            msg = ""
             logger.warning(msg)
             perturbation_encoder_mlp_kwargs = {}
 
@@ -623,61 +621,61 @@ class InverseModel(BaseModel):
         msg = f"`perturbation_covariates_dims` needs to be a dictionary mapping each condition to its dimensionality, found {type(perturbation_covariates_dims)}"
         assert isinstance(perturbation_covariates_dims, dict), msg
 
-        msg = f""
+        msg = ""
         assert isinstance(is_discrete_dict, dict), msg
 
-        msg = f""
+        msg = ""
         assert isinstance(perturbation_initializer, dict), msg
 
-        msg = f""
+        msg = ""
         assert isinstance(perturbation_non_linearities, dict), msg
 
-        msg = f""
+        msg = ""
         assert isinstance(perturbation_covariates_noise_models, dict), msg
 
-        msg = f""
+        msg = ""
         assert isinstance(perturbation_covariates_predictor_kwargs, dict), msg
 
         # we want all these dictionaries to share the same keys (i.e.: covariate ids) found in perturbation_covariates
         for perturbation_key in perturbation_covariates:
-            
+
             msg = f"{perturbation_key=} not found in `perturbation_covariates_dims.keys()`, you need to specify a corresponding dimensionality."
             assert perturbation_key in perturbation_covariates_dims.keys(), msg
-            
-            msg = f""
+
+            msg = ""
             assert perturbation_key in is_discrete_dict.keys(), msg
-            
+
             # when initializer is not passed for a covariate we set it to normal initialization
-            msg = f""
+            msg = ""
             assert perturbation_key in perturbation_initializer.keys(), msg
             if perturbation_initializer[perturbation_key] is None:
                 perturbation_initializer[perturbation_key] = torch.randn
 
             # when non linearity is not passed for a covariate we set it to identity
-            msg = f""
+            msg = ""
             assert perturbation_key in perturbation_non_linearities.keys(), msg
             if perturbation_non_linearities[perturbation_key] is None:
                 perturbation_non_linearities[perturbation_key] = torch.nn.Identity()
 
-            msg = f""
+            msg = ""
             assert perturbation_key in perturbation_covariates_noise_models, msg
 
             # when non keyword settings are not passed for a covariate we set it to empty dictionary
-            msg = f""
+            msg = ""
             assert perturbation_key in perturbation_covariates_predictor_kwargs, msg
             if perturbation_covariates_predictor_kwargs[perturbation_key] is None:
                 perturbation_covariates_predictor_kwargs[perturbation_key] = {}
 
-        # when we pass the prior on the perturbations        
+        # when we pass the prior on the perturbations
         if prior is not None:
             if prior_weight is None:
-                msg = f"`prior` was passed, but no `prior_weight` was given. Setting to 1.0 by default."
+                msg = "`prior` was passed, but no `prior_weight` was given. Setting to 1.0 by default."
                 logger.warning(msg)
                 prior_weight = 1.0
-        
+
         # when we use langevin we need to pass the number of samples
         if n_samples is None and self.inverse_method == "langevin":
-            msg = f""
+            msg = ""
             logger.warning(msg)
             n_samples = 1
 
@@ -725,9 +723,9 @@ class InverseModel(BaseModel):
         self.inverse_model = self.inverse_model.float()
         self.inverse_model = self.inverse_model.to(self.device)
 
-        # optimizer and scheduler 
+        # optimizer and scheduler
         if self.inverse_method == "langevin":
-            if not optimizer_class is LangevinOptimizer:
+            if optimizer_class is not LangevinOptimizer:
                 msg = f"When {self.inverse_method=}, you need to pass `LangevinOptimizer` as the `optimizer_class` argument. Setting it for you."
                 logger.warning(msg)
                 optimizer_class = LangevinOptimizer
@@ -806,21 +804,21 @@ class InverseModel(BaseModel):
         :type grad_steps_log_interval: class:`int`
         """
         # sanity checks
-        msg = f"You need to have instantitated the target predictor model by calling `prepare_inverse_model`"
+        msg = "You need to have instantitated the target predictor model by calling `prepare_inverse_model`"
         assert self.inverse_model is not None, msg
 
         if train_data is None:
-            msg = f""
+            msg = ""
             assert self.forward_model is not None, msg
 
-            msg = f""
+            msg = ""
             assert self.forward_model.train_data is not None, msg
             train_data = self.forward_model.train_data
 
-        msg = f""
+        msg = ""
         assert isinstance(train_data, AnnotatedPerturbationData), msg
 
-        msg = f""
+        msg = ""
         assert train_data.target_reprs is not None, msg
 
         # initialize trainer
@@ -836,7 +834,7 @@ class InverseModel(BaseModel):
         )
 
         # retrieving control indices
-        control_idxs = np.argwhere(train_data.adata.obs[train_data.control_key].values == True)[:, 0]
+        control_idxs = np.argwhere(train_data.adata.obs[train_data.control_key].values == True)[:, 0]  # noqa: E712
         # initializing data loader with only control states
         self.inverse_model_train_data = train_data[control_idxs]
         self.inverse_model_train_dataloader = SequentialDataLoader(
@@ -849,15 +847,15 @@ class InverseModel(BaseModel):
         # optional validation data
         self.inverse_model_validation_dataloader = None
         if validation_data is not None:
-            control_idxs = np.argwhere(validation_data.adata.obs[validation_data.control_key].values == True)[:, 0]
-            self.inverse_model_validation_data = validation_data[control_idxs] 
+            control_idxs = np.argwhere(validation_data.adata.obs[validation_data.control_key].values == True)[:, 0]  # noqa: E712
+            self.inverse_model_validation_data = validation_data[control_idxs]
             self.inverse_model_validation_dataloader = SequentialDataLoader(
                 self.inverse_model_train_data,
                 validation_batch_size,
                 state_transforms=state_transforms,
                 device_id=self.device_id,
             )
-        
+
         # fitting the trainer
         self.inverse_model_trainer.fit(
             num_training_steps,
@@ -889,4 +887,3 @@ class InverseModel(BaseModel):
         if return_loss:
             return loss, out_dict
         return out_dict
-        

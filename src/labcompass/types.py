@@ -1,12 +1,11 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
-from dataclasses import field as dc_field
-from typing import Any, ClassVar, Literal
+from typing import Any, ClassVar
 
 from numpy import ndarray
-from torch import Tensor, nn
+from torch import Tensor
 
-__all__ = ["TensorLike", "LinearModelConfig", "MLPConfigFields"]
+__all__ = ["TensorLike", "MLPConfigFields"]
 
 
 TensorLike = Tensor | ndarray
@@ -17,7 +16,7 @@ class MLPConfigFields:
     """"""
     types: ClassVar[dict[str, type]] = {
         "input_dim": int,
-        "output_dim": int, 
+        "output_dim": int,
         "hidden_dims": Sequence,
         "use_batchnorm": bool,
         "use_dropout": bool,
@@ -25,7 +24,7 @@ class MLPConfigFields:
         "activation_class": type,
         "final_activation_class": type,
     }
-    
+
     @classmethod
     def get_fields(
         cls,
@@ -46,29 +45,29 @@ class MLPConfigFields:
         # optional check on input dimension
         if require_input_dim_key:
             # verify that the key is present in the dictionary
-            msg = f"The dictionary is expected to contain the `'input_dim'` key."
+            msg = "The dictionary is expected to contain the `'input_dim'` key."
             assert "input_dim" in keys, msg
             # verify that the value is not None
-            msg = f"`'input_dim'` value should be an integer, found `None`."
+            msg = "`'input_dim'` value should be an integer, found `None`."
             assert layers_dict["input_dim"] is not None, msg
         else:
             # otherwise we are already passing the argument so it should not be there
-            msg = f""
+            msg = ""
             assert "input_dim" not in keys, msg
         # optional check on output dimension
         if require_output_dim_key:
             # verify that the key is present in the dictionary
-            msg = f"The dictionary is expected to contain the `'output_dim'` key."
+            msg = "The dictionary is expected to contain the `'output_dim'` key."
             assert "output_dim" in keys, msg
             # verify that the value is not None
-            msg = f"`'output_dim'` value should be an integer, found `None`."
+            msg = "`'output_dim'` value should be an integer, found `None`."
             assert layers_dict["output_dim"] is not None, msg
         else:
             # otherwise we are already passing the argument so it should not be there
-            msg = f""
+            msg = ""
             assert "output_dim" not in keys, msg
         # cheking the other keys
-        for key, value in layers_dict.items(): 
+        for key, value in layers_dict.items():
             # valid configuration key
             msg = f"Key {key} not a valid MLP configuration field, possible options are {cls.get_fields()}"
             assert key in cls.get_fields(), msg

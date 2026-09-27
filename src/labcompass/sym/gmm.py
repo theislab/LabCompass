@@ -17,8 +17,9 @@ class GaussianMixtureModel:
 
     The model consists of multiple Gaussian distributions, each with its own mean and covariance matrix.
     The distributions are weighted, and the class allows sampling from the mixture, as well as calculating
-    the log probability of given samples under the mixture model.    
+    the log probability of given samples under the mixture model.
     """
+
     _initialize_distributions: bool = True
 
     def __init__(
@@ -49,7 +50,8 @@ class GaussianMixtureModel:
         """
         Returns the number of Gaussian components in the mixture.
 
-        Returns:
+        Returns
+        -------
             int: The number of components.
         """
         return len(self.params)
@@ -61,7 +63,8 @@ class GaussianMixtureModel:
         """
         Returns the dimensionality of the samples (i.e., the shape of the mean vectors).
 
-        Returns:
+        Returns
+        -------
             int: The dimensionality of the samples.
         """
         if self.is_multi_attribute:
@@ -115,7 +118,8 @@ class GaussianMixtureModel:
             num_samples (int, optional): The number of samples to generate. If None, a single sample is returned.
             comps (np.ndarray | None, optional): If provided, it specifies which components to sample from for each sample.
 
-        Returns:
+        Returns
+        -------
             TensorLike: A tensor containing the sampled data points from the mixture model.
         """
         # overriding the num_samples argument if
@@ -151,7 +155,8 @@ class GaussianMixtureModel:
         Args:
             samples (TensorLike): A tensor containing the samples for which the log probability is calculated.
 
-        Returns:
+        Returns
+        -------
             TensorLike: The log probabilities of the samples.
         """
         ind_log_probs = [comp.log_prob(samples) * self.weights[idx] for idx, comp in enumerate(self.distributions)]
@@ -166,6 +171,7 @@ class AnnotatedGaussianMixtureModel(GaussianMixtureModel):
     This class extends the standard Gaussian Mixture Model by incorporating categorical labels
     for each sample based on a learned linear transformation of the feature space.
     """
+
     _initialize_distributions: bool = True
 
     def __init__(
@@ -177,26 +183,26 @@ class AnnotatedGaussianMixtureModel(GaussianMixtureModel):
         non_linearity: Callable[[TensorLike], TensorLike] | None = None
     ) -> None:
         """
-        Initializes the annotated Gaussian Mixture Model with given parameters, category information, 
+        Initializes the annotated Gaussian Mixture Model with given parameters, category information,
         and a linear mapping for category logits.
 
         Args:
-            params (Sequence[dict[str, TensorLike]]): A sequence of dictionaries containing "mean" and "cov" 
+            params (Sequence[dict[str, TensorLike]]): A sequence of dictionaries containing "mean" and "cov"
                                                       for each Gaussian component.
             n_cat (int): The number of categorical labels.
             cat_logit_lm (TensorLike): A matrix (n_features x n_categories) representing the logits for categories.
-            weights (Sequence[float] | None, optional): A sequence of weights for the Gaussian components. 
+            weights (Sequence[float] | None, optional): A sequence of weights for the Gaussian components.
                                                         If None, uniform weights are used.
             non_linearity (Callable[[Tensor], Tensor]): The non-linearity to be applied before computing the class logits
         """
-        super(AnnotatedGaussianMixtureModel, self).__init__(params, weights)
-        self.n_cat = n_cat  # number of categories 
-        self.cat_logit_lm = cat_logit_lm  # (n_features x n_categories) matrix representing the logits 
+        super().__init__(params, weights)
+        self.n_cat = n_cat  # number of categories
+        self.cat_logit_lm = cat_logit_lm  # (n_features x n_categories) matrix representing the logits
 
         if non_linearity is None:
             non_linearity = {cat_id: lambda x: x for cat_id in self.n_cat.keys()}
         self.non_linearity = non_linearity
-        
+
     @property
     def num_categories(
             self,
@@ -204,7 +210,8 @@ class AnnotatedGaussianMixtureModel(GaussianMixtureModel):
         """
         Returns the number of categorical labels.
 
-        Returns:
+        Returns
+        -------
             int: The number of categories.
         """
         return self.n_cat
@@ -219,7 +226,8 @@ class AnnotatedGaussianMixtureModel(GaussianMixtureModel):
         Args:
             features (TensorLike): The feature vectors for which to sample categories.
 
-        Returns:
+        Returns
+        -------
             TensorLike: The sampled categorical labels.
         """
         sampled_categories = {}
@@ -243,7 +251,8 @@ class AnnotatedGaussianMixtureModel(GaussianMixtureModel):
             num_samples (int, optional): The number of samples to generate. If None, a single sample is returned.
             comps (np.ndarray | None, optional): If provided, specifies which components to sample from for each sample.
 
-        Returns:
+        Returns
+        -------
             tuple[TensorLike, TensorLike]: A tuple containing the sampled data points and their corresponding categorical labels.
         """
         # overriding the num_samples argument if
@@ -254,7 +263,7 @@ class AnnotatedGaussianMixtureModel(GaussianMixtureModel):
             # only one sample by default
             if num_samples is None:
                 num_samples = 1
-            # Sample mixture components based on the weights 
+            # Sample mixture components based on the weights
             comps = np.random.choice(self.num_components, size=num_samples, p=self.weights)
 
         # converting components array to list
@@ -297,7 +306,8 @@ class MultiAttributeAnnotatedGaussianMixtureModel(AnnotatedGaussianMixtureModel)
         Args:
             features (TensorLike): The feature vectors for which to sample categories.
 
-        Returns:
+        Returns
+        -------
             TensorLike: The sampled categorical labels.
         """
         sampled_categories = {}
@@ -317,7 +327,7 @@ class MultiAttributeAnnotatedGaussianMixtureModel(AnnotatedGaussianMixtureModel)
         # retrieving the perturbation identifiers
         perturbation_ids = list(self.params.keys())
         # mapping the identifier to the integer index
-        pert_ids = {idx: pert_id for idx, pert_id in enumerate(perturbation_ids)}
+        pert_ids = dict(enumerate(perturbation_ids))
         # defining list to append the retrieved param
         params = []
         # iterating over the components of each perturbation
@@ -326,7 +336,7 @@ class MultiAttributeAnnotatedGaussianMixtureModel(AnnotatedGaussianMixtureModel)
             pert_id = pert_ids[idx]
             # this will retrieve the corresponding parameters
             pert_params = self.params[pert_id]
-            # appending the current component params to the return list 
+            # appending the current component params to the return list
             params.append(pert_params[comp])
         return params
 
@@ -342,16 +352,16 @@ class MultiAttributeAnnotatedGaussianMixtureModel(AnnotatedGaussianMixtureModel)
             # checking that all components have the same number of samples
             # by using the first one as reference
             reference_num_samples = len(list(comps.values())[0])
-            for comp_cov, comp_ids in comps.items():
+            for comp_ids in comps.values():
                 num_samples = len(comp_ids)
-                msg = f""
+                msg = ""
                 assert num_samples == reference_num_samples, msg
         else:
             # only one sample by default
             if num_samples is None:
                 num_samples = 1
-            # Sample mixture components based on the weights 
-            comps = { 
+            # Sample mixture components based on the weights
+            comps = {
                 comp_cov: np.random.choice(len(comp_params), size=num_samples, p=self.weights)
                     for comp_cov, comp_params in self.params.items()
             }
@@ -375,13 +385,13 @@ class MultiAttributeAnnotatedGaussianMixtureModel(AnnotatedGaussianMixtureModel)
             params = self.get_params(comp)
             # retrieving the mean for current components
             means = torch.stack([param["mean"] for param in params], dim=0)
-            # computing the mean for current observations 
+            # computing the mean for current observations
             # by summing the means of each perturbation feature
             mean = torch.sum(means, dim=0)
 
             # retrieving the mean for current components
             covs = torch.stack([param["cov"] for param in params], dim=0)
-            # computing the mean for current observations 
+            # computing the mean for current observations
             # by summing the means of each perturbation feature
             cov = torch.sum(covs, dim=0)
 
@@ -422,19 +432,19 @@ class DoseResolvedAnnotatedGaussianMixtureModel(MultiAttributeAnnotatedGaussianM
         if interpolation_fn is None:
             interpolation_fn = lambda dose, source, target: (1 - dose)*source + dose*target
         self.interpolation_fn = interpolation_fn
-        
+
         if control_mean is None:
             control_mean = torch.zeros(self.dimensionality)
         self.control_mean = control_mean
         self.multi_attribute = multi_attribute
 
-        # handling parameters type in case is not multi-attribute 
+        # handling parameters type in case is not multi-attribute
         # to make it compatible with the methods of the parent class
         if not self.is_multi_attribute:
             self.params = {
                 "pert": self.params,
             }
-    
+
     @property
     def num_perturbations(
         self,
@@ -475,7 +485,7 @@ class DoseResolvedAnnotatedGaussianMixtureModel(MultiAttributeAnnotatedGaussianM
         # retrieving the perturbation identifiers
         perturbation_ids = list(self.params.keys())
         # mapping the identifier to the integer index
-        pert_ids = {idx: pert_id for idx, pert_id in enumerate(perturbation_ids)}
+        pert_ids = dict(enumerate(perturbation_ids))
 
         # iterating over the components of each observation
         for obs_id, comp in enumerate(comps_zipped):
@@ -493,7 +503,7 @@ class DoseResolvedAnnotatedGaussianMixtureModel(MultiAttributeAnnotatedGaussianM
                 covariate_cov = covariate_param["cov"]
 
                 # retrieving the perturbation covariante
-                pert_covariate = pert_ids[covariate_idx] 
+                pert_covariate = pert_ids[covariate_idx]
                 # retrieving corresponding dosage
                 obs_dosage = dosages[pert_covariate][obs_id]
 
@@ -530,12 +540,10 @@ class DoseResolvedAnnotatedGaussianMixtureModel(MultiAttributeAnnotatedGaussianM
     ) -> tuple[TensorLike, TensorLike, TensorLike]:
         """"""
 
-        # handling components type in case is not multi-attribute 
+        # handling components type in case is not multi-attribute
         # to make it compatible with the methods of the parent class
         if not isinstance(comps, dict):
-            comps = {
-                key: comps for key in self.params.keys()
-            }
+            comps = dict.fromkeys(self.params.keys(), comps)
 
         # overriding the num_samples argument if
         # the components are explicitly paxssed
@@ -543,16 +551,16 @@ class DoseResolvedAnnotatedGaussianMixtureModel(MultiAttributeAnnotatedGaussianM
             # checking that all components have the same number of samples
             # by using the first one as reference
             reference_num_samples = len(list(comps.values())[0])
-            for comp_cov, comp_ids in comps.items():
+            for comp_ids in comps.values():
                 num_samples = len(comp_ids)
-                msg = f""
+                msg = ""
                 assert num_samples == reference_num_samples, msg
         else:
             # only one sample by default
             if num_samples is None:
                 num_samples = 1
-            # Sample mixture components based on the weights 
-            comps = { 
+            # Sample mixture components based on the weights
+            comps = {
                 comp_cov: np.random.choice(len(comp_params), size=num_samples, p=self.weights)
                     for comp_cov, comp_params in self.params.items()
             }
@@ -565,19 +573,17 @@ class DoseResolvedAnnotatedGaussianMixtureModel(MultiAttributeAnnotatedGaussianM
             comps_copy[comp_cov] = comp_ids
         comps = comps_copy
 
-        # sampling from dosage prior if not specified        
+        # sampling from dosage prior if not specified
         if dosages is None:
             dosages = {
                 key: self.dosage_prior((num_samples, )) for key in self.params.keys()
             }
-        
-        # handling dosages type in case is not multi-attribute 
+
+        # handling dosages type in case is not multi-attribute
         # to make it compatible with the methods of the parent class
         if not isinstance(dosages, dict):
-            dosages = {
-                key: dosages for key in self.params.keys()
-            }
-        
+            dosages = dict.fromkeys(self.params.keys(), dosages)
+
         # retrieving dose-resolved interpolated distributions
         distributions = self.__interpolate_distributions(comps, dosages)
 

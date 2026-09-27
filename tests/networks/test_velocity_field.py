@@ -5,7 +5,6 @@ import pytest
 import torch
 
 import labcompass
-from labcompass.constants import ParamsFields, VFStepFields
 
 # dimensionalities
 batch_size = 4
@@ -172,7 +171,7 @@ class TestNeuralVelocityField:
             config,
         )
         vf = cvf.forward(t_test, x_test, cond, source=source)
- 
+
         # sanity check on velocity field output
         msg = f"The velocity field has the wrong shape. Got {vf.shape}, expected {(batch_size, flow_dim)}."
         assert vf.shape == (batch_size, flow_dim), msg

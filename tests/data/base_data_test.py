@@ -1,10 +1,5 @@
-from collections.abc import Sequence
-from typing import Any, Literal
 
 import pytest
-
-from labcompass.constants import DataFields
-from labcompass.data import DataContainer
 
 
 @pytest.mark.parametrize("sample_rep", [None, "states"])
@@ -13,7 +8,7 @@ from labcompass.data import DataContainer
 @pytest.mark.parametrize(
     "perturbation_covariates",
     [
-        None, 
+        None,
         {"treatment0":("treatment0_dose", )},
         {"treatment0":("treatment0_dose", "treatment0_time")},
         {"treatment0": ("treatment0_dose", ), "treatment1": ("treatment1_dose", )},
@@ -25,7 +20,7 @@ from labcompass.data import DataContainer
 @pytest.mark.parametrize(
     "perturbation_reps",
     [
-        None, 
+        None,
         {"treatment0":("treatment0_label", )},
         {"treatment0":("treatment0_label", "treatment0_group")},
         {"treatment0": ("treatment0_label", ), "treatment1": ("treatment1_label", )},

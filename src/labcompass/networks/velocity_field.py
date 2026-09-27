@@ -1,13 +1,11 @@
-import itertools
 import logging
-from collections.abc import Callable, Iterator
+from collections.abc import Callable
 
 import torch
 from torch import Tensor, nn
 
-from labcompass.constants import VFStepFields
-from labcompass.networks.blocks import BaseModule, ConditionEncoder, MLPBlock, ResnetBlock, FiLMBlock
 from labcompass.config.velocity_field import NeuralVelocityFieldConfig
+from labcompass.networks.blocks import BaseModule, ConditionEncoder, FiLMBlock, MLPBlock, ResnetBlock
 from labcompass.utils import sinusoidal_time_features
 
 logger = logging.getLogger(__name__)
@@ -45,7 +43,7 @@ class NeuralVelocityField(BaseModule):
         Initializes all necessary neural network modules including encoders, decoders, and inference models.
         """
         # state encoder
-        modules = {} 
+        modules = {}
         if self.config.encode_state:
             modules["x_encoder"] = MLPBlock(
                 self.config.flow_dim,
@@ -82,19 +80,19 @@ class NeuralVelocityField(BaseModule):
             )
         # ResNet
         self.resnet_blocks = None
-        if self.config.conditioning_type == "resnet":            
+        if self.config.conditioning_type == "resnet":
             resnet_blocks = []
             for _ in range(self.config.n_resnet_blocks):
                 resnet_blocks.append(
                     ResnetBlock(
-                        self.config.state_encoder_output_dim, 
-                        out_dim=None,  # dimensionality preserving 
-                        dropout_prob=self.config.resnet_dropout_prob, 
+                        self.config.state_encoder_output_dim,
+                        out_dim=None,  # dimensionality preserving
+                        dropout_prob=self.config.resnet_dropout_prob,
                         embedding_dim=self.config.resnet_embedding_dim,
                         normalization=self.config.resnet_normalization
                     )
-                ) 
-            modules["resnet_blocks"] = nn.ModuleList(resnet_blocks)   
+                )
+            modules["resnet_blocks"] = nn.ModuleList(resnet_blocks)
         #FiLM
         if self.config.conditioning_type == "film":
             modules["film_block"] = FiLMBlock(
@@ -107,7 +105,7 @@ class NeuralVelocityField(BaseModule):
             **self.config.decoder_mlp_kwargs
         )
         self.vf_modules = torch.nn.ModuleDict(modules)
-        
+
     def forward(
         self,
         t: Tensor,
@@ -150,12 +148,12 @@ class NeuralVelocityField(BaseModule):
             )
         if self.config.encode_time:
             t_latent = self.vf_modules["time_encoder"](t_latent)
-            
+
         # encoding conditions
         condition_latent = cond
         if self.config.use_guidance and self.config.encode_conditions:
             # sanity check (condition should be not None)
-            msg = f""
+            msg = ""
             assert cond is not None, msg
             condition_latent = self.vf_modules["condition_encoder"](cond)
             condition_latent = nn.functional.dropout(
@@ -164,13 +162,13 @@ class NeuralVelocityField(BaseModule):
             )
         elif self.config.use_guidance and (not self.config.encode_conditions):
             # sanity check (condition should be not None)
-            msg = f""
+            msg = ""
             assert cond is not None, msg
             cond_values = [val for key, val in cond.items() if key in self.config.perturbation_layers_before_pooling]
             condition_latent = torch.concatenate(cond_values, dim=-1)
 
 
-        
+
         # encoding states
         xt_latent = xt
         if self.config.encode_state:
@@ -180,7 +178,7 @@ class NeuralVelocityField(BaseModule):
         if self.config.conditioning_type == "concatenation":
             if self.config.use_guidance:
                 # sanity check (condition should be not None)
-                msg = f""
+                msg = ""
                 assert cond is not None, msg
                 latent_concat = torch.cat([t_latent, xt_latent, condition_latent], dim=-1)
             else:
@@ -188,18 +186,18 @@ class NeuralVelocityField(BaseModule):
         elif self.config.conditioning_type == "resnet":
             latent_concat = xt_latent
             if self.config.use_guidance:
-                condition_concat = torch.cat([t_latent, condition_latent], dim=-1)  
+                condition_concat = torch.cat([t_latent, condition_latent], dim=-1)
             else:
                 condition_concat = t_latent
         elif self.config.conditioning_type == "film":
-            msg = f"FiLM is only possible with guidance"
+            msg = "FiLM is only possible with guidance"
             assert self.config.use_guidance, msg
-            condition_concat = condition_latent 
+            condition_concat = condition_latent
             latent_concat = torch.cat([t_latent, xt_latent], dim=-1)
-     
+
         # encoding source
         if self.config.use_source_as_condition:
-            msg = f""
+            msg = ""
             assert source is not None, msg
             source_latent = source
             if self.config.encode_source:
@@ -209,8 +207,8 @@ class NeuralVelocityField(BaseModule):
                 latent_concat = torch.cat([latent_concat, source_latent], dim=-1)
             else:
                 condition_concat = torch.cat([condition_concat, source_latent], dim=-1)  # concatenate
-            
-        # ResNet 
+
+        # ResNet
         if self.config.conditioning_type == "resnet":
             latent_initial_shape = latent_concat.shape
             condition_initial_shape = condition_concat.shape
@@ -259,7 +257,7 @@ class NeuralVelocityField(BaseModule):
         """
         # sanity checks
         if self.config.use_source_as_condition:
-            msg = f""
+            msg = ""
             assert source is not None, msg
 
         def vf_fn(
@@ -298,11 +296,12 @@ class NeuralVelocityField(BaseModule):
     ) -> Tensor:
         """
         Computes the condition embedding.
-        
+
         Args:
             cond (dict[str, Tensor]): Conditioning variables.
-        
-        Returns:
+
+        Returns
+        -------
             Tensor: Condition embedding tensor.
         """
         # sanity check
