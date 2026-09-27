@@ -212,7 +212,7 @@ class FlowMatchingWithScore(FlowMatching):
         )
 
         self.validation_dataloader = None
-        if self.validation_data is not None:
+        if self.validation_data:
             self.validation_dataloader = ValidationDataLoader(
                 self.validation_data,
                 self.coupling,

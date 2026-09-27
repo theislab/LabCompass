@@ -33,6 +33,7 @@ class TargetPredictionModel(BaseModel):
         self.device = torch.device(self.device_id)
         self.target_prediction_model = None
         self.target_prediction_model_trained = False
+        self.validation_data = None
 
     def prepare_train_data(
         self,

@@ -32,8 +32,8 @@ provides a family of models for the design and analysis of perturbation experime
   (rectified, variance-preserving, ...).
 - `labcompass.ode` — ODE integration utilities for pushing cell states forward through a trained
   velocity field.
-- `labcompass.inverse` — the constrained-optimization machinery (KKT conditions, guided flows)
-  backing `InverseModel`.
+- `labcompass.inverse` — training-free guided sampling from a pretrained flow: `LossGuidedFlow` steers
+  generation towards a target loss, and `ImpliciDualGuidedFlow` handles inequality constraints via KKT conditions.
 - `labcompass.training` — training loops and loss/metric callbacks for each model type.
 - `labcompass.transforms` — invertible pre/post-processing transforms (standardization,
   composition of transforms).
@@ -43,55 +43,62 @@ provides a family of models for the design and analysis of perturbation experime
 
 ## Example usage
 
-```{python}
->>> # importing the required packages
->>> import labcompass
->>> import anndata as ad
->>> # initializing the AnnData object with the train data
->>> train_adata = ad.AnnData(...)
->>> # retrieving the default configurations
->>> config = labcompass.config.NeuralVelocityFieldConfig()
->>> # initializing the model with default settings
->>> cfm = labcompass.models.FlowMatching()
->>> # preparing the train data
->>> cfm.prepare_train_data(
-...     train_adata,
-...     control_key="is_control",
-...     perturbations=("Drug1", "Drug2"),
-...     perturbation_covariates={
-...            "Drug1": ("time", "dosage"),
-...            "Drug2": ("time", "dosage"),
-...     },
-...     perturbation_reps={
-...            "Drug1": ("drug_id", ),
-...            "Drug2": ("drug_id", ),
-...    },
-... )
->>> # preparing the model
->>> cfm.prepare_model(
-...    2, # dimensionality of the flow
-...    config, # configurations for the conditional velocity field
-... )
->>> # training the model
->>> cfm.train()
+A minimal end-to-end run on the synthetic data shipped with the package:
+
+```python
+import numpy as np
+import torch
+
+import labcompass
+
+# synthetic AnnData with control and perturbed cells
+adata = labcompass.sym.get_dummy_adata(states=np.random.normal(size=(850, 200)).astype(np.float32))
+
+# initializing the model
+cfm = labcompass.models.FlowMatching(coupling_type="ot", device_id="cpu")
+
+# preparing the train data
+cfm.prepare_train_data(
+    adata,
+    sample_rep="states",                                   # `.obsm` key holding the cell states
+    control_key="is_control",                              # boolean `.obs` column flagging control cells
+    perturbations=("treatment0",),                         # `.obs` columns holding the perturbations
+    perturbation_reps={"treatment0": "treatment0_label"},  # representation of each perturbation
+)
+
+# configuring the conditional velocity field; each perturbation representation gets its own
+# encoder, keyed as `repr_<perturbation>_<representation>`
+config = labcompass.config.NeuralVelocityFieldConfig(
+    flow_dim=adata.obsm["states"].shape[1],
+    encode_conditions=True,
+    perturbation_layers_before_pooling={
+        "repr_treatment0_treatment0_label": {"input_dim": 5, "output_dim": 16},
+    },
+)
+
+# preparing and training the model
+cfm.prepare_model(config)
+cfm.train(num_training_steps=500)
+
+# predicting perturbed states from control cells
+control_states = torch.from_numpy(adata.obsm["states"][adata.obs["is_control"].values][:16])
+preds = cfm.predict(
+    {
+        "condition": {"repr_treatment0_treatment0_label": torch.eye(5)[[0] * 16]},
+        "source": control_states,
+    },
+)
 ```
+
+Validation sets can be registered with `cfm.prepare_validation_data(name, adata)` and are evaluated every
+`valid_freq` steps during `cfm.train(...)`.
 
 ## Installation
 
 You need to have Python 3.10 or newer installed on your system.
-If you don't have Python installed, we recommend installing [Mambaforge][].
+If you don't have Python installed, we recommend installing [Miniforge][].
 
-There are several alternative options to install LabCompass:
-
-<!--
-1) Install the latest release of `LabCompass` from [PyPI][]:
-
-```bash
-pip install LabCompass
-```
--->
-
-1. Install the latest development version:
+Install the latest development version:
 
 ```bash
 pip install git+https://github.com/theislab/LabCompass.git@main
@@ -112,14 +119,11 @@ See [CHANGELOG.md](CHANGELOG.md).
 
 ## Contact
 
-For questions and help requests, you can reach out in the [scverse discourse][].
-If you found a bug, please use the [issue tracker][].
+For questions, help requests or bug reports, please use the [issue tracker][].
 
 ## Citation
 
 > t.b.a
 
-[mambaforge]: https://github.com/conda-forge/miniforge#mambaforge
-[scverse discourse]: https://discourse.scverse.org/
+[miniforge]: https://github.com/conda-forge/miniforge
 [issue tracker]: https://github.com/theislab/LabCompass/issues
-[pypi]: https://pypi.org/project/LabCompass
