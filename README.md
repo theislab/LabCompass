@@ -123,7 +123,17 @@ For questions, help requests or bug reports, please use the [issue tracker][].
 
 ## Citation
 
-> t.b.a
+@article {Paulas-Condori2026.10.07.756550,
+	author = {Paulas-Condori, Licyel and Palma, Alessandro and Consoli, Lorenzo and Rubio-Lara, Juan Antonio and Hidajat, Olivia and Zheng, Weizhong and Klein, Dominik and Martinuzzi, Deborah G. and Wu, Zhimeng and Dittadi, Andrea and Wilson, Nicola K. and G{\"o}ttgens, Berthold and Theis, Fabian J.},
+	title = {Generative inverse design steers human hematopoietic cell fate in vitro},
+	elocation-id = {2026.10.07.756550},
+	year = {2026},
+	doi = {10.64898/2026.10.07.756550},
+	publisher = {Cold Spring Harbor Laboratory},
+	eprint = {https://www.biorxiv.org/content/early/2026/10/09/2026.10.07.756550.full.pdf},
+	journal = {bioRxiv}
+}
+
 
 [miniforge]: https://github.com/conda-forge/miniforge
 [issue tracker]: https://github.com/theislab/LabCompass/issues
